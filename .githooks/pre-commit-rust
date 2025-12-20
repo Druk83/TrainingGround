@@ -1,36 +1,15 @@
-#!/bin/bash
-set -e
+﻿#!/bin/bash
+# Rust pre-commit hook
 
 echo "[INFO] Running pre-commit checks for Rust..."
 
-cd backend/rust-api
-
-# 1. Форматирование
-echo "Checking Rust formatting..."
-cargo fmt --check || {
-  echo "[ERROR] Rust formatting failed. Run: cargo fmt"
-  exit 1
-}
-
-# 2. Clippy (линтер)
-echo "Running Clippy..."
-cargo clippy --all-targets --all-features -- -D warnings || {
-  echo "[ERROR] Clippy warnings found. Fix them before commit."
-  exit 1
-}
-
-# 3. Unit тесты
-echo "Running Rust tests..."
-cargo test --lib || {
-  echo "[ERROR] Tests failed!"
-  exit 1
-}
-
-# 4. Security audit
-echo "Running cargo audit..."
-cargo audit || {
-  echo "[WARNING] Security vulnerabilities found!"
-  exit 1
-}
-
-echo "[SUCCESS] Rust checks passed!"
+if [ -d "backend/rust-api" ]; then
+    cd backend/rust-api
+    
+    cargo fmt --check || exit 1
+    cargo clippy --all-targets --all-features -- -D warnings || exit 1
+    cargo test --lib || exit 1
+    cargo audit || exit 1
+    
+    echo "[SUCCESS] Rust checks passed!"
+fi

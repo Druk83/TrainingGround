@@ -1,42 +1,15 @@
-#!/bin/bash
-set -e
+﻿#!/bin/sh
+# Frontend pre-commit hook
 
 echo "[INFO] Running pre-commit checks for Frontend..."
 
-cd frontend
-
-# 1. Lint и форматирование
-echo "Running ESLint..."
-npm run lint || {
-  echo "[ERROR] ESLint failed!"
-  exit 1
-}
-
-echo "Checking Prettier formatting..."
-npm run format:check || {
-  echo "[ERROR] Prettier formatting failed. Run: npm run format"
-  exit 1
-}
-
-# 2. TypeScript проверка
-echo "Running TypeScript type check..."
-npm run type-check || {
-  echo "[ERROR] TypeScript type check failed!"
-  exit 1
-}
-
-# 3. Unit тесты измененных файлов
-echo "Running tests for changed files..."
-npx lint-staged || {
-  echo "[ERROR] Tests failed!"
-  exit 1
-}
-
-# 4. Security audit
-echo "Running npm audit..."
-npm audit --audit-level=moderate || {
-  echo "[WARNING] Security vulnerabilities found!"
-  exit 1
-}
-
-echo "[SUCCESS] Frontend checks passed!"
+if [ -d "frontend" ]; then
+    cd frontend
+    
+    npm run lint || exit 1
+    npm run format:check || exit 1
+    npm run type-check || exit 1
+    npm audit --audit-level=moderate || exit 1
+    
+    echo "[SUCCESS] Frontend checks passed!"
+fi

@@ -129,21 +129,113 @@ TrainingGround/
 ## Работа с Docker
 
 ```bash
-# Запуск всех сервисов
+# Windows
+dev.cmd up          # Запуск всех сервисов
+dev.cmd down        # Остановка
+dev.cmd logs        # Просмотр логов
+
+# Или напрямую через docker-compose
+docker-compose up -d
+docker-compose down
+docker-compose logs -f
+
+# Linux/macOS
 make up
-
-# Остановка
 make down
-
-# Перезапуск отдельного сервиса
-docker-compose restart rust-api
-
-# Просмотр логов
 make logs
 
 # Очистка volumes (ВНИМАНИЕ: удалит все данные)
 docker-compose down -v
 ```
+
+## Инициализация хранилищ данных
+
+### Установка Python зависимостей
+
+Перед работой с инфраструктурными скриптами установите зависимости:
+
+```bash
+# Windows
+infra\install-deps.cmd
+
+# Linux/macOS
+pip install -r infra/requirements.txt
+```
+
+### MongoDB
+
+MongoDB инициализируется автоматически при первом запуске через скрипты в `infra/mongo-init/`:
+
+```bash
+# Проверить статус MongoDB
+docker-compose exec mongodb mongosh -u admin -p password --eval "db.adminCommand('ping')"
+
+# Просмотреть коллекции
+docker-compose exec mongodb mongosh -u admin -p password trainingground --eval "show collections"
+
+# Проверить индексы
+docker-compose exec mongodb mongosh -u admin -p password trainingground --eval "db.users.getIndexes()"
+```
+
+**Важно:** Change Streams требуют replica set. Для dev окружения:
+
+```bash
+docker-compose exec mongodb mongosh -u admin -p password --eval "rs.initiate()"
+```
+
+### Redis
+
+Redis готов к работе сразу после запуска:
+
+```bash
+# Проверить подключение
+docker-compose exec redis redis-cli -a redispass PING
+
+# Просмотреть ключи (ВНИМАНИЕ: не использовать в production)
+docker-compose exec redis redis-cli -a redispass --scan --pattern 'session:*'
+
+# Проверить Lua скрипт
+docker-compose exec redis redis-cli -a redispass --eval /path/to/purchase_hint.lua
+```
+
+### Qdrant
+
+Инициализация коллекций:
+
+```bash
+# Запустить скрипт инициализации
+python infra/qdrant/init_collections.py
+
+# Проверить коллекции через API
+curl http://localhost:6333/collections -H "api-key: qdrantkey"
+
+# Проверить количество векторов
+curl http://localhost:6333/collections/rules_embeddings -H "api-key: qdrantkey"
+```
+
+## Backup и Restore
+
+### Создание backup
+
+```bash
+# Полный backup (MongoDB + Redis + Qdrant)
+bash infra/scripts/backup.sh
+
+# Backup загружается в Yandex Object Storage
+# Location: s3://trainingground-backups/full_backup/{timestamp}/
+```
+
+### Восстановление из backup
+
+```bash
+# Список доступных backup'ов
+aws s3 ls s3://trainingground-backups/full_backup/ --endpoint-url https://storage.yandexcloud.net
+
+# Восстановить из конкретного backup
+bash infra/scripts/restore.sh 20251220_143000
+```
+
+**Время восстановления:** ≤15 минут (SLA requirement)
 
 ## Тестирование
 

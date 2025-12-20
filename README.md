@@ -17,8 +17,8 @@
 # Запустите скрипт настройки (Windows)
 powershell -ExecutionPolicy Bypass -File scripts/setup-dev.ps1
 
-# Или используйте Makefile
-make setup
+# Linux/macOS
+./scripts/setup-dev.sh
 ```
 
 ### 3. Конфигурация и запуск
@@ -27,7 +27,15 @@ make setup
 # Создайте .env файл
 copy .env.example .env
 
-# Установите зависимости
+# Запуск сервисов (Windows)
+dev.cmd up
+
+# Linux/macOS
+make up
+
+# Проверка статуса
+docker-compose ps
+```
 make dev-setup
 
 # Запустите локальное окружение
