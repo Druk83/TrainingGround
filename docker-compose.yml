@@ -1,0 +1,116 @@
+version: '3.9'
+
+services:
+  # MongoDB — основная БД
+  mongodb:
+    image: mongo:6
+    container_name: trainingground-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-password}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-trainingground}
+    volumes:
+      - mongodb_data:/data/db
+      - ./docker/mongo-init:/docker-entrypoint-initdb.d
+    networks:
+      - trainingground-network
+
+  # Redis — кеш и сессии
+  redis:
+    image: redis:7-alpine
+    container_name: trainingground-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redispass}
+    volumes:
+      - redis_data:/data
+    networks:
+      - trainingground-network
+
+  # Qdrant — векторная БД для семантического поиска
+  qdrant:
+    image: qdrant/qdrant:v1.8.0
+    container_name: trainingground-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-qdrantkey}
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - trainingground-network
+
+  # Rust API — основной backend
+  rust-api:
+    build:
+      context: ./backend/rust-api
+      dockerfile: Dockerfile
+    container_name: trainingground-rust-api
+    restart: unless-stopped
+    ports:
+      - "${RUST_API_PORT:-3000}:3000"
+    environment:
+      RUST_LOG: ${RUST_LOG:-info}
+      MONGODB_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD:-password}@mongodb:27017/${MONGO_DB:-trainingground}?authSource=admin
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redispass}@redis:6379
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-qdrantkey}
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key}
+      YANDEX_CLIENT_ID: ${YANDEX_CLIENT_ID}
+      YANDEX_CLIENT_SECRET: ${YANDEX_CLIENT_SECRET}
+      VK_CLIENT_ID: ${VK_CLIENT_ID}
+      VK_CLIENT_SECRET: ${VK_CLIENT_SECRET}
+      GOSUSLUGI_CLIENT_ID: ${GOSUSLUGI_CLIENT_ID}
+      GOSUSLUGI_CLIENT_SECRET: ${GOSUSLUGI_CLIENT_SECRET}
+    depends_on:
+      - mongodb
+      - redis
+      - qdrant
+    networks:
+      - trainingground-network
+    volumes:
+      - ./backend/rust-api/src:/app/src
+      - ./backend/rust-api/Cargo.toml:/app/Cargo.toml
+      - ./backend/rust-api/Cargo.lock:/app/Cargo.lock
+
+  # Python Generator — генерация заданий и объяснений
+  python-generator:
+    build:
+      context: ./backend/python-generator
+      dockerfile: Dockerfile
+    container_name: trainingground-python-generator
+    restart: unless-stopped
+    ports:
+      - "${PYTHON_API_PORT:-8000}:8000"
+    environment:
+      MONGODB_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD:-password}@mongodb:27017/${MONGO_DB:-trainingground}?authSource=admin
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redispass}@redis:6379
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-qdrantkey}
+      YANDEXGPT_API_KEY: ${YANDEXGPT_API_KEY}
+      YANDEXGPT_FOLDER_ID: ${YANDEXGPT_FOLDER_ID}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      - mongodb
+      - redis
+      - qdrant
+    networks:
+      - trainingground-network
+    volumes:
+      - ./backend/python-generator/src:/app/src
+      - ./backend/python-generator/tests:/app/tests
+
+networks:
+  trainingground-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  redis_data:
+  qdrant_data:

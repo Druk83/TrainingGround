@@ -1,0 +1,43 @@
+#!/bin/bash
+set -e
+
+echo "[INFO] Running pre-commit checks for Python..."
+
+cd backend/python-generator
+
+# 1. Форматирование (black)
+echo "Checking Python formatting..."
+black --check src/ tests/ || {
+  echo "[ERROR] Python formatting failed. Run: black src/ tests/"
+  exit 1
+}
+
+# 2. Линтер (ruff)
+echo "Running Ruff..."
+ruff check src/ tests/ || {
+  echo "[ERROR] Linting errors found!"
+  exit 1
+}
+
+# 3. Type checking (mypy)
+echo "Running mypy..."
+mypy src/ || {
+  echo "[ERROR] Type checking failed!"
+  exit 1
+}
+
+# 4. Unit тесты
+echo "Running Python tests..."
+pytest tests/unit/ --tb=short || {
+  echo "[ERROR] Tests failed!"
+  exit 1
+}
+
+# 5. Security audit
+echo "Running pip-audit..."
+pip-audit || {
+  echo "[WARNING] Security vulnerabilities found!"
+  exit 1
+}
+
+echo "[SUCCESS] Python checks passed!"

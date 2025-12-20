@@ -1,0 +1,210 @@
+# GitLab CI/CD конфигурация
+# Использует те же проверки, что и pre-commit хуки
+
+stages:
+  - validate
+  - test
+  - build
+  - deploy
+
+variables:
+  DOCKER_DRIVER: overlay2
+  RUST_VERSION: "1.75"
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+
+# Кеширование зависимостей
+cache:
+  paths:
+    - frontend/node_modules/
+    - backend/rust-api/target/
+    - backend/python-generator/.venv/
+
+# === Валидация (идентична pre-commit) ===
+
+lint:frontend:
+  stage: validate
+  image: node:${NODE_VERSION}
+  script:
+    - cd frontend
+    - npm ci
+    - npm run lint
+    - npm run format:check
+    - npm run type-check
+  allow_failure: false
+
+lint:rust:
+  stage: validate
+  image: rust:${RUST_VERSION}
+  script:
+    - cd backend/rust-api
+    - cargo fmt --check
+    - cargo clippy --all-targets --all-features -- -D warnings
+  allow_failure: false
+
+lint:python:
+  stage: validate
+  image: python:${PYTHON_VERSION}
+  script:
+    - cd backend/python-generator
+    - pip install black ruff mypy
+    - black --check src/ tests/
+    - ruff check src/ tests/
+    - mypy src/
+  allow_failure: false
+
+# Security audit
+audit:frontend:
+  stage: validate
+  image: node:${NODE_VERSION}
+  script:
+    - cd frontend
+    - npm ci
+    - npm audit --audit-level=moderate
+  allow_failure: false
+
+audit:rust:
+  stage: validate
+  image: rust:${RUST_VERSION}
+  before_script:
+    - cargo install cargo-audit
+  script:
+    - cd backend/rust-api
+    - cargo audit
+  allow_failure: false
+
+audit:python:
+  stage: validate
+  image: python:${PYTHON_VERSION}
+  script:
+    - cd backend/python-generator
+    - pip install pip-audit
+    - pip-audit
+  allow_failure: false
+
+# === Тестирование ===
+
+test:frontend:
+  stage: test
+  image: node:${NODE_VERSION}
+  script:
+    - cd frontend
+    - npm ci
+    - npm run test:coverage
+  coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: frontend/coverage/cobertura-coverage.xml
+
+test:rust:
+  stage: test
+  image: rust:${RUST_VERSION}
+  services:
+    - name: mongo:6
+      alias: mongodb
+    - name: redis:7-alpine
+      alias: redis
+  variables:
+    MONGODB_URI: "mongodb://testuser:testpass@mongodb:27017/test"
+    REDIS_URL: "redis://redis:6379"
+  script:
+    - cd backend/rust-api
+    - cargo test --all-features
+  artifacts:
+    reports:
+      junit: backend/rust-api/target/nextest/default/junit.xml
+
+test:python:
+  stage: test
+  image: python:${PYTHON_VERSION}
+  services:
+    - name: mongo:6
+      alias: mongodb
+    - name: redis:7-alpine
+      alias: redis
+  variables:
+    MONGODB_URI: "mongodb://testuser:testpass@mongodb:27017/test"
+    REDIS_URL: "redis://redis:6379"
+  script:
+    - cd backend/python-generator
+    - pip install -e ".[dev]"
+    - pytest --cov=src --cov-report=xml --cov-report=term
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: backend/python-generator/coverage.xml
+
+# === Сборка ===
+
+build:frontend:
+  stage: build
+  image: node:${NODE_VERSION}
+  script:
+    - cd frontend
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - frontend/dist/
+    expire_in: 1 week
+  only:
+    - main
+    - develop
+
+build:rust:
+  stage: build
+  image: rust:${RUST_VERSION}
+  script:
+    - cd backend/rust-api
+    - cargo build --release
+  artifacts:
+    paths:
+      - backend/rust-api/target/release/rust-api
+    expire_in: 1 week
+  only:
+    - main
+    - develop
+
+build:python:
+  stage: build
+  image: python:${PYTHON_VERSION}
+  script:
+    - cd backend/python-generator
+    - pip install build
+    - python -m build
+  artifacts:
+    paths:
+      - backend/python-generator/dist/
+    expire_in: 1 week
+  only:
+    - main
+    - develop
+
+# === Деплой ===
+
+deploy:staging:
+  stage: deploy
+  script:
+    - echo "Deploying to staging environment..."
+    # Добавить скрипты деплоя на staging
+  environment:
+    name: staging
+    url: https://staging.trainingground.ru
+  only:
+    - develop
+
+deploy:production:
+  stage: deploy
+  script:
+    - echo "Deploying to production environment..."
+    # Добавить скрипты деплоя на production
+  environment:
+    name: production
+    url: https://trainingground.ru
+  when: manual
+  only:
+    - main

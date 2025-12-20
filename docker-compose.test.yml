@@ -1,0 +1,44 @@
+version: '3.9'
+
+# Тестовое окружение — изолированное от dev
+services:
+  mongodb-test:
+    image: mongo:6
+    container_name: trainingground-mongodb-test
+    tmpfs:
+      - /data/db
+    ports:
+      - "27018:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: testuser
+      MONGO_INITDB_ROOT_PASSWORD: testpass
+      MONGO_INITDB_DATABASE: trainingground_test
+    networks:
+      - test-network
+
+  redis-test:
+    image: redis:7-alpine
+    container_name: trainingground-redis-test
+    tmpfs:
+      - /data
+    ports:
+      - "6380:6379"
+    command: redis-server --requirepass testredispass
+    networks:
+      - test-network
+
+  qdrant-test:
+    image: qdrant/qdrant:v1.8.0
+    container_name: trainingground-qdrant-test
+    tmpfs:
+      - /qdrant/storage
+    ports:
+      - "6335:6333"
+    environment:
+      QDRANT__SERVICE__API_KEY: testqdrantkey
+    networks:
+      - test-network
+
+networks:
+  test-network:
+    driver: bridge
