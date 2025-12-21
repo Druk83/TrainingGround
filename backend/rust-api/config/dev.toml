@@ -1,0 +1,44 @@
+# Development configuration for TrainingGround Rust API
+
+[server]
+host = "127.0.0.1"
+port = 8081
+workers = 4
+
+[database]
+mongo_uri = "mongodb://admin:password@localhost:27017"
+mongo_database = "trainingground_dev"
+
+[redis]
+uri = "redis://:redispass@127.0.0.1:6379/0"
+pool_size = 10
+connection_timeout_secs = 30
+
+[auth]
+jwt_secret = "dev-secret-change-in-production"
+jwt_expiration_hours = 24
+
+[rate_limit]
+per_user_per_minute = 100
+per_ip_per_minute = 200
+
+[python_api]
+url = "http://localhost:8000"
+timeout_secs = 2
+
+[hints]
+max_per_session = 2
+cost = 5
+cache_ttl_secs = 300
+
+[anticheat]
+speed_threshold_per_hour = 10
+repeated_threshold = 8
+suspicious_threshold = 5
+
+[session]
+ttl_secs = 3600
+
+[logging]
+level = "debug"
+format = "pretty"

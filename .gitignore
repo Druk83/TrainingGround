@@ -61,3 +61,15 @@ secrets/
 *.key
 *.crt
 requirements/пример/compose_sinonim.py
+tests/performance/results_answers.json
+tests/performance/results_answers.txt
+tests/performance/results_hints.json
+tests/performance/results_hints.txt
+tests/performance/results_sse.json
+tests/performance/results_sse.txt
+tests/performance/report.txt
+tests/performance/debug_output.txt
+tests/performance/docker_stats.txt
+tests/performance/mongo_server_status.txt
+tests/performance/results_smoke.jsondocker
+tests/performance/rust-api-logs.txtk6

@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = [
+    "backend/rust-api",
+]
+
+# Shared workspace dependencies (optional, can be used later)
+[workspace.dependencies]
+
+# Workspace-wide lints configuration (optional)
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+enum_glob_use = "deny"

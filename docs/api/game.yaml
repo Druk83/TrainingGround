@@ -1,0 +1,573 @@
+openapi: 3.0.3
+info:
+  title: TrainingGround Game API
+  description: |
+    REST API для Lesson Execution Service - управление игровыми сессиями,
+    проверка ответов, выдача подсказок, античит и таймеры.
+    
+    ## Основные возможности
+    - Управление сессиями (создание, получение, завершение)
+    - Проверка ответов с начислением баллов (S1-S5 правила)
+    - Выдача подсказок с ограничениями
+    - Античит система с блокировкой
+    - SSE стрим для таймеров
+    
+    ## Аутентификация
+    Используется JWT токен в заголовке `Authorization: Bearer <token>`.
+    
+    ## Rate Limiting
+    - 100 запросов/минуту на пользователя
+    - 200 запросов/минуту на IP
+    
+  version: 1.0.0
+  contact:
+    name: TrainingGround Team
+    email: dev@trainingground.com
+
+servers:
+  - url: http://localhost:8081/api/v1
+    description: Development server
+  - url: https://api.trainingground.com/api/v1
+    description: Production server
+
+tags:
+  - name: sessions
+    description: Управление игровыми сессиями
+  - name: answers
+    description: Проверка ответов и начисление баллов
+  - name: hints
+    description: Получение подсказок
+  - name: stream
+    description: Server-Sent Events для таймеров
+
+paths:
+  /sessions:
+    post:
+      tags:
+        - sessions
+      summary: Создать новую сессию
+      description: |
+        Создает новую игровую сессию для пользователя с заданием.
+        Резервирует задание из MongoDB и записывает сессию в Redis с TTL 3600 сек.
+      operationId: createSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+            examples:
+              basic:
+                value:
+                  user_id: "user-123"
+                  task_id: "task-particles-01"
+                  group_id: null
+      responses:
+        '201':
+          description: Сессия успешно создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateSessionResponse'
+              examples:
+                success:
+                  value:
+                    session_id: "sess_a1b2c3d4"
+                    task:
+                      id: "task-particles-01"
+                      title: "Частицы НЕ и НИ"
+                      description: "Определите правильное написание частицы"
+                      time_limit_seconds: 300
+                    expires_at: "2025-12-21T15:30:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /sessions/{id}:
+    get:
+      tags:
+        - sessions
+      summary: Получить информацию о сессии
+      description: Возвращает текущее состояние сессии из Redis
+      operationId: getSession
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Информация о сессии
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+              examples:
+                active:
+                  value:
+                    id: "sess_a1b2c3d4"
+                    user_id: "user-123"
+                    task_id: "task-particles-01"
+                    group_id: null
+                    started_at: "2025-12-21T15:00:00Z"
+                    expires_at: "2025-12-21T15:30:00Z"
+                    status: "active"
+                    hints_used: 1
+                    score: 25
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /sessions/{id}/complete:
+    post:
+      tags:
+        - sessions
+      summary: Завершить сессию
+      description: Помечает сессию как завершенную и удаляет из Redis
+      operationId: completeSession
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Сессия успешно завершена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Session completed successfully"
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /sessions/{id}/answers:
+    post:
+      tags:
+        - answers
+      summary: Отправить ответ на задание
+      description: |
+        Проверяет ответ пользователя и начисляет баллы согласно правилам S1-S5:
+        - S1: +10 базовых очков за правильный ответ
+        - S2: 0 очков за неправильный, сброс серии
+        - S3: -5 очков за подсказку (в /hints)
+        - S4: +5 бонус комбо при серии ≥3
+        - S5: отслеживание 80% порога для уровня
+        
+        Поддерживает идемпотентность через `idempotency_key`.
+        Проверяет timeout сессии и античит.
+      operationId: submitAnswer
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitAnswerRequest'
+            examples:
+              correct:
+                value:
+                  answer: "не"
+                  idempotency_key: "sess_a1b2c3d4:task-particles-01:1"
+              incorrect:
+                value:
+                  answer: "ни"
+                  idempotency_key: "sess_a1b2c3d4:task-particles-01:2"
+      responses:
+        '200':
+          description: Ответ обработан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitAnswerResponse'
+              examples:
+                correct_first:
+                  value:
+                    correct: true
+                    score_awarded: 10
+                    combo_bonus: 0
+                    total_score: 10
+                    current_streak: 1
+                    feedback: "Correct!"
+                correct_combo:
+                  value:
+                    correct: true
+                    score_awarded: 10
+                    combo_bonus: 5
+                    total_score: 35
+                    current_streak: 4
+                    feedback: "Correct!"
+                incorrect:
+                  value:
+                    correct: false
+                    score_awarded: 0
+                    combo_bonus: 0
+                    total_score: 35
+                    current_streak: 0
+                    feedback: "Incorrect answer"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: Пользователь заблокирован античитом
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                blocked:
+                  value:
+                    error: "User is blocked due to suspicious activity"
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          description: Сессия истекла (timeout)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                expired:
+                  value:
+                    error: "Session has expired"
+
+  /sessions/{id}/hints:
+    post:
+      tags:
+        - hints
+      summary: Запросить подсказку
+      description: |
+        Выдает подсказку для текущего задания с учетом:
+        - Лимита 2 подсказки на сессию (Lua script)
+        - Списания -5 баллов ДО выдачи подсказки (S3)
+        - Интеграции с Python Explanation API (timeout 2s)
+        - Fallback на статичные подсказки из MongoDB
+        - Кэширования в Redis (TTL 5 мин)
+      operationId: requestHint
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestHintRequest'
+            examples:
+              basic:
+                value:
+                  user_id: "user-123"
+      responses:
+        '200':
+          description: Подсказка выдана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestHintResponse'
+              examples:
+                from_api:
+                  value:
+                    hint_text: "Частица НЕ используется для отрицания глаголов и существительных"
+                    hints_remaining: 1
+                    cost_deducted: 5
+                    source: "python-api"
+                from_cache:
+                  value:
+                    hint_text: "Обратите внимание на контекст предложения"
+                    hints_remaining: 0
+                    cost_deducted: 5
+                    source: "cache"
+        '400':
+          description: Превышен лимит подсказок
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                limit:
+                  value:
+                    error: "Maximum hints limit (2) reached for this session"
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /sessions/{id}/stream:
+    get:
+      tags:
+        - stream
+      summary: SSE стрим таймера сессии
+      description: |
+        Server-Sent Events стрим с событиями таймера:
+        - `timer-tick`: каждую секунду с оставшимся временем
+        - `time-expired`: когда время истекло
+        
+        Формат событий SSE:
+        ```
+        event: timer-tick
+        data: {"type":"timer-tick","remaining":299,"elapsed":1,"total":300}
+        
+        event: time-expired
+        data: {"type":"time-expired","session_id":"sess_a1b2c3d4"}
+        ```
+      operationId: sessionStream
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: SSE стрим установлен
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                format: event-stream
+              examples:
+                tick:
+                  value: |
+                    event: timer-tick
+                    data: {"type":"timer-tick","remaining":299,"elapsed":1,"total":300}
+                    
+                expired:
+                  value: |
+                    event: time-expired
+                    data: {"type":"time-expired","session_id":"sess_a1b2c3d4"}
+                    
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  schemas:
+    CreateSessionRequest:
+      type: object
+      required:
+        - user_id
+        - task_id
+      properties:
+        user_id:
+          type: string
+          description: ID пользователя
+          example: "user-123"
+        task_id:
+          type: string
+          description: ID задания из коллекции tasks
+          example: "task-particles-01"
+        group_id:
+          type: string
+          nullable: true
+          description: ID группы (опционально)
+          example: "group-8b"
+
+    CreateSessionResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          description: Уникальный ID сессии
+          example: "sess_a1b2c3d4"
+        task:
+          $ref: '#/components/schemas/TaskInfo'
+        expires_at:
+          type: string
+          format: date-time
+          description: Время истечения сессии
+          example: "2025-12-21T15:30:00Z"
+
+    TaskInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "task-particles-01"
+        title:
+          type: string
+          example: "Частицы НЕ и НИ"
+        description:
+          type: string
+          example: "Определите правильное написание частицы"
+        time_limit_seconds:
+          type: integer
+          format: int32
+          example: 300
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "sess_a1b2c3d4"
+        user_id:
+          type: string
+          example: "user-123"
+        task_id:
+          type: string
+          example: "task-particles-01"
+        group_id:
+          type: string
+          nullable: true
+          example: null
+        started_at:
+          type: string
+          format: date-time
+          example: "2025-12-21T15:00:00Z"
+        expires_at:
+          type: string
+          format: date-time
+          example: "2025-12-21T15:30:00Z"
+        status:
+          type: string
+          enum: [active, completed, expired, abandoned]
+          example: "active"
+        hints_used:
+          type: integer
+          format: int32
+          example: 1
+        score:
+          type: integer
+          format: int32
+          example: 25
+
+    SubmitAnswerRequest:
+      type: object
+      required:
+        - answer
+      properties:
+        answer:
+          type: string
+          description: Ответ пользователя
+          example: "не"
+        idempotency_key:
+          type: string
+          nullable: true
+          description: |
+            Ключ идемпотентности для предотвращения дублирования.
+            Если не указан, используется `{session_id}:{task_id}`.
+            Кэшируется в Redis на 24 часа.
+          example: "sess_a1b2c3d4:task-particles-01:1"
+
+    SubmitAnswerResponse:
+      type: object
+      properties:
+        correct:
+          type: boolean
+          description: Правильность ответа
+          example: true
+        score_awarded:
+          type: integer
+          format: int32
+          description: Базовые очки (S1: +10 или S2: 0)
+          example: 10
+        combo_bonus:
+          type: integer
+          format: int32
+          description: Бонус комбо (S4: +5 при streak ≥3)
+          example: 5
+        total_score:
+          type: integer
+          format: int32
+          description: Общий счет пользователя
+          example: 35
+        current_streak:
+          type: integer
+          format: int32
+          description: Текущая серия правильных ответов
+          example: 4
+        feedback:
+          type: string
+          nullable: true
+          description: Текстовая обратная связь
+          example: "Correct!"
+
+    RequestHintRequest:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          description: ID пользователя
+          example: "user-123"
+
+    RequestHintResponse:
+      type: object
+      properties:
+        hint_text:
+          type: string
+          description: Текст подсказки
+          example: "Частица НЕ используется для отрицания"
+        hints_remaining:
+          type: integer
+          format: int32
+          description: Оставшееся количество подсказок
+          example: 1
+        cost_deducted:
+          type: integer
+          format: int32
+          description: Списанные баллы (S3: -5)
+          example: 5
+        source:
+          type: string
+          enum: [python-api, cache, fallback]
+          description: Источник подсказки
+          example: "python-api"
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Описание ошибки
+          example: "Session not found"
+
+  parameters:
+    SessionId:
+      name: id
+      in: path
+      required: true
+      description: ID сессии
+      schema:
+        type: string
+        example: "sess_a1b2c3d4"
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            validation:
+              value:
+                error: "Invalid request parameters"
+
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            session:
+              value:
+                error: "Session not found"
+
+    TooManyRequests:
+      description: Превышен лимит запросов
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            rate_limit:
+              value:
+                error: "Rate limit exceeded: 100 requests per minute per user"
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT токен с claims:
+        - sub: user_id
+        - role: student/teacher/admin
+        - group_ids: массив ID групп
+        - exp: время истечения
+        - iat: время выдачи
+
+security:
+  - bearerAuth: []
