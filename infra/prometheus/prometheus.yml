@@ -1,0 +1,25 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Rust API метрики (когда добавим /metrics endpoint)
+  - job_name: 'rust-api'
+    static_configs:
+      - targets: ['rust-api:8081']
+    metrics_path: '/metrics'
+
+  # MongoDB метрики
+  - job_name: 'mongodb'
+    static_configs:
+      - targets: ['mongodb-exporter:9216']
+
+  # Redis метрики
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

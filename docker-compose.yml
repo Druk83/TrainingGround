@@ -1,12 +1,10 @@
 version: '3.9'
 
 services:
-  # MongoDB — основная БД
-  # NOTE: Replica set отключен для dev окружения из-за сложностей с keyfile на Windows
-  # Для production используйте MongoDB Atlas или настройте keyfile вручную
-  mongodb:
+  # MongoDB Replica Set — 3 ноды для поддержки Change Streams
+  mongodb-primary:
     image: mongo:6
-    container_name: trainingground-mongodb
+    container_name: trainingground-mongodb-primary
     restart: unless-stopped
     ports:
       - "27017:27017"
@@ -14,9 +12,17 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
       MONGO_INITDB_DATABASE: ${MONGO_DB:-trainingground}
+    command: >
+      bash -c "
+        mkdir -p /data/keyfile &&
+        echo 'dHJhaW5pbmdncm91bmRkZXZrZXlwbGVhc2VjaGFuZ2VpbnByb2R1Y3Rpb24K' > /data/keyfile/mongo-keyfile &&
+        chmod 400 /data/keyfile/mongo-keyfile &&
+        chown mongodb:mongodb /data/keyfile/mongo-keyfile &&
+        exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /data/keyfile/mongo-keyfile
+      "
     volumes:
-      - mongodb_data:/data/db
-      - ./infra/mongo-init:/docker-entrypoint-initdb.d
+      - mongodb_primary_data:/data/db
+      - ./infra/mongo-init:/docker-entrypoint-initdb.d:ro
     networks:
       - trainingground-network
     healthcheck:
@@ -24,6 +30,86 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  mongodb-secondary1:
+    image: mongo:6
+    container_name: trainingground-mongodb-secondary1
+    restart: unless-stopped
+    ports:
+      - "27018:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    command: >
+      bash -c "
+        mkdir -p /data/keyfile &&
+        echo 'dHJhaW5pbmdncm91bmRkZXZrZXlwbGVhc2VjaGFuZ2VpbnByb2R1Y3Rpb24K' > /data/keyfile/mongo-keyfile &&
+        chmod 400 /data/keyfile/mongo-keyfile &&
+        chown mongodb:mongodb /data/keyfile/mongo-keyfile &&
+        exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /data/keyfile/mongo-keyfile
+      "
+    volumes:
+      - mongodb_secondary1_data:/data/db
+    networks:
+      - trainingground-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb-secondary2:
+    image: mongo:6
+    container_name: trainingground-mongodb-secondary2
+    restart: unless-stopped
+    ports:
+      - "27019:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    command: >
+      bash -c "
+        mkdir -p /data/keyfile &&
+        echo 'dHJhaW5pbmdncm91bmRkZXZrZXlwbGVhc2VjaGFuZ2VpbnByb2R1Y3Rpb24K' > /data/keyfile/mongo-keyfile &&
+        chmod 400 /data/keyfile/mongo-keyfile &&
+        chown mongodb:mongodb /data/keyfile/mongo-keyfile &&
+        exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /data/keyfile/mongo-keyfile
+      "
+    volumes:
+      - mongodb_secondary2_data:/data/db
+    networks:
+      - trainingground-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Инициализатор MongoDB Replica Set — запускается один раз для настройки реплика-сета
+  mongodb-init:
+    image: mongo:6
+    container_name: trainingground-mongodb-init
+    restart: "no"
+    depends_on:
+      mongodb-primary:
+        condition: service_healthy
+      mongodb-secondary1:
+        condition: service_healthy
+      mongodb-secondary2:
+        condition: service_healthy
+    volumes:
+      - ./infra/mongo-init:/scripts:ro
+    networks:
+      - trainingground-network
+    command: >
+      bash -c "
+        echo 'Waiting for MongoDB nodes to be ready...' &&
+        sleep 5 &&
+        mongosh --host mongodb-primary:27017 -u ${MONGO_USER} -p ${MONGO_PASSWORD} --authenticationDatabase admin --file /scripts/03_replica_set.js &&
+        echo 'Replica set initialized successfully'
+      "
+    profiles:
+      - init
 
   # Redis — кеш и сессии
   redis:
@@ -53,7 +139,7 @@ services:
     networks:
       - trainingground-network
 
-  # Rust API — Lesson Execution Service (A2)
+  # Rust API — сервис выполнения уроков (A2)
   rust-api:
     build:
       context: ./backend/rust-api
@@ -73,14 +159,14 @@ services:
       SSE_MAX_STREAM_SECONDS: ${SSE_MAX_STREAM_SECONDS:-3600}
       SSE_TICK_INTERVAL_MS: ${SSE_TICK_INTERVAL_MS:-1000}
       ANTICHEAT_DISABLED: ${ANTICHEAT_DISABLED:-0}
-      APP__DATABASE__MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/${MONGO_DB:-trainingground}?authSource=admin
+      APP__DATABASE__MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb-primary:27017,mongodb-secondary1:27017,mongodb-secondary2:27017/${MONGO_DB:-trainingground}?authSource=admin&replicaSet=rs0
       APP__REDIS__URI: redis://:${REDIS_PASSWORD}@redis:6379
       APP__AUTH__JWT_SECRET: ${JWT_SECRET}
       APP__PYTHON_API__URL: http://python-generator:8000
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4318}
       OTEL_SERVICE_NAME: rust-api
     depends_on:
-      mongodb:
+      mongodb-primary:
         condition: service_healthy
       redis:
         condition: service_started
@@ -93,21 +179,88 @@ services:
       start_period: 10s
       retries: 3
 
-  # Grafana — optional monitoring dashboard
+  # Prometheus — сбор метрик
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: trainingground-prometheus
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - trainingground-network
+
+  # Jaeger — distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.52
+    container_name: trainingground-jaeger
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "4317:4317"    # OTLP gRPC receiver
+      - "4318:4318"    # OTLP HTTP receiver
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - trainingground-network
+
+  # MongoDB Exporter — метрики MongoDB для Prometheus
+  mongodb-exporter:
+    image: percona/mongodb_exporter:0.40
+    container_name: trainingground-mongodb-exporter
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    ports:
+      - "9216:9216"
+    environment:
+      - MONGODB_URI=mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb-primary:27017/?authSource=admin&replicaSet=rs0
+    networks:
+      - trainingground-network
+    depends_on:
+      - mongodb-primary
+
+  # Redis Exporter — метрики Redis для Prometheus
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.55.0
+    container_name: trainingground-redis-exporter
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    ports:
+      - "9121:9121"
+    environment:
+      - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    networks:
+      - trainingground-network
+    depends_on:
+      - redis
+
+  # Grafana — визуализация метрик и дашборды
   grafana:
     image: grafana/grafana:10.2.2
     container_name: trainingground-grafana
+    profiles: ["monitoring"]
     restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: redis-datasource
     volumes:
       - ./infra/grafana/provisioning:/etc/grafana/provisioning
       - ./infra/grafana/dashboards:/var/lib/grafana/dashboards
       - grafana_data:/var/lib/grafana
     networks:
       - trainingground-network
+    depends_on:
+      - prometheus
 
   # Python Generator — генерация заданий и объяснений (будет добавлен в A3)
   # python-generator:
@@ -141,7 +294,10 @@ networks:
     driver: bridge
 
 volumes:
-  mongodb_data:
+  mongodb_primary_data:
+  mongodb_secondary1_data:
+  mongodb_secondary2_data:
   redis_data:
   qdrant_data:
+  prometheus_data:
   grafana_data:
