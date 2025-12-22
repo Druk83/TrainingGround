@@ -39,12 +39,12 @@ mongodb:
 
 #### Инициализация replica set
 ```bash
-docker-compose exec mongodb mongosh -u admin -p password --eval "rs.initiate()"
+docker-compose exec mongodb mongosh -u ${MONGO_USER:-admin} -p ${MONGO_PASSWORD:-password} --eval "rs.initiate()"
 ```
 
 #### Проверка
 ```bash
-docker-compose exec mongodb mongosh -u admin -p password --eval "rs.status()"
+docker-compose exec mongodb mongosh -u ${MONGO_USER:-admin} -p ${MONGO_PASSWORD:-password} --eval "rs.status()"
 ```
 
 ## Альтернатива для dev: Change Stream эмуляция

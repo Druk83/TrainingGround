@@ -27,11 +27,20 @@ powershell -ExecutionPolicy Bypass -File scripts/setup-dev.ps1
 # Создайте .env файл
 copy .env.example .env
 
+# Сгенерируйте безопасные пароли
+powershell -ExecutionPolicy Bypass -File infra\scripts\generate_secrets.ps1
+
+# Проверьте конфигурацию
+infra\scripts\check_env.cmd
+
 # Запуск сервисов (Windows)
 dev.cmd up
 
 # Linux/macOS
-make up
+# cp .env.example .env
+# bash infra/scripts/generate_secrets.sh
+# bash infra/scripts/check_env.sh
+# make up
 
 # Проверка статуса
 docker-compose ps

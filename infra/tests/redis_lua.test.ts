@@ -10,7 +10,7 @@ import { join } from 'path';
 const redis = new Redis({
   host: process.env.REDIS_HOST || 'localhost',
   port: parseInt(process.env.REDIS_PORT || '6379'),
-  password: process.env.REDIS_PASSWORD || 'redispass',
+  password: process.env.REDIS_PASSWORD, // Required - no fallback for security
 });
 
 const purchaseHintScript = readFileSync(join(__dirname, '../redis/purchase_hint.lua'), 'utf-8');

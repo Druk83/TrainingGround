@@ -86,12 +86,12 @@ for %t in (answers hints sse) do k6 run tests\performance\%t.js
 
 1. **MongoDB**: добавьте тестовый task.
    ```bash
-   docker exec -it trainingground-mongodb mongosh -u admin -p password --authenticationDatabase admin \
+   docker exec -it trainingground-mongodb mongosh -u ${MONGO_USER:-admin} -p ${MONGO_PASSWORD:-password} --authenticationDatabase admin \
      --eval "use trainingground; db.tasks.updateOne({_id:'task-1'},{\$set:{correct_answer:'correct_answer',static_hint:'Test hint'}},{upsert:true})"
    ```
 2. **Redis**: очистите состояние.
    ```bash
-   docker exec -it trainingground-redis redis-cli -a redispass FLUSHDB
+  docker exec -it trainingground-redis redis-cli -a ${REDIS_PASSWORD:-redispass} FLUSHDB
    ```
 3. **JWT**: используйте валидный токен (можно стаб из README).
 

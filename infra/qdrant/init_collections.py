@@ -8,12 +8,16 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, HnswConfigDiff, PayloadSchemaType, PayloadIndexInfo
 
 # Configuration
-QDRANT_URL = "http://localhost:6333"
-QDRANT_API_KEY = "qdrantkey"
+import os
+
+QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", None)
 VECTOR_DIM = 768  # sentence-transformers/paraphrase-multilingual-mpnet-base-v2
 
 def create_collections():
     """Initialize all Qdrant collections"""
+    if not QDRANT_API_KEY:
+        print("[WARNING] QDRANT_API_KEY is not set. Using unauthenticated requests or default key if Qdrant is configured that way.")
     client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
     
     print("[INFO] Creating Qdrant collections...")

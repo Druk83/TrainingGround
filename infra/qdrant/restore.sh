@@ -4,7 +4,10 @@
 set -e
 
 QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
-QDRANT_API_KEY="${QDRANT_API_KEY:-qdrantkey}"
+if [ -z "${QDRANT_API_KEY}" ]; then
+  echo "ERROR: QDRANT_API_KEY must be set"
+  exit 1
+fi
 S3_BUCKET="${S3_BUCKET:-trainingground-backups}"
 S3_ENDPOINT="${S3_ENDPOINT:-https://storage.yandexcloud.net}"
 

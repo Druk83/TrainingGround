@@ -12,8 +12,26 @@ from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 
 # Configuration
-MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://admin:password@localhost:27017/trainingground?authSource=admin")
-REDIS_URL = os.getenv("REDIS_URL", "redis://:redispass@localhost:6379")
+# Build MONGODB_URI from environment variables if not explicitly provided
+MONGODB_URI = os.getenv("MONGODB_URI")
+if not MONGODB_URI:
+    mongo_user = os.getenv("MONGO_USER", "admin")
+    mongo_password = os.getenv("MONGO_PASSWORD")
+    if not mongo_password:
+        print("ERROR: MONGO_PASSWORD must be set", file=sys.stderr)
+        sys.exit(1)
+    MONGODB_URI = f"mongodb://{mongo_user}:{mongo_password}@localhost:27017/trainingground?authSource=admin"
+
+# Build REDIS_URL if not provided
+REDIS_URL = os.getenv("REDIS_URL")
+if not REDIS_URL:
+    redis_host = os.getenv("REDIS_HOST", "localhost")
+    redis_port = os.getenv("REDIS_PORT", "6379")
+    redis_password = os.getenv("REDIS_PASSWORD")
+    if not redis_password:
+        print("ERROR: REDIS_PASSWORD must be set", file=sys.stderr)
+        sys.exit(1)
+    REDIS_URL = f"redis://:{redis_password}@{redis_host}:{redis_port}"
 STREAM_NAME = "content:changes"
 MAX_STREAM_LENGTH = 1000
 

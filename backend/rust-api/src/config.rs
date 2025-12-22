@@ -12,8 +12,12 @@ pub struct Config {
 
 impl Config {
     pub fn load() -> Result<Self, config::ConfigError> {
-        // Load environment variables from .env files
-        dotenvy::dotenv().ok();
+        // Load environment variables from root .env file (two levels up)
+        // Try root .env first, then fallback to local .env
+        if dotenvy::from_path("../../.env").is_err() {
+            // Fallback to current directory .env for backward compatibility
+            dotenvy::dotenv().ok();
+        }
 
         // Determine environment (defaults to dev)
         let env = env::var("APP_ENV").unwrap_or_else(|_| "dev".to_string());
@@ -33,12 +37,24 @@ impl Config {
         let mongo_uri = settings
             .get_string("database.mongo_uri")
             .or_else(|_| env::var("MONGO_URI"))
-            .unwrap_or_else(|_| "mongodb://admin:password@localhost:27017".to_string());
+            .unwrap_or_else(|_| {
+                let user = env::var("MONGO_USER").expect("MONGO_USER must be set");
+                let password = env::var("MONGO_PASSWORD").expect("MONGO_PASSWORD must be set");
+                let db = env::var("MONGO_DB").unwrap_or_else(|_| "trainingground".to_string());
+                eprintln!("WARNING: Building MongoDB URI from MONGO_USER/MONGO_PASSWORD env vars");
+                format!("mongodb://{}:{}@localhost:27017/{}?authSource=admin", user, password, db)
+            });
 
         let redis_uri = settings
             .get_string("redis.uri")
             .or_else(|_| env::var("REDIS_URI"))
-            .unwrap_or_else(|_| "redis://:redispass@127.0.0.1:6379/0".to_string());
+            .unwrap_or_else(|_| {
+                let host = env::var("REDIS_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+                let port = env::var("REDIS_PORT").unwrap_or_else(|_| "6379".to_string());
+                let password = env::var("REDIS_PASSWORD").expect("REDIS_PASSWORD must be set");
+                eprintln!("WARNING: Building Redis URI from REDIS_PASSWORD env var");
+                format!("redis://:{}@{}:{}/0", password, host, port)
+            });
 
         let mongo_database = settings
             .get_string("database.mongo_database")
@@ -48,7 +64,13 @@ impl Config {
         let jwt_secret = settings
             .get_string("auth.jwt_secret")
             .or_else(|_| env::var("JWT_SECRET"))
-            .unwrap_or_else(|_| "dev-secret-change-in-production".to_string());
+            .unwrap_or_else(|_| {
+                if env == "prod" {
+                    panic!("FATAL: JWT_SECRET must be set in production!");
+                }
+                eprintln!("WARNING: Using default JWT_SECRET (dev mode only!)");
+                "dev-secret-only-for-local-testing".to_string()
+            });
 
         let python_api_url = settings
             .get_string("python_api.url")

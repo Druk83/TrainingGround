@@ -107,8 +107,9 @@ test:rust:
     - name: redis:7-alpine
       alias: redis
   variables:
-    MONGODB_URI: "mongodb://testuser:testpass@mongodb:27017/test"
-    REDIS_URL: "redis://redis:6379"
+    # CI test credentials - isolated environment only
+    MONGODB_URI: "mongodb://${MONGO_USER:-ci_test_user}:${MONGO_PASSWORD:-ci_test_P@ssw0rd_2025}@mongodb:27017/test"
+    REDIS_URL: "redis://:${REDIS_PASSWORD:-ci_redis_T3st_2025}@redis:6379"
   script:
     - cd backend/rust-api
     - cargo test --all-features
@@ -125,8 +126,9 @@ test:python:
     - name: redis:7-alpine
       alias: redis
   variables:
-    MONGODB_URI: "mongodb://testuser:testpass@mongodb:27017/test"
-    REDIS_URL: "redis://redis:6379"
+    # CI test credentials - isolated environment only
+    MONGODB_URI: "mongodb://${MONGO_USER:-ci_test_user}:${MONGO_PASSWORD:-ci_test_P@ssw0rd_2025}@mongodb:27017/test"
+    REDIS_URL: "redis://:${REDIS_PASSWORD:-ci_redis_T3st_2025}@redis:6379"
   script:
     - cd backend/python-generator
     - pip install -e ".[dev]"
@@ -208,3 +210,39 @@ deploy:production:
   when: manual
   only:
     - main
+
+security:secrets-scan:
+  stage: validate
+  image: python:3.14
+  script:
+    - echo "Scanning repository for hardcoded default passwords..."
+    - |
+      set -e
+      python - <<'PY'
+  import re,sys,subprocess
+  p = subprocess.run(['git','ls-files'], capture_output=True, text=True)
+  files = p.stdout.splitlines()
+  # Patterns to search for
+  pattern = re.compile(r"\b(admin:password|admin:admin|redispass|testpass|testredispass|qdrantkey|your-secret-key-change-in-prod)\b", re.I)
+  # Whitelist files or directories where defaults are acceptable (docs, infra scripts, test compose files)
+  whitelist = re.compile(r"^(docs/|infra/|docker-compose.test.yml|\.env.example$)")
+  failed=[]
+  for f in files:
+    if whitelist.search(f):
+      continue
+    if f.endswith(('.png','.jpg','.jpeg','.svg','.lock','.bin')): continue
+    try:
+      txt=open(f,encoding='utf-8').read()
+    except Exception:
+      continue
+    if pattern.search(txt):
+      failed.append(f)
+  if failed:
+    print('Found files with default credentials:')
+    for x in failed: print(' -',x)
+    sys.exit(2)
+  print('No obvious default credentials found')
+  PY
+  allow_failure: false
+  only:
+    - branches

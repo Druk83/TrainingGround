@@ -18,7 +18,7 @@
 | Компонент | Порт | Назначение | Примечания |
 |-----------|------|------------|------------|
 | Rust API (внутренний) | 8081 | REST/SSE/WebSocket | За Ingress, только внутренняя сеть. |
-| Python Generator / Explanation API | 9000 | REST/gRPC | Только внутренняя сеть; таймаут 2 сек. |
+| Python Generator / Explanation API | 8000 | REST/gRPC | Только внутренняя сеть; таймаут 2 сек. |
 | MongoDB Replica Set | 27017 | Документное хранилище | Обязательный порт. |
 | Redis Cluster | 6379 | Кэш, очереди | Обязательный. |
 | Qdrant | 6333 | Векторный индекс | Обязательный. |
@@ -29,12 +29,17 @@
 
 ## 3. Мониторинг и опциональные сервисы
 
-| Сервис | Порт | Статус |
-|--------|------|--------|
-| Prometheus | 9090 | опция |
-| Grafana | 3000 | опция |
-| Alertmanager | 9093 | опция |
-| Loki / Fluent Bit | 3100 / 24224 | опция |
+| Сервис | Порт | Статус | Примечания |
+|--------|------|--------|------------|
+| Prometheus | 9090 | опция | Сбор метрик, scraping |
+| Grafana | 3000 | опция | Визуализация метрик |
+| Alertmanager | 9093 | опция | Алерты и уведомления |
+| Jaeger UI | 16686 | опция | Distributed tracing UI |
+| Jaeger OTLP gRPC | 4317 | опция | OpenTelemetry traces (gRPC) |
+| Jaeger OTLP HTTP | 4318 | опция | OpenTelemetry traces (HTTP) |
+| MongoDB Exporter | 9216 | опция | Prometheus exporter для MongoDB |
+| Redis Exporter | 9121 | опция | Prometheus exporter для Redis |
+| Loki / Fluent Bit | 3100 / 24224 | опция | Логи и агрегация |
 
 ---
 

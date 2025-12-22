@@ -150,6 +150,11 @@ docker-compose down -v
 
 ## Инициализация хранилищ данных
 
+## Секреты и ротация
+
+Секреты (JWT_SECRET, MONGO_PASSWORD, REDIS_PASSWORD, QDRANT_API_KEY, GRAFANA_PASSWORD) управляются через корневой файл `.env`. Смотрите `docs/security/secrets.md` для рекомендаций по ротации и использованию в продакшне.
+
+
 ### Установка Python зависимостей
 
 Перед работой с инфраструктурными скриптами установите зависимости:
@@ -168,19 +173,19 @@ MongoDB инициализируется автоматически при пе�
 
 ```bash
 # Проверить статус MongoDB
-docker-compose exec mongodb mongosh -u admin -p password --eval "db.adminCommand('ping')"
+docker-compose exec mongodb mongosh -u ${MONGO_USER:-admin} -p ${MONGO_PASSWORD:-password} --eval "db.adminCommand('ping')"
 
 # Просмотреть коллекции
-docker-compose exec mongodb mongosh -u admin -p password trainingground --eval "show collections"
+docker-compose exec mongodb mongosh -u ${MONGO_USER:-admin} -p ${MONGO_PASSWORD:-password} trainingground --eval "show collections"
 
 # Проверить индексы
-docker-compose exec mongodb mongosh -u admin -p password trainingground --eval "db.users.getIndexes()"
+docker-compose exec mongodb mongosh -u ${MONGO_USER:-admin} -p ${MONGO_PASSWORD:-password} trainingground --eval "db.users.getIndexes()"
 ```
 
 **Важно:** Change Streams требуют replica set. Для dev окружения:
 
 ```bash
-docker-compose exec mongodb mongosh -u admin -p password --eval "rs.initiate()"
+docker-compose exec mongodb mongosh -u ${MONGO_USER:-admin} -p ${MONGO_PASSWORD:-password} --eval "rs.initiate()"
 ```
 
 ### Redis
@@ -189,16 +194,25 @@ Redis готов к работе сразу после запуска:
 
 ```bash
 # Проверить подключение
-docker-compose exec redis redis-cli -a redispass PING
+docker-compose exec redis redis-cli -a ${REDIS_PASSWORD:-redispass} PING
 
 # Просмотреть ключи (ВНИМАНИЕ: не использовать в production)
-docker-compose exec redis redis-cli -a redispass --scan --pattern 'session:*'
+docker-compose exec redis redis-cli -a ${REDIS_PASSWORD:-redispass} --scan --pattern 'session:*'
 
 # Проверить Lua скрипт
-docker-compose exec redis redis-cli -a redispass --eval /path/to/purchase_hint.lua
+docker-compose exec redis redis-cli -a ${REDIS_PASSWORD:-redispass} --eval /path/to/purchase_hint.lua
 ```
 
 ### Qdrant
+
+
+### Grafana
+
+Если вы включили Grafana в `docker-compose`, пароль администратора берётся из переменной `GRAFANA_PASSWORD` в корневом файле `.env` (значение по умолчанию: `admin`).
+
+Откройте http://localhost:3000 и войдите под пользователем `admin`, пароль — `${GRAFANA_PASSWORD:-admin}`.
+
+Файлы provisioning и дашбордов читаются из `infra/grafana/provisioning` и `infra/grafana/dashboards`, если эти каталоги присутствуют.
 
 Инициализация коллекций:
 
@@ -206,11 +220,11 @@ docker-compose exec redis redis-cli -a redispass --eval /path/to/purchase_hint.l
 # Запустить скрипт инициализации
 python infra/qdrant/init_collections.py
 
-# Проверить коллекции через API
-curl http://localhost:6333/collections -H "api-key: qdrantkey"
+# Проверить коллекции через API (используйте переменную окружения QDRANT_API_KEY)
+curl http://localhost:6333/collections -H "api-key: ${QDRANT_API_KEY:-qdrantkey}"
 
 # Проверить количество векторов
-curl http://localhost:6333/collections/rules_embeddings -H "api-key: qdrantkey"
+curl http://localhost:6333/collections/rules_embeddings -H "api-key: ${QDRANT_API_KEY:-qdrantkey}"
 ```
 
 ## Backup и Restore
@@ -222,7 +236,7 @@ curl http://localhost:6333/collections/rules_embeddings -H "api-key: qdrantkey"
 bash infra/scripts/backup.sh
 
 # Backup загружается в Yandex Object Storage
-# Location: s3://trainingground-backups/full_backup/{timestamp}/
+# Расположение: s3://trainingground-backups/full_backup/{timestamp}/
 ```
 
 ### Восстановление из backup
@@ -235,7 +249,7 @@ aws s3 ls s3://trainingground-backups/full_backup/ --endpoint-url https://storag
 bash infra/scripts/restore.sh 20251220_143000
 ```
 
-**Время восстановления:** ≤15 минут (SLA requirement)
+**Время восстановления:** ≤15 минут (требование SLA)
 
 ## Тестирование
 

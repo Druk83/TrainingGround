@@ -6,11 +6,11 @@ port = 8081
 workers = 4
 
 [database]
-mongo_uri = "mongodb://admin:password@localhost:27017"
+mongo_uri = "mongodb://localhost:27017"
 mongo_database = "trainingground_dev"
 
 [redis]
-uri = "redis://:redispass@127.0.0.1:6379/0"
+uri = "redis://127.0.0.1:6379/0"
 pool_size = 10
 connection_timeout_secs = 30
 

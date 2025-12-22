@@ -4,8 +4,13 @@
 *.swp
 *.swo
 *~
+
+# Environment files with secrets
 .env
 .env.local
+.env.production
+.env.prod
+.env.*.local
 
 # IDE
 .vscode/
@@ -55,11 +60,36 @@ tmp/
 temp/
 *.tmp
 
-# Secrets
+# Secrets and credentials
 secrets/
+credentials/
 *.pem
 *.key
 *.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+*_rsa
+*_rsa.pub
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+credentials.json
+service-account*.json
+*.backup
+*.bak
+*.old
+# Sensitive filenames (excluding scripts and docs)
+password.txt
+passwords.txt
+secret.txt
+secrets.txt
+.password
+.secret
+**/passwords/
+**/.secrets/
 requirements/пример/compose_sinonim.py
 tests/performance/results_answers.json
 tests/performance/results_answers.txt
@@ -73,3 +103,4 @@ tests/performance/docker_stats.txt
 tests/performance/mongo_server_status.txt
 tests/performance/results_smoke.jsondocker
 tests/performance/rust-api-logs.txtk6
+tasks/SECURITY-AUDIT-2025-12-22.md

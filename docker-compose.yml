@@ -11,8 +11,8 @@ services:
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-password}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
       MONGO_INITDB_DATABASE: ${MONGO_DB:-trainingground}
     volumes:
       - mongodb_data:/data/db
@@ -32,7 +32,7 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"
-    command: redis-server --requirepass ${REDIS_PASSWORD:-redispass}
+    command: redis-server --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
     networks:
@@ -47,7 +47,7 @@ services:
       - "6333:6333"
       - "6334:6334"
     environment:
-      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-qdrantkey}
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY}
     volumes:
       - qdrant_data:/qdrant/storage
     networks:
@@ -73,9 +73,9 @@ services:
       SSE_MAX_STREAM_SECONDS: ${SSE_MAX_STREAM_SECONDS:-3600}
       SSE_TICK_INTERVAL_MS: ${SSE_TICK_INTERVAL_MS:-1000}
       ANTICHEAT_DISABLED: ${ANTICHEAT_DISABLED:-0}
-      APP__DATABASE__MONGO_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD:-password}@mongodb:27017/${MONGO_DB:-trainingground}?authSource=admin
-      APP__REDIS__URI: redis://:${REDIS_PASSWORD:-redispass}@redis:6379
-      APP__AUTH__JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-prod}
+      APP__DATABASE__MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/${MONGO_DB:-trainingground}?authSource=admin
+      APP__REDIS__URI: redis://:${REDIS_PASSWORD}@redis:6379
+      APP__AUTH__JWT_SECRET: ${JWT_SECRET}
       APP__PYTHON_API__URL: http://python-generator:8000
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4318}
       OTEL_SERVICE_NAME: rust-api
@@ -93,6 +93,22 @@ services:
       start_period: 10s
       retries: 3
 
+  # Grafana — optional monitoring dashboard
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: trainingground-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana_data:/var/lib/grafana
+    networks:
+      - trainingground-network
+
   # Python Generator — генерация заданий и объяснений (будет добавлен в A3)
   # python-generator:
   #   build:
@@ -103,10 +119,10 @@ services:
   #   ports:
   #     - "${PYTHON_API_PORT:-8000}:8000"
   #   environment:
-  #     MONGODB_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD:-password}@mongodb:27017/${MONGO_DB:-trainingground}?authSource=admin
-  #     REDIS_URL: redis://:${REDIS_PASSWORD:-redispass}@redis:6379
+  #     MONGODB_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/${MONGO_DB:-trainingground}?authSource=admin
+  #     REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
   #     QDRANT_URL: http://qdrant:6333
-  #     QDRANT_API_KEY: ${QDRANT_API_KEY:-qdrantkey}
+  #     QDRANT_API_KEY: ${QDRANT_API_KEY}
   #     YANDEXGPT_API_KEY: ${YANDEXGPT_API_KEY}
   #     YANDEXGPT_FOLDER_ID: ${YANDEXGPT_FOLDER_ID}
   #     LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -128,3 +144,4 @@ volumes:
   mongodb_data:
   redis_data:
   qdrant_data:
+  grafana_data:

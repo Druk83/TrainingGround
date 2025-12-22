@@ -18,16 +18,30 @@ S3_BUCKET="${S3_BUCKET:-trainingground-backups}"
 S3_ENDPOINT="${S3_ENDPOINT:-https://storage.yandexcloud.net}"
 
 # MongoDB
-MONGODB_URI="${MONGODB_URI:-mongodb://admin:password@localhost:27017/trainingground?authSource=admin}"
+# Prefer explicit MONGODB_URI, otherwise build from MONGO_USER/MONGO_PASSWORD
+if [ -z "${MONGODB_URI}" ]; then
+  MONGO_USER="${MONGO_USER:-admin}"
+  if [ -z "${MONGO_PASSWORD}" ]; then
+    echo "ERROR: MONGO_PASSWORD must be set"
+    exit 1
+  fi
+  MONGODB_URI="mongodb://${MONGO_USER}:${MONGO_PASSWORD}@localhost:27017/trainingground?authSource=admin"
+fi
 
 # Redis
 REDIS_HOST="${REDIS_HOST:-localhost}"
 REDIS_PORT="${REDIS_PORT:-6379}"
-REDIS_PASSWORD="${REDIS_PASSWORD:-redispass}"
+if [ -z "${REDIS_PASSWORD}" ]; then
+  echo "ERROR: REDIS_PASSWORD must be set"
+  exit 1
+fi
 
 # Qdrant
 QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
-QDRANT_API_KEY="${QDRANT_API_KEY:-qdrantkey}"
+if [ -z "${QDRANT_API_KEY}" ]; then
+  echo "ERROR: QDRANT_API_KEY must be set"
+  exit 1
+fi
 
 echo "================================"
 echo "TrainingGround Restore: ${BACKUP_TIMESTAMP}"

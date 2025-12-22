@@ -10,8 +10,8 @@ services:
     ports:
       - "27018:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: testuser
-      MONGO_INITDB_ROOT_PASSWORD: testpass
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-testuser}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-testpass}
       MONGO_INITDB_DATABASE: trainingground_test
     networks:
       - test-network
@@ -23,7 +23,7 @@ services:
       - /data
     ports:
       - "6380:6379"
-    command: redis-server --requirepass testredispass
+    command: redis-server --requirepass ${REDIS_PASSWORD:-testredispass}
     networks:
       - test-network
 
@@ -35,7 +35,7 @@ services:
     ports:
       - "6335:6333"
     environment:
-      QDRANT__SERVICE__API_KEY: testqdrantkey
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-testqdrantkey}
     networks:
       - test-network
 
