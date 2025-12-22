@@ -9,16 +9,16 @@ stages:
 
 variables:
   DOCKER_DRIVER: overlay2
-  RUST_VERSION: "1.75"
-  PYTHON_VERSION: "3.12"
-  NODE_VERSION: "20"
+  RUST_VERSION: "1.89"
+  PYTHON_VERSION: "3.14"
+  NODE_VERSION: "24"
 
 # Кеширование зависимостей
 cache:
   paths:
     - frontend/node_modules/
     - backend/rust-api/target/
-    - backend/python-generator/.venv/
+    - backend/python-generator/venv/
 
 # === Валидация (идентична pre-commit) ===
 

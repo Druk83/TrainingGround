@@ -24,7 +24,7 @@ if (Get-Command node -ErrorAction SilentlyContinue) {
     Write-Host "  [OK] Node.js $nodeVersion" -ForegroundColor Green
 } else {
     Write-Host "  [ERROR] Node.js not found" -ForegroundColor Red
-    Write-Host "  Install from: https://nodejs.org/ (v20.x LTS)" -ForegroundColor Yellow
+    Write-Host "  Install from: https://nodejs.org/ (v24.x LTS)" -ForegroundColor Yellow
     $dependencies += "Node.js"
 }
 
@@ -44,7 +44,7 @@ if (Get-Command python -ErrorAction SilentlyContinue) {
     Write-Host "  [OK] Python $pythonVersion" -ForegroundColor Green
 } else {
     Write-Host "  [ERROR] Python not found" -ForegroundColor Red
-    Write-Host "  Install from: https://www.python.org/ (v3.12+)" -ForegroundColor Yellow
+    Write-Host "  Install from: https://www.python.org/ (v3.14+)" -ForegroundColor Yellow
     $dependencies += "Python"
 }
 

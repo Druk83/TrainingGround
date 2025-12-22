@@ -69,7 +69,7 @@
 - Redis Cluster (очереди задач)
 
 **System Software / Artefacts:**
-- Python 3.12 runtime (`asyncio`, `pymorphy2`, `sentence-transformers`)
+- Python 3.14 runtime (`asyncio`, `pymorphy2`, `sentence-transformers`)
 - Docker image `generator:latest`
 - Qdrant (HNSW)
 

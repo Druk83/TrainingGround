@@ -105,9 +105,9 @@ TrainingGround/
 
 ## Требования
 
-- **Node.js** 20+
-- **Rust** 1.75+
-- **Python** 3.12+
+- **Node.js** 24+
+- **Rust** 1.89+
+- **Python** 3.14+
 - **Docker** 24+
 - **Git** 2.30+
 

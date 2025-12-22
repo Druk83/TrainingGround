@@ -14,7 +14,7 @@ echo "Checking dependencies..."
 
 # Node.js
 if ! command -v node &> /dev/null; then
-    echo "[ERROR] Node.js not found. Please install Node.js 20+"
+    echo "[ERROR] Node.js not found. Please install Node.js 24+"
     exit 1
 fi
 echo "[INFO] Node.js version: $(node --version)"
@@ -28,7 +28,7 @@ echo "[INFO] Rust version: $(rustc --version)"
 
 # Python
 if ! command -v python3 &> /dev/null; then
-    echo "[ERROR] Python 3.12+ not found"
+    echo "[ERROR] Python 3.14+ not found"
     exit 1
 fi
 echo "[INFO] Python version: $(python3 --version)"

@@ -109,27 +109,40 @@ if ($runPython) {
     
     if (Test-Path "backend\python-generator") {
         Push-Location backend\python-generator
+
+        $poetryCmd = Get-Command poetry -ErrorAction SilentlyContinue
+
+        function Invoke-PythonCheck {
+            param(
+                [string]$Command,
+                [string[]]$Args
+            )
+
+            if ($poetryCmd) {
+                poetry run $Command @Args
+            }
+            else {
+                & $Command @Args
+            }
+
+            if ($LASTEXITCODE -ne 0) { $script:hasErrors = $true }
+        }
         
         try {
             Write-Host "  - Format check..." -ForegroundColor Gray
-            black --check src/ tests/
-            if ($LASTEXITCODE -ne 0) { $hasErrors = $true }
+            Invoke-PythonCheck -Command "black" -Args @("--check", "src/", "tests/")
             
             Write-Host "  - Linting..." -ForegroundColor Gray
-            ruff check src/ tests/
-            if ($LASTEXITCODE -ne 0) { $hasErrors = $true }
+            Invoke-PythonCheck -Command "ruff" -Args @("check", "src/", "tests/")
             
             Write-Host "  - Type checking..." -ForegroundColor Gray
-            mypy src/
-            if ($LASTEXITCODE -ne 0) { $hasErrors = $true }
+            Invoke-PythonCheck -Command "mypy" -Args @("src/")
             
             Write-Host "  - Unit tests..." -ForegroundColor Gray
-            pytest tests/unit/ --tb=short
-            if ($LASTEXITCODE -ne 0) { $hasErrors = $true }
+            Invoke-PythonCheck -Command "pytest" -Args @("tests/unit/", "--tb=short")
             
             Write-Host "  - Security audit..." -ForegroundColor Gray
-            pip-audit
-            if ($LASTEXITCODE -ne 0) { $hasErrors = $true }
+            Invoke-PythonCheck -Command "pip-audit" -Args @()
             
             if (-not $hasErrors) {
                 Write-Host "[SUCCESS] Python checks passed!" -ForegroundColor Green

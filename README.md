@@ -6,9 +6,9 @@
 
 ### 1. Установите зависимости
 
-- **Node.js** 20.x LTS - https://nodejs.org/
-- **Rust** 1.75+ - https://rustup.rs/
-- **Python** 3.12+ - https://www.python.org/
+- **Node.js** 24.x LTS - https://nodejs.org/
+- **Rust** 1.89+ - https://rustup.rs/
+- **Python** 3.14+ - https://www.python.org/
 - **Docker Desktop** - https://www.docker.com/products/docker-desktop/
 
 ### 2. Настройте окружение
@@ -81,7 +81,7 @@ Business Layer сценарии (`requirements/архитектура/описа
 ## Архитектура и стек
 - **PWA** на TypeScript + нативные Web Components, собирается esbuild/Vite, работает офлайн через Service Worker (`requirements/структураПО/стек%20проекта.md`).
 - **Rust API** (axum, tokio, serde) отвечает за сессии, таймеры, начисление баллов, anti-cheat и Reporting API.
-- **Python 3.12 сервис** занимается генерацией заданий, объяснений, морфологией и пайплайном эмбеддингов (YandexGPT + Qdrant).
+- **Python 3.14 сервис** занимается генерацией заданий, объяснений, морфологией и пайплайном эмбеддингов (YandexGPT + Qdrant).
 - **Хранилища:** MongoDB (темы, попытки, отчёты), Redis (сессии, лимиты, античит), Qdrant (векторы правил/примеров), Object Storage для бэкапов (`requirements/струтура%20Данных/описани%20БД.md`).
 - **Инфраструктура:** Docker, docker-compose для локальной работы, Kubernetes/YaCloud + GitHub Actions, Vault, Prometheus/Grafana/Loki. Сетевые порты и политики описаны в `requirements/структураПО/ports.md`.
 
@@ -98,7 +98,7 @@ Business Layer сценарии (`requirements/архитектура/описа
 - Античит хранит журналы инцидентов (`incidents`), счётчики Redis `anticheat:{user_id}` и использует Redis Streams для уведомлений DevOps (см. `requirements/архитектура/описание%20AL.md` и TL-2/TL-4).
 
 ## Локальный запуск (план MVP)
-1. Подготовьте окружение: Node.js 22.x, Rust 1.80+, Python 3.12, Docker Engine 24+ (`requirements/структураПО/зависимости.md`).
+1. Подготовьте окружение: Node.js 24.x, Rust 1.89+, Python 3.14, Docker Engine 24+ (`requirements/структураПО/зависимости.md`).
 2. Разверните инфраструктуру через будущий `infra/docker-compose.yml`, включающий MongoDB, Redis, Qdrant и сервисы (см. `requirements/структураПО/файловая%20структура%20проекта.md`).
 3. Соберите фронтенд (`frontend/`), запустив тесты через `vitest` и `@web/test-runner`; для прод-сборки используйте esbuild/Vite.
 4. Соберите и поднимите Rust API (`backend/rust-api/`) и Python generator (`backend/python-generator/`), подключив `.env` из `.env.example`.
