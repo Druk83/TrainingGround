@@ -42,7 +42,10 @@ impl Config {
                 let password = env::var("MONGO_PASSWORD").expect("MONGO_PASSWORD must be set");
                 let db = env::var("MONGO_DB").unwrap_or_else(|_| "trainingground".to_string());
                 eprintln!("WARNING: Building MongoDB URI from MONGO_USER/MONGO_PASSWORD env vars");
-                format!("mongodb://{}:{}@localhost:27017/{}?authSource=admin", user, password, db)
+                format!(
+                    "mongodb://{}:{}@localhost:27017/{}?authSource=admin",
+                    user, password, db
+                )
             });
 
         let redis_uri = settings

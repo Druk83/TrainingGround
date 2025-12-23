@@ -1,3 +1,4 @@
+use crate::metrics::{record_cache_hit, record_cache_miss, ANSWERS_SUBMITTED_TOTAL};
 use crate::models::answer::{
     AttemptFailureReason, AttemptRecord, SubmitAnswerRequest, SubmitAnswerResponse,
 };
@@ -50,12 +51,14 @@ impl AnswerService {
         })
         .await?
         {
+            record_cache_hit();
             tracing::info!(
                 "Returning cached response for idempotency_key={}",
                 idempotency_key
             );
             return Ok(cached_response);
         }
+        record_cache_miss();
 
         // Check session timeout
         let session = retry_async_with_config(retry_cfg.clone(), || async {
@@ -97,6 +100,12 @@ impl AnswerService {
         })
         .await?;
         let is_correct = req.answer.trim() == correct_answer.trim();
+
+        // Record answer submission metric
+        let correct_label = if is_correct { "true" } else { "false" };
+        ANSWERS_SUBMITTED_TOTAL
+            .with_label_values(&[correct_label])
+            .inc();
 
         // Calculate score based on rules S1-S5
         let (score_awarded, combo_bonus, current_streak) = if is_correct {

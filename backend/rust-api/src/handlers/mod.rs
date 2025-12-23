@@ -2,6 +2,7 @@ use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
 use serde_json::json;
 use std::sync::Arc;
 
+use crate::metrics;
 use crate::services::AppState;
 
 pub async fn health_check(State(state): State<Arc<AppState>>) -> impl IntoResponse {
@@ -47,13 +48,16 @@ async fn check_mongodb(state: &AppState) -> serde_json::Map<String, serde_json::
 
     match tokio::time::timeout(
         std::time::Duration::from_secs(1),
-        state.mongo.run_command(mongodb::bson::doc! { "ping": 1 })
+        state.mongo.run_command(mongodb::bson::doc! { "ping": 1 }),
     )
     .await
     {
         Ok(Ok(_)) => {
             result.insert("status".to_string(), json!("healthy"));
-            result.insert("message".to_string(), json!("MongoDB connection successful"));
+            result.insert(
+                "message".to_string(),
+                json!("MongoDB connection successful"),
+            );
         }
         Ok(Err(e)) => {
             result.insert("status".to_string(), json!("unhealthy"));
@@ -74,7 +78,7 @@ async fn check_redis(state: &AppState) -> serde_json::Map<String, serde_json::Va
     let mut conn = state.redis.clone();
     match tokio::time::timeout(
         std::time::Duration::from_millis(500),
-        redis::cmd("PING").query_async::<String>(&mut conn)
+        redis::cmd("PING").query_async::<String>(&mut conn),
     )
     .await
     {
@@ -93,6 +97,16 @@ async fn check_redis(state: &AppState) -> serde_json::Map<String, serde_json::Va
     }
 
     result
+}
+
+pub async fn metrics_handler() -> impl IntoResponse {
+    match metrics::render_metrics() {
+        Ok(metrics_text) => (StatusCode::OK, metrics_text),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to render metrics: {}", e),
+        ),
+    }
 }
 
 pub mod sessions;

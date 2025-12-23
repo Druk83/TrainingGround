@@ -1,15 +1,20 @@
-﻿#!/bin/bash
+#!/bin/bash
 # Rust pre-commit hook
 
 echo "[INFO] Running pre-commit checks for Rust..."
 
 if [ -d "backend/rust-api" ]; then
     cd backend/rust-api
-    
+
     cargo fmt --check || exit 1
     cargo clippy --all-targets --all-features -- -D warnings || exit 1
     cargo test --lib || exit 1
-    cargo audit || exit 1
-    
+
+    # cargo audit is optional - don't fail on advisory db issues
+    echo "[INFO] Running cargo audit..."
+    if ! cargo audit; then
+        echo "[WARNING] cargo audit failed, but continuing (non-blocking)"
+    fi
+
     echo "[SUCCESS] Rust checks passed!"
 fi

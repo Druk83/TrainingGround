@@ -1,16 +1,16 @@
-﻿#!/bin/bash
+#!/bin/bash
 # Python pre-commit hook
 
 echo "[INFO] Running pre-commit checks for Python..."
 
 if [ -d "backend/python-generator" ]; then
     cd backend/python-generator
-    
+
     black --check src/ tests/ || exit 1
     ruff check src/ tests/ || exit 1
     mypy src/ || exit 1
     pytest tests/unit/ --tb=short || exit 1
     pip-audit || exit 1
-    
+
     echo "[SUCCESS] Python checks passed!"
 fi

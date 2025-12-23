@@ -1,3 +1,4 @@
+use crate::metrics::{track_cache_operation, SESSIONS_ACTIVE, SESSIONS_TOTAL};
 use crate::models::{
     CreateSessionRequest, CreateSessionResponse, Session, SessionStatus, TaskInfo,
 };
@@ -55,13 +56,21 @@ impl SessionService {
         let session_key = format!("session:{}", session_id);
         let session_json = serde_json::to_string(&session)?;
 
-        redis::cmd("SETEX")
-            .arg(&session_key)
-            .arg(3600) // TTL 1 hour
-            .arg(session_json)
-            .query_async::<()>(&mut conn)
-            .await
-            .context("Failed to save session to Redis")?;
+        // Track cache operation with metrics
+        track_cache_operation("setex", async {
+            redis::cmd("SETEX")
+                .arg(&session_key)
+                .arg(3600) // TTL 1 hour
+                .arg(session_json)
+                .query_async::<()>(&mut conn)
+                .await
+                .context("Failed to save session to Redis")
+        })
+        .await?;
+
+        // Record business metrics
+        SESSIONS_TOTAL.with_label_values(&["created"]).inc();
+        SESSIONS_ACTIVE.inc();
 
         tracing::info!("Session created: {} for user: {}", session_id, req.user_id);
 
@@ -98,11 +107,18 @@ impl SessionService {
         let mut conn = self.redis.clone();
 
         let session_key = format!("session:{}", session_id);
-        redis::cmd("DEL")
-            .arg(&session_key)
-            .query_async::<()>(&mut conn)
-            .await
-            .context("Failed to delete session from Redis")?;
+        track_cache_operation("del", async {
+            redis::cmd("DEL")
+                .arg(&session_key)
+                .query_async::<()>(&mut conn)
+                .await
+                .context("Failed to delete session from Redis")
+        })
+        .await?;
+
+        // Record business metrics
+        SESSIONS_TOTAL.with_label_values(&["completed"]).inc();
+        SESSIONS_ACTIVE.dec();
 
         tracing::info!("Session completed: {}", session_id);
 

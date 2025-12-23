@@ -9,6 +9,7 @@ use tower_http::trace::TraceLayer;
 
 pub mod config;
 pub mod handlers;
+pub mod metrics;
 pub mod middlewares;
 pub mod models;
 pub mod services;
@@ -21,6 +22,7 @@ pub fn create_router(app_state: std::sync::Arc<services::AppState>) -> Router {
     Router::new()
         // Public endpoints (no auth required)
         .route("/health", get(handlers::health_check))
+        .route("/metrics", get(handlers::metrics_handler))
         // Protected endpoints (require JWT)
         .nest(
             "/api/v1/sessions",
@@ -30,6 +32,9 @@ pub fn create_router(app_state: std::sync::Arc<services::AppState>) -> Router {
             )),
         )
         .with_state(app_state)
+        .layer(middleware::from_fn(
+            middlewares::metrics::metrics_middleware,
+        ))
         .layer(TraceLayer::new_for_http())
 }
 
