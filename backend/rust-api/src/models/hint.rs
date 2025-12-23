@@ -5,6 +5,16 @@ use serde::{Deserialize, Serialize};
 pub struct RequestHintRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub idempotency_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub topic_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub task_type: Option<String>,
+    #[serde(default)]
+    pub user_errors: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language_level: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

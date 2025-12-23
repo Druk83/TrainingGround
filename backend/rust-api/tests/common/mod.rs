@@ -17,6 +17,7 @@ pub async fn create_test_app() -> Router {
     let config = Config::load().expect("Failed to load test configuration");
 
     eprintln!("Test config loaded - Redis URI: {}", config.redis_uri);
+    eprintln!("Test config Mongo URI: {}", config.mongo_uri);
 
     // Connect to test databases
     let mongo_client = mongodb::Client::with_uri_str(&config.mongo_uri)

@@ -29,7 +29,7 @@ impl HintService {
         session_id: &str,
         user_id: &str,
         task_id: &str,
-        _req: &RequestHintRequest,
+        req: &RequestHintRequest,
     ) -> Result<RequestHintResponse> {
         tracing::info!(
             "Processing hint request: session={}, user={}, task={}",
@@ -56,7 +56,7 @@ impl HintService {
         let new_score = self.deduct_hint_cost(user_id).await?;
 
         // Get hint text (cache -> Python API -> fallback)
-        let (hint_text, source) = self.get_hint_text(task_id).await?;
+        let (hint_text, source) = self.get_hint_text(task_id, req).await?;
 
         // Save hint record to MongoDB
         let record = HintRecord {
@@ -170,7 +170,11 @@ impl HintService {
         Ok(new_score)
     }
 
-    async fn get_hint_text(&self, task_id: &str) -> Result<(String, HintSource)> {
+    async fn get_hint_text(
+        &self,
+        task_id: &str,
+        req: &RequestHintRequest,
+    ) -> Result<(String, HintSource)> {
         // 1. Try cache first
         if let Ok(cached) = self.get_cached_hint(task_id).await {
             tracing::debug!("Hint found in cache for task={}", task_id);
@@ -179,7 +183,7 @@ impl HintService {
 
         // 2. Try Python Explanation API with 2s timeout (if enabled)
         if Self::python_api_enabled() {
-            match self.fetch_from_python_api(task_id).await {
+            match self.fetch_from_python_api(task_id, req).await {
                 Ok(hint) => {
                     // Cache the result
                     self.cache_hint(task_id, &hint).await.ok();
@@ -207,24 +211,54 @@ impl HintService {
         let mut conn = self.redis.clone();
         let cache_key = format!("explanation:cache:{}", task_id);
 
-        let hint: String = redis::cmd("GET")
+        let raw: String = redis::cmd("GET")
             .arg(&cache_key)
             .query_async(&mut conn)
             .await
             .context("Hint not in cache")?;
 
-        Ok(hint)
+        if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&raw) {
+            if let Some(explanation) = json_value
+                .get("response")
+                .and_then(|v| v.get("explanation"))
+                .and_then(|v| v.as_str())
+            {
+                return Ok(explanation.to_string());
+            }
+            if let Some(explanation) = json_value.get("explanation").and_then(|v| v.as_str()) {
+                return Ok(explanation.to_string());
+            }
+        }
+
+        Ok(raw)
     }
 
-    async fn fetch_from_python_api(&self, task_id: &str) -> Result<String> {
-        let url = format!("{}/explanations/{}", self.python_api_url, task_id);
+    async fn fetch_from_python_api(
+        &self,
+        task_id: &str,
+        req: &RequestHintRequest,
+    ) -> Result<String> {
+        let url = format!("{}/v1/explanations", self.python_api_url);
 
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(2))
             .build()?;
 
+        let language = req.language.clone().unwrap_or_else(|| "ru".to_string());
+
+        let body = serde_json::json!({
+            "task_id": task_id,
+            "topic_id": req.topic_id.clone(),
+            "task_type": req.task_type.clone(),
+            "user_errors": req.user_errors.clone(),
+            "language_level": req.language_level.clone(),
+            "language": language,
+            "request_id": req.idempotency_key.clone(),
+        });
+
         let response = client
-            .get(&url)
+            .post(&url)
+            .json(&body)
             .send()
             .await
             .context("Failed to call Python API")?;

@@ -1,0 +1,10 @@
+{
+  "include": [
+    "backend",
+    "frontend",
+    "tests"
+  ],
+  "extraPaths": [
+    "backend/python-generator/src"
+  ]
+}

@@ -262,32 +262,36 @@ services:
     depends_on:
       - prometheus
 
-  # Python Generator — генерация заданий и объяснений (будет добавлен в A3)
-  # python-generator:
-  #   build:
-  #     context: ./backend/python-generator
-  #     dockerfile: Dockerfile
-  #   container_name: trainingground-python-generator
-  #   restart: unless-stopped
-  #   ports:
-  #     - "${PYTHON_API_PORT:-8000}:8000"
-  #   environment:
-  #     MONGODB_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/${MONGO_DB:-trainingground}?authSource=admin
-  #     REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
-  #     QDRANT_URL: http://qdrant:6333
-  #     QDRANT_API_KEY: ${QDRANT_API_KEY}
-  #     YANDEXGPT_API_KEY: ${YANDEXGPT_API_KEY}
-  #     YANDEXGPT_FOLDER_ID: ${YANDEXGPT_FOLDER_ID}
-  #     LOG_LEVEL: ${LOG_LEVEL:-INFO}
-  #   depends_on:
-  #     - mongodb
-  #     - redis
-  #     - qdrant
-  #   networks:
-  #     - trainingground-network
-  #   volumes:
-  #     - ./backend/python-generator/src:/app/src
-  #     - ./backend/python-generator/tests:/app/tests
+  python-generator:
+    build:
+      context: ./backend/python-generator
+      dockerfile: Dockerfile
+    container_name: trainingground-python-generator
+    restart: unless-stopped
+    ports:
+      - "${PYTHON_API_PORT:-8000}:8000"
+    environment:
+      MONGODB_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb-primary:27017,mongodb-secondary1:27017,mongodb-secondary2:27017/${MONGO_DB:-trainingground}?authSource=admin&replicaSet=rs0
+      MONGODB_DB: ${MONGO_DB:-trainingground}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      YANDEXGPT_API_KEY: ${YANDEXGPT_API_KEY:-}
+      YANDEXGPT_FOLDER_ID: ${YANDEXGPT_FOLDER_ID:-}
+      LOG_LEVEL: ${PYTHON_LOG_LEVEL:-INFO}
+      EXPLANATION_YANDEXGPT_ENABLED: ${EXPLANATION_YANDEXGPT_ENABLED:-1}
+    depends_on:
+      mongodb-primary:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      qdrant:
+        condition: service_started
+    networks:
+      - trainingground-network
+    volumes:
+      - ./backend/python-generator/src:/app/src
+      - ./backend/python-generator/scripts:/app/scripts
 
 networks:
   trainingground-network:

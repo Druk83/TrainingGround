@@ -14,7 +14,10 @@ impl Config {
     pub fn load() -> Result<Self, config::ConfigError> {
         // Load environment variables from root .env file (two levels up)
         // Try root .env first, then fallback to local .env
-        if dotenvy::from_path("../../.env").is_err() {
+        let skip_root_env = env::var("SKIP_ROOT_ENV").is_ok();
+        if skip_root_env {
+            dotenvy::dotenv().ok();
+        } else if dotenvy::from_path("../../.env").is_err() {
             // Fallback to current directory .env for backward compatibility
             dotenvy::dotenv().ok();
         }
