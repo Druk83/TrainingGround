@@ -17,10 +17,15 @@ export interface ExplanationResponse {
 }
 
 const DEFAULT_BASE = '/api/explanations';
-const API_BASE: string =
-  (globalThis as Record<string, string | undefined>)?.__EXPLANATION_API__ ??
-  (import.meta as Record<string, any>)?.env?.VITE_EXPLANATION_API ??
-  DEFAULT_BASE;
+const globalApiOverride = (
+  globalThis as unknown as { __EXPLANATION_API__?: string }
+).__EXPLANATION_API__;
+
+const viteApiOverride = (
+  import.meta as unknown as { env?: { VITE_EXPLANATION_API?: string } }
+).env?.VITE_EXPLANATION_API;
+
+const API_BASE: string = globalApiOverride ?? viteApiOverride ?? DEFAULT_BASE;
 
 export async function requestExplanation(
   payload: ExplanationRequest,
@@ -36,7 +41,7 @@ export async function requestExplanation(
     request_id: payload.requestId,
   });
 
-  const response = await fetch(${API_BASE}, {
+  const response = await fetch(`${API_BASE}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body,
@@ -44,7 +49,7 @@ export async function requestExplanation(
   });
 
   if (!response.ok) {
-    throw new Error(Explanation request failed with status );
+    throw new Error(`Explanation request failed with status ${response.status}`);
   }
 
   const data = await response.json();

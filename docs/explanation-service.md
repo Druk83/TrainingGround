@@ -78,13 +78,19 @@ sequenceDiagram
 
 ## Configuration
 Key environment variables:
-| Variable | Description |
-| --- | --- |
-| MONGODB_URI / MONGODB_DB | MongoDB connection for tasks/rules/templates |
-| REDIS_URL | Redis for cache + stream processing |
-| QDRANT_URL / QDRANT_API_KEY | Vector storage |
-| YANDEXGPT_API_KEY / YANDEXGPT_FOLDER_ID | Credentials for completion API |
-| EXPLANATION_YANDEXGPT_ENABLED | Feature flag default |
-| REDIS_STREAM_NAME | Defaults to content:changes |
+| Variable | Description | Default |
+| --- | --- | --- |
+| MONGODB_URI / MONGODB_DB | MongoDB connection for tasks/rules/templates | mongodb://localhost:27017 |
+| REDIS_URL | Redis for cache + stream processing | redis://localhost:6379/0 |
+| QDRANT_URL / QDRANT_API_KEY | Vector storage | http://localhost:6333 |
+| YANDEXGPT_API_KEY / YANDEXGPT_FOLDER_ID | Credentials for completion API | None (required) |
+| YANDEXGPT_API_URL | YandexGPT API endpoint | https://llm.api.cloud.yandex.net/... |
+| YANDEXGPT_MODEL | Model name (yandexgpt-lite, yandexgpt) | yandexgpt-lite |
+| YANDEXGPT_TEMPERATURE | Sampling temperature (0.0-1.0) | 0.2 |
+| YANDEXGPT_MAX_TOKENS | Max response tokens | 700 |
+| YANDEXGPT_TIMEOUT_SECONDS | Request timeout | 2.0 |
+| YANDEXGPT_SYSTEM_PROMPT | System prompt for LLM | "Ты — преподаватель..." |
+| EXPLANATION_YANDEXGPT_ENABLED | Feature flag to enable/disable LLM | true |
+| REDIS_STREAM_NAME | Redis stream for content changes | content:changes |
 
 See ackend/python-generator/README.md and CLI help (python scripts/rebuild_embeddings.py --help) for operational details.

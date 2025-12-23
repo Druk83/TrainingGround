@@ -25,7 +25,9 @@ class EmbeddingGenerator:
             vector = await asyncio.to_thread(transformer.encode, text)
             return self._resize(vector.tolist())
         except Exception as exc:  # pragma: no cover - depends on external model
-            LOGGER.warning("Transformer embedding failed, falling back to fastText: %s", exc)
+            LOGGER.warning(
+                "Transformer embedding failed, falling back to fastText: %s", exc
+            )
             return await asyncio.to_thread(self._fasttext_embed, text)
 
     def _ensure_transformer(self):
@@ -60,7 +62,9 @@ class EmbeddingGenerator:
     @staticmethod
     def _hash_vector(text: str, dim: int = 768) -> list[float]:
         digest = hashlib.sha256(text.encode("utf-8")).digest()
-        chunk = [int.from_bytes(digest[i : i + 4], "little") / 1e9 for i in range(0, 32, 4)]
+        chunk = [
+            int.from_bytes(digest[i : i + 4], "little") / 1e9 for i in range(0, 32, 4)
+        ]
         return EmbeddingGenerator._resize(chunk, dim)
 
     @staticmethod

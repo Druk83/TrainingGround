@@ -79,7 +79,9 @@ class EmbeddingWorker:
                             message_id,
                         )
                     except Exception as exc:  # pragma: no cover
-                        LOGGER.exception("Failed to process event %s: %s", message_id, exc)
+                        LOGGER.exception(
+                            "Failed to process event %s: %s", message_id, exc
+                        )
 
     async def _process(self, payload: dict[str, Any]) -> None:
         collection = payload.get("collection")

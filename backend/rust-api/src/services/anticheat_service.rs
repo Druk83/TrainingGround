@@ -357,12 +357,14 @@ mod tests {
     use super::*;
 
     #[test]
+    #[serial_test::serial]
     fn anticheat_disabled_default_false() {
         std::env::remove_var("ANTICHEAT_DISABLED");
         assert!(!AnticheatService::anticheat_disabled());
     }
 
     #[test]
+    #[serial_test::serial]
     fn anticheat_disabled_can_be_enabled() {
         std::env::set_var("ANTICHEAT_DISABLED", "1");
         assert!(AnticheatService::anticheat_disabled());
@@ -370,12 +372,14 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn anticheat_write_async_default_true() {
         std::env::remove_var("ANTICHEAT_WRITE_ASYNC");
         assert!(AnticheatService::anticheat_write_async_enabled());
     }
 
     #[test]
+    #[serial_test::serial]
     fn anticheat_write_async_can_be_disabled() {
         std::env::set_var("ANTICHEAT_WRITE_ASYNC", "0");
         assert!(!AnticheatService::anticheat_write_async_enabled());

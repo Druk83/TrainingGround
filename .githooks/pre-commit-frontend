@@ -1,15 +1,26 @@
-﻿#!/bin/sh
+#!/bin/sh
 # Frontend pre-commit hook
 
-echo "[INFO] Running pre-commit checks for Frontend..."
+set -e
 
-if [ -d "frontend" ]; then
-    cd frontend
-    
-    npm run lint || exit 1
-    npm run format:check || exit 1
-    npm run type-check || exit 1
-    npm audit --audit-level=moderate || exit 1
-    
-    echo "[SUCCESS] Frontend checks passed!"
+echo '[INFO] Running pre-commit checks for Frontend...'
+
+if [ ! -d 'frontend' ]; then
+  echo '[WARN] frontend/ directory not found, skipping checks'
+  exit 0
 fi
+
+cd frontend
+
+if [ ! -f 'package.json' ]; then
+  echo '[WARN] frontend/package.json not found, skipping checks'
+  exit 0
+fi
+
+npm run lint
+npm run format:check
+npm run type-check
+npm audit --audit-level=moderate
+
+echo '[SUCCESS] Frontend checks passed!'
+

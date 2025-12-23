@@ -17,7 +17,6 @@ class YandexGPTClient:
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
-        self._base_url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
         headers = {"Content-Type": "application/json"}
         if settings.yandexgpt_api_key:
             headers["Authorization"] = f"Api-Key {settings.yandexgpt_api_key}"
@@ -29,37 +28,48 @@ class YandexGPTClient:
     async def close(self) -> None:
         await self._client.aclose()
 
-    async def generate(self, prompt: str, temperature: float = 0.2) -> str:
+    async def generate(
+        self,
+        prompt: str,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
         """
-        Call YandexGPT completion endpoint with predefined options.
+        Call YandexGPT completion endpoint with configurable options.
 
-        Raises httpx.HTTPStatusError for non-2xx responses.
+        Args:
+            prompt: User prompt text
+            temperature: Override default temperature from config
+            max_tokens: Override default max_tokens from config
+
+        Raises:
+            httpx.HTTPStatusError for non-2xx responses.
         """
 
-        if not self._settings.yandexgpt_api_key or not self._settings.yandexgpt_folder_id:
+        if (
+            not self._settings.yandexgpt_api_key
+            or not self._settings.yandexgpt_folder_id
+        ):
             raise RuntimeError("YandexGPT credentials are not configured")
 
         body = {
             "modelUri": f"gpt://{self._settings.yandexgpt_folder_id}/{self._settings.yandexgpt_model}",
             "completionOptions": {
                 "stream": False,
-                "temperature": temperature,
-                "maxTokens": 700,
+                "temperature": temperature or self._settings.yandexgpt_temperature,
+                "maxTokens": max_tokens or self._settings.yandexgpt_max_tokens,
             },
             "messages": [
                 {
                     "role": "system",
-                    "text": (
-                        "Ты — преподаватель русского языка. "
-                        "Объясняй ошибки кратко, с примерами и отсылками к правилам."
-                    ),
+                    "text": self._settings.yandexgpt_system_prompt,
                 },
                 {"role": "user", "text": prompt},
             ],
         }
 
         LOGGER.debug("Sending prompt to YandexGPT (len=%s)", len(prompt))
-        response = await self._client.post(self._base_url, json=body)
+        response = await self._client.post(self._settings.yandexgpt_api_url, json=body)
         response.raise_for_status()
 
         payload: dict[str, Any] = response.json()

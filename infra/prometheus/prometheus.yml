@@ -9,6 +9,13 @@ scrape_configs:
       - targets: ['rust-api:8081']
     metrics_path: '/metrics'
 
+  # Python Explanation Service метрики
+  - job_name: 'python-generator'
+    static_configs:
+      - targets: ['python-generator:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
   # MongoDB метрики
   - job_name: 'mongodb'
     static_configs:

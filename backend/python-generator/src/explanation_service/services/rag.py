@@ -59,7 +59,9 @@ class RAGPipeline:
         query_text = self._compose_query(task, normalized_errors)
         reference_chunks, rule_refs = await self._search_rules(query_text, template)
 
-        context_lines = "\n".join(reference_chunks) if reference_chunks else "Нет контекста."
+        context_lines = (
+            "\n".join(reference_chunks) if reference_chunks else "Нет контекста."
+        )
 
         prompt = (
             f"Тема: {topic_name}\n"
@@ -123,6 +125,7 @@ class RAGPipeline:
         cursor = self._rules.find({"_id": {"$in": rule_ids}})
         rules = await cursor.to_list(length=len(rule_ids))
         return [
-            f"{rule.get('name', rule.get('_id', 'правило'))}: {rule.get('description', 'нет описания')}"
+            f"{rule.get('name', rule.get('_id', 'правило'))}: "
+            f"{rule.get('description', 'нет описания')}"
             for rule in rules
         ]

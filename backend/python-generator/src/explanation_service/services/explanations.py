@@ -76,7 +76,8 @@ class ExplanationService:
         explanation_text: str | None = None
         source: Literal["cache", "yandexgpt", "fallback"] = "fallback"
         use_llm = await self._feature_flags.is_enabled(
-            "explanation_yandexgpt_enabled", self._settings.explanation_yandexgpt_enabled
+            "explanation_yandexgpt_enabled",
+            self._settings.explanation_yandexgpt_enabled,
         )
 
         if use_llm and self._yandex:

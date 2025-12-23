@@ -57,7 +57,9 @@ def create_app() -> FastAPI:
         logging.getLogger(__name__).info("Starting explanation service")
         mongo_client: AsyncIOMotorClient = AsyncIOMotorClient(settings.mongodb_uri)
         redis_client = redis.from_url(settings.redis_url, decode_responses=True)
-        qdrant_client = QdrantClient(url=str(settings.qdrant_url), api_key=settings.qdrant_api_key)
+        qdrant_client = QdrantClient(
+            url=str(settings.qdrant_url), api_key=settings.qdrant_api_key
+        )
 
         yandex_client = None
         if settings.yandexgpt_api_key and settings.yandexgpt_folder_id:
@@ -69,7 +71,9 @@ def create_app() -> FastAPI:
         app.state.redis = redis_client
         app.state.qdrant = qdrant_client
         app.state.yandex_client = yandex_client
-        worker = EmbeddingWorker(settings, app.state.mongo_db, redis_client, qdrant_client)
+        worker = EmbeddingWorker(
+            settings, app.state.mongo_db, redis_client, qdrant_client
+        )
         app.state.embedding_worker = worker
         app.state.embedding_task = asyncio.create_task(worker.run_forever())
         scheduler = MaintenanceScheduler(settings, qdrant_client, redis_client)

@@ -49,6 +49,17 @@ class Settings(BaseSettings):
     yandexgpt_folder_id: str | None = None
     yandexgpt_model: str = Field(default="yandexgpt-lite")
     yandexgpt_timeout_seconds: float = Field(default=2.0)
+    yandexgpt_api_url: str = Field(
+        default="https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+    )
+    yandexgpt_temperature: float = Field(default=0.2)
+    yandexgpt_max_tokens: int = Field(default=700)
+    yandexgpt_system_prompt: str = Field(
+        default=(
+            "Ты — преподаватель русского языка. "
+            "Объясняй ошибки кратко, с примерами и отсылками к правилам."
+        )
+    )
     explanation_yandexgpt_enabled: bool = Field(default=True)
 
     embedding_model_name: str = Field(

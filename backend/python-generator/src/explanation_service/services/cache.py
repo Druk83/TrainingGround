@@ -29,7 +29,9 @@ class ExplanationCache:
                 "language",
             }
         )
-        encoded = json.dumps(serializable, sort_keys=True, ensure_ascii=False).encode("utf-8")
+        encoded = json.dumps(serializable, sort_keys=True, ensure_ascii=False).encode(
+            "utf-8"
+        )
         return hashlib.sha1(encoded).hexdigest()
 
     def _key(self, task_id: str) -> str:
@@ -65,4 +67,6 @@ class ExplanationCache:
             "fingerprint": self._fingerprint(payload),
             "response": response.model_dump(mode="json"),
         }
-        await self._redis.setex(key, self._ttl, json.dumps(document, ensure_ascii=False))
+        await self._redis.setex(
+            key, self._ttl, json.dumps(document, ensure_ascii=False)
+        )

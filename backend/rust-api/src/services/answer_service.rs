@@ -463,12 +463,14 @@ mod tests {
     use super::*;
 
     #[test]
+    #[serial_test::serial]
     fn answers_save_async_default_enabled() {
         std::env::remove_var("ANSWERS_SAVE_ASYNC");
         assert!(AnswerService::answers_save_async_enabled());
     }
 
     #[test]
+    #[serial_test::serial]
     fn answers_save_async_can_be_disabled() {
         std::env::set_var("ANSWERS_SAVE_ASYNC", "0");
         assert!(!AnswerService::answers_save_async_enabled());
