@@ -1,0 +1,127 @@
+:root {
+  --surface-0: #050914;
+  --surface-1: #0b1521;
+  --surface-2: #111d2d;
+  --surface-3: #172236;
+  --primary: #3b82f6;
+  --primary-soft: #60a5fa33;
+  --error: #f87171;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --text-main: #f8fafc;
+  --text-muted: #93adc9;
+  color-scheme: dark;
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+
+  /* Профильные брейкпоинты */
+  --bp-xxs: 0px;
+  --bp-xs: 480px;
+  --bp-sm: 768px;
+  --bp-m: 1024px;
+  --bp-l: 1440px;
+  --bp-xl: 1920px;
+  --bp-vh-compact: 600px;
+
+  /* Токены адаптивного layout */
+  --layout-max-width: 1920px;
+  --layout-padding-x: clamp(1rem, 4vw, 2.5rem);
+  --layout-padding-y: clamp(1rem, 3vh, 2rem);
+  --layout-gap: 1.5rem;
+  --layout-sidebar: 280px;
+  --layout-insights: 320px;
+  --panel-radius: 1.5rem;
+  --panel-padding: 1.5rem;
+  --panel-gap: 1rem;
+}
+
+@media (max-width: 1919px) {
+  :root {
+    --layout-max-width: 1760px;
+  }
+}
+
+@media (max-width: 1439px) {
+  :root {
+    --layout-max-width: 1320px;
+    --layout-insights: 300px;
+  }
+}
+
+@media (max-width: 1279px) {
+  :root {
+    --layout-padding-x: clamp(1rem, 5vw, 2rem);
+    --layout-gap: 1.25rem;
+  }
+}
+
+@media (max-width: 1023px) {
+  :root {
+    --layout-max-width: 960px;
+    --layout-sidebar: 100%;
+    --layout-insights: 100%;
+    --layout-padding-y: clamp(0.75rem, 4vh, 1.5rem);
+    --panel-radius: 1.25rem;
+  }
+}
+
+@media (max-width: 767px) {
+  :root {
+    --layout-max-width: 100%;
+    --layout-gap: 1rem;
+    --panel-padding: 1.25rem;
+  }
+}
+
+@media (max-width: 479px) {
+  :root {
+    --layout-padding-x: clamp(0.75rem, 5vw, 1.25rem);
+    --layout-padding-y: clamp(0.5rem, 6vh, 1rem);
+    --panel-radius: 1rem;
+    --panel-padding: 1rem;
+  }
+}
+
+@media (max-height: 599px) {
+  :root {
+    --layout-padding-y: 0.75rem;
+    --panel-padding: 1rem;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #162740, #050914);
+  color: var(--text-main);
+  font-size: clamp(0.95rem, 0.9rem + 0.4vw, 1.1rem);
+  line-height: 1.5;
+}
+
+app-shell {
+  display: block;
+  min-height: 100vh;
+  max-width: var(--layout-max-width);
+  margin: 0 auto;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

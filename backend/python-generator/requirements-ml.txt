@@ -1,0 +1,11 @@
+# Vector database client
+qdrant-client>=1.9
+
+# ML and embeddings (heavy dependencies)
+sentence-transformers>=5.2.0
+numpy>=2.4.0
+scipy>=1.11
+
+# NLP libraries
+pymorphy2>=0.9
+natasha>=1.6

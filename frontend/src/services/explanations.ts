@@ -17,9 +17,8 @@ export interface ExplanationResponse {
 }
 
 const DEFAULT_BASE = '/api/explanations';
-const globalApiOverride = (
-  globalThis as unknown as { __EXPLANATION_API__?: string }
-).__EXPLANATION_API__;
+const globalApiOverride = (globalThis as unknown as { __EXPLANATION_API__?: string })
+  .__EXPLANATION_API__;
 
 const viteApiOverride = (
   import.meta as unknown as { env?: { VITE_EXPLANATION_API?: string } }
