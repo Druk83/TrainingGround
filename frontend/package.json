@@ -12,7 +12,9 @@
     "test:components": "web-test-runner --config web-test-runner.config.mjs",
     "lint": "cross-env ESLINT_USE_FLAT_CONFIG=false eslint -c .eslintrc.cjs \"src/**/*.{ts,tsx,js}\"",
     "format": "prettier --write \"{src,public}/**/*.{ts,js,json,css,md,html}\"",
-    "check": "tsc -p tsconfig.json --noEmit"
+    "format:check": "prettier --check \"{src,public}/**/*.{ts,js,json,css,md,html}\"",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "type-check": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "idb": "^8.0.1",
