@@ -14,7 +14,14 @@
     "format": "prettier --write \"{src,public}/**/*.{ts,js,json,css,md,html}\"",
     "format:check": "prettier --check \"{src,public}/**/*.{ts,js,json,css,md,html}\"",
     "check": "tsc -p tsconfig.json --noEmit",
-    "type-check": "tsc -p tsconfig.json --noEmit"
+    "type-check": "tsc -p tsconfig.json --noEmit",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:a11y": "playwright test tests/a11y",
+    "lighthouse": "lighthouse http://localhost:4173 --preset=desktop --output=html --output-path=./lighthouse-report.html --quiet --chrome-flags=\"--headless\"",
+    "lighthouse:ci": "lighthouse http://localhost:4173 --preset=desktop --output=json --output-path=./lighthouse-report.json --chrome-flags=\"--headless\"",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "idb": "^8.0.1",
@@ -31,8 +38,10 @@
     "zod": "^4.2.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.0",
     "@open-wc/testing": "^4.0.0",
     "@open-wc/testing-helpers": "^3.0.1",
+    "@playwright/test": "^1.48.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "^25.0.3",
     "@typescript-eslint/eslint-plugin": "^8.17.0",
@@ -41,6 +50,7 @@
     "@web/dev-server-esbuild": "^1.0.4",
     "@web/test-runner": "^0.20.2",
     "@web/test-runner-playwright": "^0.11.1",
+    "axe-playwright": "^2.2.2",
     "cross-env": "^10.1.0",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^10.1.8",
@@ -51,11 +61,20 @@
     "eslint-plugin-wc": "^3.0.2",
     "fake-indexeddb": "^6.0.1",
     "happy-dom": "^20.0.11",
+    "lighthouse": "^13.0.1",
     "playwright": "^1.48.0",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2",
     "vite": "^7.3.0",
     "vite-plugin-pwa": "^1.2.0",
-    "vitest": "^4.0.16"
+    "vitest": "^4.0.16",
+    "storybook": "^10.1.10",
+    "@storybook/web-components-vite": "^10.1.10",
+    "@chromatic-com/storybook": "^4.1.3",
+    "@storybook/addon-vitest": "^10.1.10",
+    "@storybook/addon-a11y": "^10.1.10",
+    "@storybook/addon-docs": "^10.1.10",
+    "eslint-plugin-storybook": "^10.1.10",
+    "@vitest/browser-playwright": "^4.0.16"
   }
 }

@@ -1,0 +1,30 @@
+/// <reference types="mocha" />
+import { html, fixture, expect } from '@open-wc/testing';
+import '../../src/components/score-board';
+import type { ScoreBoard } from '../../src/components/score-board';
+
+describe('score-board', () => {
+  it('shows key metrics and exposes aria-live status', async () => {
+    const element = await fixture<ScoreBoard>(html`<score-board></score-board>`);
+    element.data = {
+      totalScore: 150,
+      attempts: 2,
+      correct: 2,
+      accuracy: 100,
+      currentStreak: 2,
+      longestStreak: 5,
+      hintsUsed: 1,
+      hintsRemaining: 1,
+    };
+    await element.updateComplete;
+
+    const cards = element.shadowRoot?.querySelectorAll('.card') ?? [];
+    expect(cards[0].textContent).to.include('150');
+    expect(cards[1].textContent).to.include('100%');
+
+    const statusRegion = element.shadowRoot?.querySelector('section');
+    expect(statusRegion?.getAttribute('role')).to.equal('status');
+    const liveRegion = element.shadowRoot?.querySelector('[aria-live="polite"]');
+    expect(liveRegion?.textContent).to.include('Баллы: 150');
+  });
+});

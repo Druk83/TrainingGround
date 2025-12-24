@@ -1,4 +1,4 @@
-﻿type FlagKey = 'offlineQueue' | 'analytics' | 'workbox' | 'experimentalHotkeys';
+type FlagKey = 'offlineQueue' | 'analytics' | 'workbox' | 'hotkeys';
 
 type FlagMap = Record<FlagKey, boolean>;
 
@@ -6,13 +6,11 @@ const defaultFlags: FlagMap = {
   offlineQueue: true,
   analytics: true,
   workbox: true,
-  experimentalHotkeys: false,
+  hotkeys: false,
 };
 
 const globalFlags = (
-  globalThis as unknown as {
-    __FEATURE_FLAGS__?: Partial<FlagMap>;
-  }
+  (globalThis as unknown as { __FEATURE_FLAGS__?: Partial<FlagMap> }) || {}
 ).__FEATURE_FLAGS__;
 
 const envFlags = (() => {
@@ -27,11 +25,26 @@ const envFlags = (() => {
   return undefined;
 })();
 
+const explicitHotkeys = (() => {
+  const value = import.meta.env.VITE_FEATURE_HOTKEYS;
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  return value.toString().toLowerCase() === 'true';
+})();
+
 const flags: FlagMap = {
   ...defaultFlags,
   ...(envFlags ?? {}),
   ...(globalFlags ?? {}),
 };
+
+if (typeof explicitHotkeys === 'boolean') {
+  flags.hotkeys = explicitHotkeys;
+}
 
 export function isFeatureEnabled(key: FlagKey) {
   return flags[key];

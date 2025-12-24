@@ -54,7 +54,9 @@ export class LessonCatalog extends LitElement {
 
     button[disabled] {
       cursor: not-allowed;
-      opacity: 0.6;
+      opacity: 1;
+      color: #9fb8dd;
+      border-color: #2f3d58;
     }
 
     button.active {

@@ -12,7 +12,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["vite/client", "mocha"],
+    "types": ["vite/client", "mocha", "node"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]

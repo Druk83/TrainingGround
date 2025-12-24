@@ -11,11 +11,20 @@ export class ConnectionIndicator extends LitElement {
     conflicts: { type: Number },
   };
 
-  online = true;
-  queueSize = 0;
-  syncing = false;
-  message?: string;
-  conflicts = 0;
+  declare online: boolean;
+  declare queueSize: number;
+  declare syncing: boolean;
+  declare message?: string;
+  declare conflicts: number;
+
+  constructor() {
+    super();
+    this.online = true;
+    this.queueSize = 0;
+    this.syncing = false;
+    this.message = undefined;
+    this.conflicts = 0;
+  }
 
   static styles = css`
     :host {
@@ -57,8 +66,9 @@ export class ConnectionIndicator extends LitElement {
     }
 
     button[disabled] {
-      opacity: 0.6;
+      opacity: 1;
       cursor: wait;
+      color: #cbd5f5;
     }
   `;
 

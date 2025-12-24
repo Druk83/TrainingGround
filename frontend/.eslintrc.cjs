@@ -10,7 +10,8 @@
     "plugin:lit/recommended",
     "plugin:lit-a11y/recommended",
     "plugin:wc/recommended",
-    "plugin:prettier/recommended"
+    "plugin:prettier/recommended",
+    "plugin:storybook/recommended"
   ],
   parser: "@typescript-eslint/parser",
   parserOptions: {

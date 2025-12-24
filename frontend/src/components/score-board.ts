@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, type PropertyValues } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import type { ScoreState } from '@/lib/session-store';
 
@@ -8,15 +8,22 @@ export class ScoreBoard extends LitElement {
     data: { type: Object },
   };
 
-  data: ScoreState = {
-    totalScore: 0,
-    attempts: 0,
-    correct: 0,
-    accuracy: 0,
-    currentStreak: 0,
-    longestStreak: 0,
-    hintsUsed: 0,
-  };
+  declare data: ScoreState;
+  declare private announceText: string;
+
+  constructor() {
+    super();
+    this.data = {
+      totalScore: 0,
+      attempts: 0,
+      correct: 0,
+      accuracy: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+      hintsUsed: 0,
+    };
+    this.announceText = this.composeAnnouncement(this.data);
+  }
 
   static styles = css`
     :host {
@@ -57,6 +64,18 @@ export class ScoreBoard extends LitElement {
       font-size: 1.4rem;
       font-weight: 600;
     }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
   `;
 
   render() {
@@ -75,7 +94,10 @@ export class ScoreBoard extends LitElement {
     ];
 
     return html`
-      <section aria-labelledby="score-heading">
+      <section aria-labelledby="score-heading" role="status">
+        <div class="sr-only" aria-live="polite" aria-atomic="true">
+          ${this.announceText}
+        </div>
         <h2 id="score-heading">Статистика</h2>
         <div class="grid">
           ${stats.map(
@@ -89,5 +111,32 @@ export class ScoreBoard extends LitElement {
         </div>
       </section>
     `;
+  }
+
+  protected willUpdate(changed: PropertyValues) {
+    if (changed.has('data')) {
+      this.announceText = this.composeAnnouncement(
+        this.data,
+        changed.get('data') as ScoreState,
+      );
+    }
+  }
+
+  private composeAnnouncement(current: ScoreState, previous?: ScoreState): string {
+    if (
+      previous &&
+      previous.totalScore === current.totalScore &&
+      previous.currentStreak === current.currentStreak
+    ) {
+      return this.announceText;
+    }
+
+    const parts = [`Баллы: ${current.totalScore}`];
+    parts.push(
+      current.currentStreak > 0
+        ? `Текущая серия: ${current.currentStreak}`
+        : 'Серия обнулена',
+    );
+    return parts.join('. ');
   }
 }

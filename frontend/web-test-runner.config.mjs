@@ -2,7 +2,7 @@
 import { esbuildPlugin } from "@web/dev-server-esbuild";
 
 export default {
-  files: "src/__tests__/**/*.wtr.ts",
+  files: ["src/__tests__/**/*.wtr.ts", "tests/components/**/*.wtr.ts"],
   nodeResolve: true,
   concurrentBrowsers: 1,
   browsers: [
@@ -16,7 +16,12 @@ export default {
   plugins: [
     esbuildPlugin({
       ts: true,
-      target: "es2022"
+      target: "es2022",
+      tsconfigRaw: {
+        compilerOptions: {
+          useDefineForClassFields: true
+        }
+      }
     })
   ]
 };

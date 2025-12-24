@@ -649,3 +649,7 @@ export class LessonStore {
 }
 
 export const lessonStore = new LessonStore();
+
+if (typeof window !== 'undefined') {
+  (window as unknown as { __lessonStore__?: LessonStore }).__lessonStore__ = lessonStore;
+}

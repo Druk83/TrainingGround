@@ -14,7 +14,12 @@ npm run dev # http://localhost:4173
 - `npm run dev` — запуск Vite dev-сервера с HMR и dev PWA.
 - `npm run build` / `npm run preview` — сборка и предпросмотр.
 - `npm run test` — unit-тесты (Vitest, offline queue).
-- `npm run test:components` — Web Component snapshot на Web Test Runner + Playwright.
+- `npm run test:components` — Web Component тесты на Web Test Runner + Playwright.
+- `npm run test:e2e` — E2E тесты с Playwright (lesson-flow, hints, offline, timer, conflicts).
+- `npm run test:e2e:ui` — E2E тесты в UI режиме.
+- `npm run test:a11y` — A11y тесты с axe-core.
+- `npm run lighthouse` — Lighthouse audit (HTML отчет).
+- `npm run storybook` — Storybook на http://localhost:6006.
 - `npm run lint` / `npm run format` — ESLint + Prettier.
 
 ## Архитектура
@@ -49,9 +54,13 @@ frontend/
 - `VITE_API_BASE` – базовый URL Rust API (`/api/v1` по умолчанию).
 - `VITE_EXPLANATION_API` – override для Python генератора.
 - `VITE_FEATURE_FLAGS` – JSON строка с feature flags (`{"offlineQueue":false}` ...).
+- `VITE_FEATURE_HOTKEYS` – включить горячие клавиши (H, S, Esc). По умолчанию `false`.
 
 ## Hotkeys & Edge cases
-- `Ctrl + Enter` – отправка ответа.
+- `Ctrl + Enter` – отправка ответа (всегда работает).
+- `H` – запрос подсказки (если `VITE_FEATURE_HOTKEYS=true`).
+- `S` – отправка ответа вне поля ввода (если `VITE_FEATURE_HOTKEYS=true`).
+- `Esc` – закрытие onboarding/conflict-resolver (если `VITE_FEATURE_HOTKEYS=true`).
 - При оффлайне ответы/подсказки складываются в очередь, при восстановлении сети показывается snackbar.
 - Конфликты (сервер уже получил ответ) подсвечиваются в ConnectionIndicator и хранятся до ручной синхронизации.
 - SW уведомляет о свежей версии (skipWaiting) и offline-ready событии.

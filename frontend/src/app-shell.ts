@@ -8,11 +8,13 @@ import {
   type TimerState,
   type ConflictResolution,
 } from '@/lib/session-store';
+import { isFeatureEnabled } from '@/lib/feature-flags';
 import '@/components/lesson-catalog';
 import '@/components/lesson-player';
 import '@/components/hint-panel';
 import '@/components/connection-indicator';
 import '@/components/conflict-resolver';
+import type { LessonPlayer } from '@/components/lesson-player';
 
 interface AppShellState {
   snapshot: LessonStoreSnapshot;
@@ -51,6 +53,11 @@ export class AppShell extends LitElement {
   private isCompactHeight = false;
   @state()
   private activePanel: PanelId = 'player';
+  @state()
+  private userFormError?: string;
+  @state()
+  private showConflictsPanel = true;
+  private readonly hotkeysEnabled = isFeatureEnabled('hotkeys');
   private mediaSubscriptions: Array<{
     list: MediaQueryList;
     handler: (event: MediaQueryListEvent) => void;
@@ -60,6 +67,12 @@ export class AppShell extends LitElement {
     :host {
       display: block;
       color: var(--text-main);
+    }
+
+    .app-main {
+      display: block;
+      min-height: 100vh;
+      position: relative;
     }
 
     .layout {
@@ -121,6 +134,50 @@ export class AppShell extends LitElement {
       background: var(--surface-2);
       border-radius: var(--panel-radius);
       border: 1px solid #111b2a;
+    }
+
+    .form-error {
+      color: var(--error);
+      font-size: 0.9rem;
+      margin: -0.25rem 0 0;
+    }
+
+    .hotkey-note {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin: 0.25rem 0;
+    }
+
+    .hotkey-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.5rem;
+      padding: 0.1rem 0.4rem;
+      margin-left: 0.35rem;
+      border-radius: 0.5rem;
+      border: 1px solid #334155;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      background: #02061755;
+    }
+
+    .conflict-placeholder {
+      padding: var(--panel-padding);
+      background: var(--surface-2);
+      border-radius: var(--panel-radius);
+      border: 1px dashed #334155;
+    }
+
+    .conflict-placeholder button {
+      border: none;
+      border-radius: 999px;
+      padding: 0.45rem 1.2rem;
+      margin-top: 0.5rem;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
     }
 
     details.user-form {
@@ -227,7 +284,7 @@ export class AppShell extends LitElement {
       z-index: 10;
     }
 
-    .onboarding article {
+    .onboarding-card {
       background: var(--surface-1);
       padding: 2rem;
       border-radius: 1.5rem;
@@ -304,6 +361,9 @@ export class AppShell extends LitElement {
     });
     window.addEventListener('sw-update-available', this.handleSwUpdate as EventListener);
     window.addEventListener('sw-offline-ready', this.offlineReadyHandler);
+    if (this.hotkeysEnabled) {
+      window.addEventListener('keydown', this.handleHotkeys);
+    }
     this.setupMediaQueries();
   }
 
@@ -315,16 +375,21 @@ export class AppShell extends LitElement {
       this.handleSwUpdate as EventListener,
     );
     window.removeEventListener('sw-offline-ready', this.offlineReadyHandler);
+    if (this.hotkeysEnabled) {
+      window.removeEventListener('keydown', this.handleHotkeys);
+    }
     this.teardownMediaQueries();
   }
 
   render() {
     return html`
-      <div class="layout">
-        ${this.renderStackedTabs()} ${this.renderSidebarSection()}
-        ${this.renderPlayerSection()} ${this.renderInsightsSection()}
-      </div>
-      ${this.renderNotifications()}${this.renderSwBanner()}${this.renderOnboarding()}
+      <main class="app-main" role="main" aria-labelledby="player-title">
+        <div class="layout">
+          ${this.renderStackedTabs()} ${this.renderSidebarSection()}
+          ${this.renderPlayerSection()} ${this.renderInsightsSection()}
+        </div>
+        ${this.renderNotifications()}${this.renderSwBanner()}${this.renderOnboarding()}
+      </main>
     `;
   }
 
@@ -364,15 +429,16 @@ export class AppShell extends LitElement {
       <section
         class="player-area"
         id="player-panel"
-        role=${this.isStackedLayout ? 'tabpanel' : 'main'}
+        role=${this.isStackedLayout ? 'tabpanel' : 'region'}
         aria-labelledby=${ariaLabel}
         ?hidden=${hidden}
       >
-        <h2 id="player-title" class="sr-only">Игровой плеер</h2>
+        <h1 id="player-title" class="sr-only">Игровой плеер</h1>
         <lesson-player
           .session=${this.snapshot.activeSession}
           .timer=${this.snapshot.timer as TimerState}
           .scoreboard=${this.snapshot.scoreboard as ScoreState}
+          .hotkeysEnabled=${this.hotkeysEnabled}
           @answer-submit=${this.forwardAnswer}
           @answer-typing=${this.handleTyping}
         ></lesson-player>
@@ -397,14 +463,48 @@ export class AppShell extends LitElement {
           .explanations=${this.snapshot.hints.explanations}
           .loading=${this.snapshot.hints.isLoading}
           .error=${this.snapshot.hints.error}
+          .hotkeysEnabled=${this.hotkeysEnabled}
           @request-hint=${this.forwardHint}
         ></hint-panel>
+        ${this.renderConflictResolver()}
+      </aside>
+    `;
+  }
+
+  private renderConflictResolver() {
+    const conflictCount = this.snapshot.conflicts.length;
+    if (!conflictCount) {
+      return html`
         <conflict-resolver
           .conflicts=${this.snapshot.conflicts}
           @resolve-conflict=${this.handleConflictResolve}
           @clear-conflicts=${this.handleConflictClear}
         ></conflict-resolver>
-      </aside>
+      `;
+    }
+
+    if (!this.showConflictsPanel) {
+      return html`
+        <section class="conflict-placeholder" aria-live="polite">
+          <p>Нерешённых конфликтов: ${conflictCount}. Панель скрыта.</p>
+          <button @click=${() => (this.showConflictsPanel = true)}>
+            Открыть конфликты
+          </button>
+        </section>
+      `;
+    }
+
+    return html`
+      ${this.hotkeysEnabled
+        ? html`<p class="hotkey-note" aria-hidden="true">
+            Esc — скрыть панель конфликтов.
+          </p>`
+        : null}
+      <conflict-resolver
+        .conflicts=${this.snapshot.conflicts}
+        @resolve-conflict=${this.handleConflictResolve}
+        @clear-conflicts=${this.handleConflictClear}
+      ></conflict-resolver>
     `;
   }
 
@@ -445,14 +545,28 @@ export class AppShell extends LitElement {
     if (changed.has('isCompactHeight')) {
       this.toggleAttribute('vh-compact', this.isCompactHeight);
     }
+    if (
+      changed.has('snapshot') &&
+      !this.snapshot.conflicts.length &&
+      !this.showConflictsPanel
+    ) {
+      this.showConflictsPanel = true;
+    }
   }
 
   private renderUserForm() {
+    const errorId = 'user-form-error';
     const formTemplate = html`
-      <form @submit=${this.handleUserSubmit}>
+      <form @submit=${this.handleUserSubmit} aria-describedby=${errorId} novalidate>
         <label>
           ID ученика
-          <input name="userId" .value=${this.snapshot.user.id ?? ''} required />
+          <input
+            name="userId"
+            .value=${this.snapshot.user.id ?? ''}
+            required
+            aria-describedby=${errorId}
+            aria-invalid=${this.userFormError ? 'true' : 'false'}
+          />
         </label>
         <label>
           ID группы
@@ -463,6 +577,9 @@ export class AppShell extends LitElement {
           <input name="token" .value=${this.snapshot.user.token ?? ''} />
         </label>
         <button type="submit">Сохранить</button>
+        <p id=${errorId} class="form-error" role="alert" aria-live="polite">
+          ${this.userFormError ?? ''}
+        </p>
       </form>
     `;
 
@@ -516,6 +633,66 @@ export class AppShell extends LitElement {
       `#tab-${nextPanel}`,
     );
     nextTab?.focus();
+  }
+
+  private handleHotkeys = (event: KeyboardEvent) => {
+    if (!this.hotkeysEnabled) {
+      return;
+    }
+
+    const key = event.key.toLowerCase();
+    const target = (event.composedPath?.()[0] ?? event.target) as HTMLElement | null;
+
+    if (key === 'escape') {
+      if (!this.snapshot.onboardingComplete) {
+        event.preventDefault();
+        lessonStore.setOnboardingComplete();
+        return;
+      }
+      if (this.snapshot.conflicts.length && this.showConflictsPanel) {
+        event.preventDefault();
+        this.showConflictsPanel = false;
+        return;
+      }
+    }
+
+    if (this.isInputLikeTarget(target)) {
+      return;
+    }
+
+    const isCtrlEnter = event.key === 'Enter' && event.ctrlKey;
+    if (key === 'h') {
+      event.preventDefault();
+      this.forwardHint();
+    } else if (key === 's' || isCtrlEnter) {
+      event.preventDefault();
+      this.submitAnswerFromHotkey();
+    }
+  };
+
+  private submitAnswerFromHotkey() {
+    if (!this.snapshot.activeSession) {
+      return;
+    }
+    const player = this.renderRoot?.querySelector<LessonPlayer>('lesson-player');
+    player?.submitAnswerFromHost();
+  }
+
+  private isInputLikeTarget(target: HTMLElement | null) {
+    if (!target) {
+      return false;
+    }
+    const tag = target.tagName?.toLowerCase();
+    if (!tag) {
+      return false;
+    }
+    if (tag === 'input' || tag === 'textarea') {
+      return true;
+    }
+    if (target.isContentEditable) {
+      return true;
+    }
+    return target.getAttribute('role') === 'textbox';
   }
 
   private setupMediaQueries() {
@@ -595,15 +772,28 @@ export class AppShell extends LitElement {
       return null;
     }
     return html`
-      <div class="onboarding">
-        <article>
-          <h2>Добро пожаловать</h2>
-          <p>
+      <div
+        class="onboarding"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="onboarding-title"
+        aria-describedby="onboarding-desc"
+      >
+        <section
+          class="onboarding-card"
+          aria-labelledby="onboarding-title"
+          aria-describedby="onboarding-desc"
+        >
+          <h2 id="onboarding-title">Добро пожаловать</h2>
+          <p id="onboarding-desc">
             Выберите урок, чтобы начать занятие. Можно тренироваться офлайн — ответы
             синхронизируются при подключении к сети.
           </p>
+          ${this.hotkeysEnabled
+            ? html`<p class="hotkey-note">Esc — закрыть приветствие.</p>`
+            : null}
           <button @click=${() => lessonStore.setOnboardingComplete()}>Понятно</button>
-        </article>
+        </section>
       </div>
     `;
   }
@@ -648,10 +838,21 @@ export class AppShell extends LitElement {
     event.preventDefault();
     const form = event.currentTarget as HTMLFormElement;
     const data = new FormData(form);
+    const userId = String(data.get('userId') ?? '').trim();
+    const groupId = String(data.get('groupId') ?? '').trim();
+    const token = String(data.get('token') ?? '').trim();
+
+    if (!userId) {
+      this.userFormError = 'Укажите ID ученика перед сохранением.';
+      form.querySelector<HTMLInputElement>("input[name='userId']")?.focus();
+      return;
+    }
+
+    this.userFormError = undefined;
     lessonStore.setUser({
-      id: String(data.get('userId') ?? ''),
-      groupId: String(data.get('groupId') ?? ''),
-      token: String(data.get('token') ?? ''),
+      id: userId,
+      groupId,
+      token,
     });
   }
 }

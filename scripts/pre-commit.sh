@@ -5,8 +5,8 @@ echo "================================"
 echo "Pre-commit validation started"
 echo "================================"
 
-# Определить измененные компоненты
-CHANGED_FILES=$(git diff --cached --name-only)
+# Определить измененные компоненты (staged + unstaged)
+CHANGED_FILES=$(git diff --name-only HEAD)
 
 RUN_FRONTEND=false
 RUN_RUST=false

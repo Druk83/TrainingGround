@@ -9,7 +9,12 @@ export class ConflictResolver extends LitElement {
     conflicts: { type: Array },
   };
 
-  conflicts: OfflineOperation[] = [];
+  declare conflicts: OfflineOperation[];
+
+  constructor() {
+    super();
+    this.conflicts = [];
+  }
 
   static styles = css`
     :host {

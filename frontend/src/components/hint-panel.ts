@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, nothing } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import type { HintEntry, ExplanationEntry } from '@/lib/session-store';
 
@@ -9,12 +9,23 @@ export class HintPanel extends LitElement {
     explanations: { type: Array },
     loading: { type: Boolean },
     error: { type: String },
+    hotkeysEnabled: { type: Boolean },
   };
 
-  hints: HintEntry[] = [];
-  explanations: ExplanationEntry[] = [];
-  loading = false;
-  error?: string;
+  declare hints: HintEntry[];
+  declare explanations: ExplanationEntry[];
+  declare loading: boolean;
+  declare error?: string;
+  declare hotkeysEnabled: boolean;
+
+  constructor() {
+    super();
+    this.hints = [];
+    this.explanations = [];
+    this.loading = false;
+    this.error = undefined;
+    this.hotkeysEnabled = false;
+  }
 
   static styles = css`
     :host {
@@ -50,9 +61,25 @@ export class HintPanel extends LitElement {
       font-weight: 600;
     }
 
+    .hotkey-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.5rem;
+      padding: 0.1rem 0.4rem;
+      margin-left: 0.35rem;
+      border-radius: 0.5rem;
+      border: 1px solid #334155;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      background: #02061755;
+    }
+
     button[disabled] {
-      opacity: 0.7;
+      opacity: 1;
       cursor: wait;
+      background: #1e3a8a;
+      color: #cbd5f5;
     }
 
     article {
@@ -84,8 +111,12 @@ export class HintPanel extends LitElement {
             @click=${this.handleHintRequest}
             ?disabled=${this.loading}
             aria-busy=${this.loading}
+            title=${this.hotkeysEnabled ? 'Горячая клавиша: H' : nothing}
           >
             ${this.loading ? 'Отправляем...' : 'Запросить подсказку'}
+            ${this.hotkeysEnabled && !this.loading
+              ? html`<span class="hotkey-badge" aria-hidden="true">H</span>`
+              : null}
           </button>
         </div>
         ${this.error ? html`<p role="alert">${this.error}</p>` : null}
