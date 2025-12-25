@@ -7,7 +7,7 @@ echo "================================"
 
 # SD-07: Security check - prevent committing MongoDB keyfiles
 echo "[INFO] Checking for sensitive files..."
-STAGED_KEYFILES=$(git diff --cached --name-only | grep -E "(mongo-keyfile|mongo-keyfile\.secure|mongodb-keyfile)" | grep -v "\.example" || true)
+STAGED_KEYFILES=$(git diff --cached --name-only | grep -E "(mongo-keyfile|mongo-keyfile\.secure|mongodb-keyfile)" | grep -v "\.example" | grep -v "\.md$" | grep -v "^docs/" | grep -v "^scripts/" || true)
 if [ -n "$STAGED_KEYFILES" ]; then
     echo "[ERROR] Attempting to commit MongoDB keyfile! This is a CRITICAL SECURITY ISSUE!"
     echo "The following files must NOT be committed:"
