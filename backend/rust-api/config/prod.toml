@@ -61,5 +61,8 @@ access_key = "${OBJECT_STORAGE_ACCESS_KEY}"
 secret_key = "${OBJECT_STORAGE_SECRET_KEY}"
 reports_prefix = "reports/prod"
 
+[content]
+stream_name = "${CONTENT_STREAM_NAME}"
+
 [sso]
 enabled = false

@@ -1,19 +1,28 @@
 ﻿import { nanoid } from 'nanoid';
 import type {
+  AdminTemplateDetail,
+  AdminTemplateSummary,
+  AdminTemplateUpdatePayload,
   CreateSessionPayload,
   CreateSessionResponse,
   ExportRequestPayload,
   ExportResponsePayload,
+  FeatureFlagRecord,
+  FeatureFlagUpdatePayload,
   GroupStatsResponse,
+  QueueStatus,
   RequestHintPayload,
   RequestHintResponse,
   SessionResponse,
-  SubmitAnswerPayload,
   SubmitAnswerResponse,
+  SubmitAnswerPayload,
+  TemplateFilterParams,
+  TemplateRevertPayload,
 } from './api-types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1';
 const STATS_BASE = import.meta.env.VITE_REPORTING_API ?? '/stats';
+const ADMIN_BASE = '/admin';
 
 export interface ApiClientOptions {
   jwt?: string;
@@ -109,6 +118,70 @@ export class ApiClient {
   async requestGroupExport(groupId: string, payload: ExportRequestPayload) {
     return this.request<ExportResponsePayload>(`${STATS_BASE}/groups/${groupId}/export`, {
       method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async listAdminTemplates(filters: TemplateFilterParams = {}) {
+    const query = new URLSearchParams();
+    if (filters.status) {
+      query.append('status', filters.status);
+    }
+    if (filters.topic_id) {
+      query.append('topic_id', filters.topic_id);
+    }
+    if (filters.level_id) {
+      query.append('level_id', filters.level_id);
+    }
+    if (filters.difficulty) {
+      query.append('difficulty', filters.difficulty);
+    }
+    if (typeof filters.version === 'number') {
+      query.append('version', filters.version.toString());
+    }
+    if (filters.q) {
+      query.append('q', filters.q);
+    }
+    if (typeof filters.limit === 'number') {
+      query.append('limit', filters.limit.toString());
+    }
+    const queryString = query.toString();
+    const url = `${ADMIN_BASE}/templates${queryString ? `?${queryString}` : ''}`;
+    return this.request<AdminTemplateSummary[]>(url);
+  }
+
+  async getAdminTemplate(templateId: string) {
+    return this.request<AdminTemplateDetail>(`${ADMIN_BASE}/templates/${templateId}`);
+  }
+
+  async updateAdminTemplate(templateId: string, payload: AdminTemplateUpdatePayload) {
+    return this.request<AdminTemplateSummary>(`${ADMIN_BASE}/templates/${templateId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async revertAdminTemplate(templateId: string, payload: TemplateRevertPayload) {
+    return this.request<AdminTemplateSummary>(
+      `${ADMIN_BASE}/templates/${templateId}/revert`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    );
+  }
+
+  async getEmbeddingQueueStatus() {
+    return this.request<QueueStatus>(`${ADMIN_BASE}/queue`);
+  }
+
+  async listFeatureFlags() {
+    return this.request<FeatureFlagRecord[]>(`${ADMIN_BASE}/feature-flags`);
+  }
+
+  async updateFeatureFlag(flagName: string, payload: FeatureFlagUpdatePayload) {
+    return this.request<FeatureFlagRecord>(`${ADMIN_BASE}/feature-flags/${flagName}`, {
+      method: 'PUT',
       body: JSON.stringify(payload),
     });
   }

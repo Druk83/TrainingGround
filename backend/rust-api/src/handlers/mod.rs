@@ -153,6 +153,7 @@ pub async fn metrics_auth_middleware(
     Ok(next.run(request).await)
 }
 
+pub mod admin;
 pub mod reporting;
 pub mod sessions;
 pub mod sse;

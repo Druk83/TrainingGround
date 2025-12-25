@@ -16,7 +16,9 @@ import '@/components/connection-indicator';
 import '@/components/conflict-resolver';
 import type { LessonPlayer } from '@/components/lesson-player';
 
-interface AppShellState {
+// Reserved for future state management (currently using lessonStore directly)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+interface _AppShellState {
   snapshot: LessonStoreSnapshot;
   swReadyMessage?: string;
   swUpdateHandler?: () => void;
@@ -32,14 +34,11 @@ const STACKED_PANELS: Array<{ id: PanelId; label: string }> = [
 
 @customElement('app-shell')
 export class AppShell extends LitElement {
-  static properties = {
-    snapshot: { type: Object },
-    swReadyMessage: { type: String },
-    swUpdateHandler: { type: Function },
-  } satisfies Record<keyof AppShellState, unknown>;
-
+  @state()
   snapshot: LessonStoreSnapshot = lessonStore.snapshot;
+  @state()
   swReadyMessage?: string;
+  @state()
   swUpdateHandler?: () => void;
   private unsubscribe?: () => void;
   private offlineReadyHandler = () => {

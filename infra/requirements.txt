@@ -5,9 +5,13 @@ qdrant-client>=1.8.0
 
 # MongoDB client
 pymongo>=4.6.0
+python-dotenv>=1.0
 
 # Redis client
 redis>=5.0.0
+
+# JWT for admin scripts
+PyJWT>=2.8.0
 
 # AWS CLI for S3 (Yandex Object Storage)
 boto3>=1.34.0

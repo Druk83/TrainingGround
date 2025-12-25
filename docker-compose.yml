@@ -165,6 +165,11 @@ services:
       APP__PYTHON_API__URL: http://python-generator:8000
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4318}
       OTEL_SERVICE_NAME: rust-api
+      # A6: Superuser bootstrap seed file (override .env path for Docker)
+      ADMIN_SEED_FILE: /secrets/admin-superuser.json
+    volumes:
+      # A6: Mount superuser seed file (keep this file secret!)
+      - ./infra/config/seed/admin-superuser.json:/secrets/admin-superuser.json:ro
     depends_on:
       mongodb-primary:
         condition: service_healthy

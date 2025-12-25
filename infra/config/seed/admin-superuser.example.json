@@ -1,0 +1,11 @@
+{
+  "email": "admin@example.com",
+  "name": "Super Admin",
+  "role": "admin",
+  "group_ids": ["admin"],
+  "password": "CHANGE-ME-TO-SECURE-PASSWORD",
+  "metadata": {
+    "note": "Replace this file with secure version before deployment",
+    "instructions": "Use scripts/generate_superuser_secret.py to generate a secure seed file"
+  }
+}

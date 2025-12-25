@@ -137,3 +137,88 @@ export interface ExportResponsePayload {
   status: string;
   expires_at: string;
 }
+
+export type AdminTemplateStatus = 'draft' | 'ready' | 'published' | 'deprecated';
+
+export interface LevelSummary {
+  id: string;
+  name: string;
+  order: number;
+  topic_id: string;
+}
+
+export interface TopicSummary {
+  id: string;
+  slug: string;
+  name: string;
+}
+
+export interface AdminTemplateSummary {
+  id: string;
+  slug: string;
+  status: AdminTemplateStatus;
+  version: number;
+  difficulty?: string;
+  level?: LevelSummary;
+  topic?: TopicSummary;
+  pii_flags: string[];
+  source_refs: string[];
+  updated_at: string;
+}
+
+export interface AdminTemplateDetail extends AdminTemplateSummary {
+  content: string;
+  params: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  rule_ids: string[];
+  created_at: string;
+}
+
+export interface TemplateFilterParams {
+  status?: AdminTemplateStatus;
+  topic_id?: string;
+  level_id?: string;
+  difficulty?: string;
+  version?: number;
+  q?: string;
+  limit?: number;
+}
+
+export interface AdminTemplateUpdatePayload {
+  status?: AdminTemplateStatus;
+  content?: string;
+  difficulty?: string;
+  params?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  source_refs?: string[];
+}
+
+export interface TemplateRevertPayload {
+  reason: string;
+}
+
+export interface QueueStatus {
+  length: number;
+  last_event?: ContentChangeEvent;
+}
+
+export interface ContentChangeEvent {
+  id: string;
+  template_id: string;
+  action: string;
+  version?: string;
+  timestamp?: string;
+}
+
+export interface FeatureFlagRecord {
+  id: string;
+  flag_name: string;
+  enabled: boolean;
+  rollout_percentage?: number;
+  target_groups: string[];
+  updated_at: string;
+}
+
+export interface FeatureFlagUpdatePayload {
+  enabled: boolean;
+}

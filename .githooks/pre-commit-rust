@@ -10,6 +10,34 @@ if [ -d "backend/rust-api" ]; then
     cargo clippy --all-targets --all-features -- -D warnings || exit 1
     cargo test --lib || exit 1
 
+    # A6: Run integration tests for content validation
+    echo "[INFO] Running content validation integration tests (A6)..."
+    cargo test --test content_validation_test || exit 1
+
+    # A6: Security checks for superuser file configuration
+    echo "[INFO] Running A6 security checks..."
+
+    # Check that admin-superuser.json is in .gitignore
+    if ! grep -q "admin-superuser.json" ../../.gitignore; then
+        echo "[ERROR] admin-superuser.json must be in .gitignore to prevent credential leaks!"
+        exit 1
+    fi
+
+    # Check that example file exists in repo
+    if [ ! -f "../../infra/config/seed/admin-superuser.example.json" ]; then
+        echo "[ERROR] Example file admin-superuser.example.json is missing from repo!"
+        exit 1
+    fi
+
+    # Check that no real secret files are staged
+    cd ../..
+    if git diff --cached --name-only | grep -E "(admin-superuser\.json|\.env$)" | grep -v "example" | grep -v "\.env\.example"; then
+        echo "[ERROR] Attempting to commit secret files! Remove them from staging:"
+        git diff --cached --name-only | grep -E "(admin-superuser\.json|\.env$)" | grep -v "example"
+        exit 1
+    fi
+    cd backend/rust-api
+
     # cargo audit is optional - don't fail on advisory db issues
     echo "[INFO] Running cargo audit..."
     if ! cargo audit; then

@@ -53,6 +53,8 @@ impl AppState {
             None
         };
 
+        superuser_seed::bootstrap(&config, &mongo).await?;
+
         Ok(Self {
             config,
             mongo,
@@ -65,8 +67,10 @@ impl AppState {
 pub mod analytics_worker;
 pub mod answer_service;
 pub mod anticheat_service;
+pub mod content_service;
 pub mod export_worker;
 pub mod hint_service;
 pub mod object_storage;
 pub mod reporting_service;
 pub mod session_service;
+pub mod superuser_seed;

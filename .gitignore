@@ -82,6 +82,7 @@ credentials/
 *.pfx
 *.jks
 *.keystore
+infra/config/seed/admin-superuser.json
 *_rsa
 *_rsa.pub
 id_rsa
@@ -93,6 +94,9 @@ service-account*.json
 *.backup
 *.bak
 *.old
+# MongoDB Replica Set keyfile (CRITICAL SECURITY)
+infra/mongo-keyfile
+infra/mongodb-keyfile
 # Sensitive filenames (excluding scripts and docs)
 password.txt
 passwords.txt

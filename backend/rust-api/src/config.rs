@@ -9,6 +9,8 @@ pub struct Config {
     pub jwt_secret: String,
     pub python_api_url: String,
     pub reporting: ReportingSettings,
+    pub content: ContentSettings,
+    pub superuser_seed_file: Option<String>,
     pub object_storage: Option<ObjectStorageSettings>,
     pub enable_sso: bool,
 }
@@ -100,6 +102,36 @@ impl ReportingSettings {
 
     pub fn export_expiration(&self) -> Duration {
         Duration::from_secs(self.export_ttl_hours * 3600)
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ContentSettings {
+    #[serde(default = "ContentSettings::default_stream_name_string")]
+    pub stream_name: String,
+}
+
+impl ContentSettings {
+    const fn default_stream_name() -> &'static str {
+        "content:changes"
+    }
+
+    fn default_stream_name_string() -> String {
+        Self::default_stream_name().to_string()
+    }
+
+    pub fn from_env() -> Self {
+        let stream_name = std::env::var("CONTENT_STREAM_NAME")
+            .unwrap_or_else(|_| Self::default_stream_name().to_string());
+        Self { stream_name }
+    }
+}
+
+impl Default for ContentSettings {
+    fn default() -> Self {
+        Self {
+            stream_name: Self::default_stream_name().to_string(),
+        }
     }
 }
 
@@ -237,6 +269,15 @@ impl Config {
             Err(_) => ObjectStorageSettings::from_env(),
         };
 
+        let content = settings
+            .get::<ContentSettings>("content")
+            .unwrap_or_else(|_| ContentSettings::from_env());
+
+        let superuser_seed_file = settings
+            .get_string("superuser_seed_file")
+            .ok()
+            .or_else(|| env::var("ADMIN_SEED_FILE").ok());
+
         let enable_sso = settings
             .get_bool("sso.enabled")
             .map(Some)
@@ -250,6 +291,8 @@ impl Config {
             jwt_secret,
             python_api_url,
             reporting,
+            content,
+            superuser_seed_file,
             object_storage,
             enable_sso,
         })

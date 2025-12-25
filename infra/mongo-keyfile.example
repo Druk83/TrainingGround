@@ -1,0 +1,17 @@
+# MongoDB Replica Set Keyfile Example
+#
+# SECURITY WARNING: This is an EXAMPLE file. DO NOT use in production!
+#
+# To generate a secure keyfile for production:
+#   openssl rand -base64 756 > infra/mongo-keyfile
+#
+# Requirements:
+#   - Size: 6-1024 bytes
+#   - Characters: base64 (A-Z, a-z, 0-9, +, /)
+#   - Permissions: chmod 400 infra/mongo-keyfile (read-only for owner)
+#   - Same file must be on ALL replica set members
+#
+# For development (local Docker):
+#   cp infra/mongo-keyfile.example infra/mongo-keyfile
+#
+# NEVER commit the real mongo-keyfile to git!

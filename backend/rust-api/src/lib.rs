@@ -5,7 +5,7 @@ use axum::{
     http::{header, HeaderValue, Method},
     middleware::{self, Next},
     response::Response,
-    routing::{get, post},
+    routing::{get, post, put},
     Router,
 };
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
@@ -70,6 +70,17 @@ pub fn create_router(app_state: std::sync::Arc<services::AppState>) -> Router {
                     middlewares::auth::auth_middleware,
                 )),
         )
+        .nest(
+            "/admin",
+            admin_routes()
+                .layer(middleware::from_fn_with_state(
+                    app_state.clone(),
+                    middlewares::auth::auth_middleware,
+                ))
+                .layer(middleware::from_fn(
+                    middlewares::auth::admin_guard_middleware,
+                )),
+        )
         .with_state(app_state)
         .layer(middleware::from_fn(csp_middleware)) // Apply CSP to all responses
         .layer(middleware::from_fn(
@@ -96,5 +107,27 @@ fn reporting_routes() -> Router<std::sync::Arc<services::AppState>> {
         .route(
             "/groups/{id}/export",
             post(handlers::reporting::request_group_export),
+        )
+}
+
+fn admin_routes() -> Router<std::sync::Arc<services::AppState>> {
+    Router::new()
+        .route(
+            "/templates",
+            get(handlers::admin::list_templates).post(handlers::admin::create_template),
+        )
+        .route(
+            "/templates/{id}",
+            get(handlers::admin::get_template).patch(handlers::admin::update_template),
+        )
+        .route(
+            "/templates/{id}/revert",
+            post(handlers::admin::revert_template),
+        )
+        .route("/queue", get(handlers::admin::queue_status))
+        .route("/feature-flags", get(handlers::admin::list_feature_flags))
+        .route(
+            "/feature-flags/{flag_name}",
+            put(handlers::admin::update_feature_flag),
         )
 }

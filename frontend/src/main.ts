@@ -2,8 +2,12 @@ import './styles/global.css';
 import { registerSW } from 'virtual:pwa-register';
 
 const isTeacherDashboard = window.location.pathname.startsWith('/teacher-dashboard');
+const isAdminConsole = window.location.pathname.startsWith('/admin');
 
-if (isTeacherDashboard) {
+if (isAdminConsole) {
+  import('./pages/admin-console');
+  document.body.appendChild(document.createElement('admin-console'));
+} else if (isTeacherDashboard) {
   import('./pages/teacher-dashboard');
   const wrapper = document.createElement('div');
   wrapper.style.minHeight = '100vh';

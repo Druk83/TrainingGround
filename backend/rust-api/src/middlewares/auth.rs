@@ -124,6 +124,16 @@ pub async fn optional_auth_middleware(
     next.run(request).await
 }
 
+pub async fn admin_guard_middleware(request: Request, next: Next) -> Result<Response, StatusCode> {
+    let claims = request.extensions().get::<JwtClaims>();
+    if let Some(claims) = claims {
+        if claims.role == "admin" {
+            return Ok(next.run(request).await);
+        }
+    }
+    Err(StatusCode::FORBIDDEN)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

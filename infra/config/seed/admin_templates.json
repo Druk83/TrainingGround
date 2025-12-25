@@ -1,0 +1,88 @@
+[
+  {
+    "topic": {
+      "slug": "cases",
+      "name": "Падежи",
+      "description": "Описания падежей и их окружение."
+    },
+    "level": {
+      "order": 1,
+      "name": "Родительный падеж: базовые формы",
+      "unlock_condition": {
+        "required_accuracy": 70
+      }
+    },
+    "rule": {
+      "slug": "noun-case-genitive",
+      "name": "Родительный падеж",
+      "description": "Научитесь различать окончания существительных в родительном падеже.",
+      "examples": [
+        {
+          "correct": "книги",
+          "incorrect": "книга",
+          "explanation": "После числительного используется форма родительного падежа."
+        }
+      ],
+      "metadata": {
+        "source": "Русский язык 2025",
+        "type": "grammar"
+      }
+    },
+    "template": {
+      "slug": "genitive-places",
+      "content": "Выберите правильный родительный падеж для слова „книга“ в сочетании с числительным.",
+      "params": {
+        "mode": "fill",
+        "focus": "number agreement"
+      },
+      "metadata": {
+        "title": "Родительный падеж после числительных"
+      },
+      "difficulty": "A1",
+      "source_refs": ["rusgram2025"]
+    }
+  },
+  {
+    "topic": {
+      "slug": "adjectives",
+      "name": "Прилагательные",
+      "description": "Согласование прилагательных по родам и падежам."
+    },
+    "level": {
+      "order": 2,
+      "name": "Согласование в предложении",
+      "unlock_condition": {
+        "required_accuracy": 75
+      }
+    },
+    "rule": {
+      "slug": "adj-agreement",
+      "name": "Согласование прилагательных",
+      "description": "Прилагательное согласуется с существительным по роду, числу и падежу.",
+      "examples": [
+        {
+          "correct": "красивую девушку",
+          "incorrect": "красивый девушку",
+          "explanation": "Винительный падеж требует формы женского рода."
+        }
+      ],
+      "metadata": {
+        "source": "Грамматика для детей",
+        "type": "agreement"
+      }
+    },
+    "template": {
+      "slug": "adj-agreement-exercise",
+      "content": "Согласуйте прилагательные с существительными в составе короткого текста.",
+      "params": {
+        "mode": "choices",
+        "variants": 3
+      },
+      "metadata": {
+        "title": "Согласование прилагательных"
+      },
+      "difficulty": "A2",
+      "source_refs": ["rusgram2025", "school-2025"]
+    }
+  }
+]
