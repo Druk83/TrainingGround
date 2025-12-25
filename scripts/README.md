@@ -96,6 +96,112 @@ ADMIN_SEED_FILE=/path/to/admin-superuser.json ./scripts/bootstrap-superuser.sh
 
 ---
 
+## MongoDB Keyfile Management
+
+### generate_mongo_keyfile.sh
+
+Генерирует криптографически стойкий keyfile для MongoDB replica set.
+
+**Использование:**
+
+```bash
+# Генерация в дефолтное место (infra/mongo-keyfile)
+./scripts/generate_mongo_keyfile.sh
+
+# Генерация в кастомное место
+./scripts/generate_mongo_keyfile.sh /path/to/keyfile
+```
+
+**Что делает:**
+- Генерирует 756 байт случайных данных в base64 формате
+- Создает backup старого keyfile (если существует)
+- Устанавливает права доступа 400 (read-only для owner)
+- Выводит инструкции по использованию
+
+**Требования к keyfile:**
+- Размер: 6-1024 байт
+- Формат: base64 (A-Z, a-z, 0-9, +, /)
+- Права: 400 (только чтение для владельца)
+- Одинаковый файл на всех членах replica set
+
+---
+
+### rotate_mongo_keyfile.sh
+
+Ротация MongoDB keyfile с zero downtime (rolling restart).
+
+**Использование:**
+
+```bash
+./scripts/rotate_mongo_keyfile.sh
+```
+
+**Процесс:**
+1. Генерирует новый keyfile
+2. Проверяет, что MongoDB сервисы запущены
+3. Копирует новый keyfile на все члены replica set
+4. Выполняет rolling restart (secondary → primary)
+5. Проверяет здоровье replica set
+6. Обновляет локальную копию keyfile
+
+**Когда нужна ротация:**
+- Регулярно каждые 90 дней (security compliance)
+- При подозрении на утечку ключа
+- При увольнении сотрудника с доступом к серверам
+- После удаления keyfile из git history
+
+---
+
+### git_remove_keyfile_history.sh
+
+Удаляет `infra/mongo-keyfile` из git history навсегда.
+
+**ВНИМАНИЕ:** Этот скрипт переписывает git history!
+
+**Использование:**
+
+```bash
+./scripts/git_remove_keyfile_history.sh
+```
+
+**Что делает:**
+1. Создает backup репозитория
+2. Удаляет файл из всех коммитов (git filter-branch)
+3. Очищает git references и запускает garbage collection
+4. Проверяет успешное удаление
+
+**После выполнения ОБЯЗАТЕЛЬНО:**
+1. Force push: `git push origin --force --all`
+2. Уведомить всю команду re-clone репозиторий
+3. Немедленно выполнить ротацию keyfile
+4. Считать старый keyfile скомпрометированным
+
+**Use case:** Если keyfile случайно попал в git history и был обнаружен secret scanning tools.
+
+---
+
+### generate_admin_jwt.py
+
+Генерирует JWT токен для доступа к admin API.
+
+**Использование:**
+
+```bash
+python3 scripts/generate_admin_jwt.py \
+  --email admin@example.com \
+  --secret YOUR_SECRET_KEY
+```
+
+**Параметры:**
+- `--email` - Email администратора
+- `--secret` - Secret key для подписи JWT (из .env: JWT_SECRET)
+- `--expiry` - Время жизни токена в днях (по умолчанию 30)
+
+**Требования:**
+- PyJWT>=2.8.0 (установлено в venv)
+
+---
+
 ## Дополнительные скрипты
 
 ### setup-dev.sh
@@ -110,8 +216,13 @@ Git pre-commit hook для проверки кода перед коммитом
 
 ## Безопасность
 
-- Все секретные файлы (`admin-superuser.json`) исключены из git через `.gitignore`
+- Все секретные файлы (`admin-superuser.json`, `mongo-keyfile`) исключены из git через `.gitignore`
 - Пароли хешируются bcrypt (cost=12) перед сохранением
+- MongoDB keyfile генерируется криптографически стойким генератором
 - Example файлы содержат только placeholder'ы, не реальные данные
+- Pre-commit hooks проверяют staging на наличие секретных файлов
 
-Подробная документация: [docs/deployment-security.md](../docs/deployment-security.md)
+Подробная документация:
+- [docs/deployment-security.md](../docs/deployment-security.md)
+- [docs/mongodb-security.md](../docs/mongodb-security.md)
+- [tasks/TD-07.md](../tasks/TD-07.md)

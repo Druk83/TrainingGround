@@ -40,8 +40,8 @@ impl SuperuserSeed {
             "role": self.role,
             "group_ids": self.group_ids,
             "metadata": self.metadata,
-            "created_at": bson_now(),
-            "updated_at": bson_now(),
+            "createdAt": bson_now(),
+            "updatedAt": bson_now(),
         };
 
         // Hash password if provided (bcrypt with cost 12)

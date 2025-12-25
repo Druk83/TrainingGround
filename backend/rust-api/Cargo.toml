@@ -11,14 +11,6 @@ path = "src/lib.rs"
 name = "trainingground-api"
 path = "src/main.rs"
 
-[[bin]]
-name = "reporting-worker"
-path = "src/bin/reporting_worker.rs"
-
-[[bin]]
-name = "export-worker"
-path = "src/bin/export_worker.rs"
-
 [dependencies]
 # Web framework
 axum = "0.8.8"

@@ -20,7 +20,7 @@ const AWS_URI_ENCODE_SET: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'.')
     .remove(b'~');
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ObjectStorageClient {
     bucket: String,
     region: String,
@@ -41,9 +41,9 @@ impl ObjectStorageClient {
             bail!("Object storage endpoint must include a host");
         }
 
-        // Enforce HTTPS in production mode
-        #[cfg(not(debug_assertions))]
-        if endpoint.scheme() != "https" {
+        // Enforce HTTPS in production mode (check APP_ENV at runtime)
+        let app_env = std::env::var("APP_ENV").unwrap_or_else(|_| "prod".to_string());
+        if app_env == "prod" && endpoint.scheme() != "https" {
             bail!(
                 "Object storage endpoint must use HTTPS in production mode. Got: {}",
                 endpoint.scheme()
@@ -51,7 +51,6 @@ impl ObjectStorageClient {
         }
 
         // In development, allow both HTTP and HTTPS
-        #[cfg(debug_assertions)]
         if endpoint.scheme() != "https" && endpoint.scheme() != "http" {
             bail!(
                 "Invalid endpoint scheme: {}. Must be http or https.",
@@ -278,8 +277,10 @@ mod tests {
     use super::*;
 
     #[test]
-    #[cfg(not(debug_assertions))]
     fn test_https_required_in_prod() {
+        // Set APP_ENV=prod to enforce HTTPS requirement
+        std::env::set_var("APP_ENV", "prod");
+
         let settings = ObjectStorageSettings {
             bucket: "test".into(),
             region: "ru-central1".into(),
@@ -294,11 +295,16 @@ mod tests {
         let err_msg = result.unwrap_err().to_string();
         assert!(err_msg.contains("HTTPS"));
         assert!(err_msg.contains("production"));
+
+        // Clean up
+        std::env::remove_var("APP_ENV");
     }
 
     #[test]
-    #[cfg(debug_assertions)]
     fn test_http_allowed_in_dev() {
+        // Set APP_ENV=dev to allow HTTP endpoints
+        std::env::set_var("APP_ENV", "dev");
+
         let settings = ObjectStorageSettings {
             bucket: "test".into(),
             region: "ru-central1".into(),
@@ -310,6 +316,9 @@ mod tests {
 
         let result = ObjectStorageClient::new(settings);
         assert!(result.is_ok());
+
+        // Clean up
+        std::env::remove_var("APP_ENV");
     }
 
     #[test]

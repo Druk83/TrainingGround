@@ -51,15 +51,11 @@ live_polling_interval_secs = 30
 enable_live_updates = true
 worker_interval_secs = 3600
 
-[object_storage]
+# [object_storage]
 # Object Storage configuration for report exports
-# All values should be provided via environment variables
-bucket = "${OBJECT_STORAGE_BUCKET}"
-region = "${OBJECT_STORAGE_REGION}"
-endpoint = "${OBJECT_STORAGE_ENDPOINT}"
-access_key = "${OBJECT_STORAGE_ACCESS_KEY}"
-secret_key = "${OBJECT_STORAGE_SECRET_KEY}"
-reports_prefix = "reports/prod"
+# All values are read from environment variables via ObjectStorageSettings::from_env()
+# OBJECT_STORAGE_BUCKET, OBJECT_STORAGE_REGION, OBJECT_STORAGE_ENDPOINT,
+# OBJECT_STORAGE_ACCESS_KEY, OBJECT_STORAGE_SECRET_KEY, OBJECT_STORAGE_REPORTS_PREFIX
 
 [content]
 stream_name = "${CONTENT_STREAM_NAME}"

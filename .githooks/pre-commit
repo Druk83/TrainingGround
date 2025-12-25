@@ -5,6 +5,19 @@ echo "================================"
 echo "Pre-commit validation started"
 echo "================================"
 
+# SD-07: Security check - prevent committing MongoDB keyfiles
+echo "[INFO] Checking for sensitive files..."
+STAGED_KEYFILES=$(git diff --cached --name-only | grep -E "(mongo-keyfile|mongo-keyfile\.secure|mongodb-keyfile)" | grep -v "\.example" || true)
+if [ -n "$STAGED_KEYFILES" ]; then
+    echo "[ERROR] Attempting to commit MongoDB keyfile! This is a CRITICAL SECURITY ISSUE!"
+    echo "The following files must NOT be committed:"
+    echo "$STAGED_KEYFILES"
+    echo ""
+    echo "These files should be in .gitignore. Run:"
+    echo "  git reset HEAD $STAGED_KEYFILES"
+    exit 1
+fi
+
 # Определить измененные компоненты
 CHANGED_FILES=$(git diff --cached --name-only)
 

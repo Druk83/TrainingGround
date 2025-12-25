@@ -96,6 +96,7 @@ service-account*.json
 *.old
 # MongoDB Replica Set keyfile (CRITICAL SECURITY)
 infra/mongo-keyfile
+infra/mongo-keyfile.secure
 infra/mongodb-keyfile
 # Sensitive filenames (excluding scripts and docs)
 password.txt

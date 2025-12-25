@@ -14,8 +14,6 @@ services:
       MONGO_INITDB_DATABASE: ${MONGO_DB:-trainingground}
     command: >
       bash -c "
-        mkdir -p /data/keyfile &&
-        echo 'dHJhaW5pbmdncm91bmRkZXZrZXlwbGVhc2VjaGFuZ2VpbnByb2R1Y3Rpb24K' > /data/keyfile/mongo-keyfile &&
         chmod 400 /data/keyfile/mongo-keyfile &&
         chown mongodb:mongodb /data/keyfile/mongo-keyfile &&
         exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /data/keyfile/mongo-keyfile
@@ -23,6 +21,7 @@ services:
     volumes:
       - mongodb_primary_data:/data/db
       - ./infra/mongo-init:/docker-entrypoint-initdb.d:ro
+      - ${MONGO_KEYFILE_PATH:-./infra/mongo-keyfile.secure}:/data/keyfile/mongo-keyfile
     networks:
       - trainingground-network
     healthcheck:
@@ -42,14 +41,13 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
     command: >
       bash -c "
-        mkdir -p /data/keyfile &&
-        echo 'dHJhaW5pbmdncm91bmRkZXZrZXlwbGVhc2VjaGFuZ2VpbnByb2R1Y3Rpb24K' > /data/keyfile/mongo-keyfile &&
         chmod 400 /data/keyfile/mongo-keyfile &&
         chown mongodb:mongodb /data/keyfile/mongo-keyfile &&
         exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /data/keyfile/mongo-keyfile
       "
     volumes:
       - mongodb_secondary1_data:/data/db
+      - ${MONGO_KEYFILE_PATH:-./infra/mongo-keyfile.secure}:/data/keyfile/mongo-keyfile
     networks:
       - trainingground-network
     healthcheck:
@@ -69,14 +67,13 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
     command: >
       bash -c "
-        mkdir -p /data/keyfile &&
-        echo 'dHJhaW5pbmdncm91bmRkZXZrZXlwbGVhc2VjaGFuZ2VpbnByb2R1Y3Rpb24K' > /data/keyfile/mongo-keyfile &&
         chmod 400 /data/keyfile/mongo-keyfile &&
         chown mongodb:mongodb /data/keyfile/mongo-keyfile &&
         exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /data/keyfile/mongo-keyfile
       "
     volumes:
       - mongodb_secondary2_data:/data/db
+      - ${MONGO_KEYFILE_PATH:-./infra/mongo-keyfile.secure}:/data/keyfile/mongo-keyfile
     networks:
       - trainingground-network
     healthcheck:
@@ -167,6 +164,13 @@ services:
       OTEL_SERVICE_NAME: rust-api
       # A6: Superuser bootstrap seed file (override .env path for Docker)
       ADMIN_SEED_FILE: /secrets/admin-superuser.json
+      # Object Storage (report exports)
+      OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET}
+      OBJECT_STORAGE_REGION: ${OBJECT_STORAGE_REGION}
+      OBJECT_STORAGE_ENDPOINT: ${OBJECT_STORAGE_ENDPOINT}
+      OBJECT_STORAGE_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY}
+      OBJECT_STORAGE_SECRET_KEY: ${OBJECT_STORAGE_SECRET_KEY}
+      OBJECT_STORAGE_REPORTS_PREFIX: ${OBJECT_STORAGE_REPORTS_PREFIX}
     volumes:
       # A6: Mount superuser seed file (keep this file secret!)
       - ./infra/config/seed/admin-superuser.json:/secrets/admin-superuser.json:ro
