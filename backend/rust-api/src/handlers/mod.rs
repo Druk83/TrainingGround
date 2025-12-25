@@ -1,4 +1,11 @@
-use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use axum::{
+    extract::{Request, State},
+    http::{header, HeaderMap, StatusCode},
+    middleware::Next,
+    response::{IntoResponse, Response},
+    Json,
+};
+use base64::{engine::general_purpose, Engine as _};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -109,5 +116,43 @@ pub async fn metrics_handler() -> impl IntoResponse {
     }
 }
 
+/// Metrics authentication middleware - protects /metrics endpoint with HTTP Basic Auth
+pub async fn metrics_auth_middleware(
+    headers: HeaderMap,
+    request: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    // Get Authorization header
+    let auth_header = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    // Check if it's Basic auth
+    if !auth_header.starts_with("Basic ") {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    // Decode base64 credentials
+    let encoded = &auth_header[6..];
+    let decoded = general_purpose::STANDARD
+        .decode(encoded)
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let credentials = String::from_utf8(decoded).map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    // Get expected credentials from environment variable
+    // Format: username:password
+    let expected = std::env::var("METRICS_AUTH").unwrap_or_else(|_| "admin:changeme".to_string());
+
+    // Compare credentials
+    if credentials != expected {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    // Credentials are valid, proceed with request
+    Ok(next.run(request).await)
+}
+
+pub mod reporting;
 pub mod sessions;
 pub mod sse;

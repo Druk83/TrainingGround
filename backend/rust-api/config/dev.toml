@@ -15,7 +15,8 @@ pool_size = 10
 connection_timeout_secs = 30
 
 [auth]
-jwt_secret = "dev-secret-change-in-production"
+# Use JWT_SECRET environment variable (see .env.example)
+jwt_secret = "${JWT_SECRET}"
 jwt_expiration_hours = 24
 
 [rate_limit]
@@ -42,3 +43,23 @@ ttl_secs = 3600
 [logging]
 level = "debug"
 format = "pretty"
+
+[reporting]
+signed_url_ttl_hours = 24
+export_ttl_hours = 24
+export_rate_limit_per_hour = 5
+live_polling_interval_secs = 30
+enable_live_updates = true
+worker_interval_secs = 3600
+
+[object_storage]
+bucket = "trainingground-dev-reports"
+region = "ru-central1"
+endpoint = "http://localhost:9000"
+# Use environment variables for credentials (see .env.example)
+access_key = "${OBJECT_STORAGE_ACCESS_KEY}"
+secret_key = "${OBJECT_STORAGE_SECRET_KEY}"
+reports_prefix = "reports/dev"
+
+[sso]
+enabled = false

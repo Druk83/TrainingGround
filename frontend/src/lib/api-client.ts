@@ -2,6 +2,9 @@
 import type {
   CreateSessionPayload,
   CreateSessionResponse,
+  ExportRequestPayload,
+  ExportResponsePayload,
+  GroupStatsResponse,
   RequestHintPayload,
   RequestHintResponse,
   SessionResponse,
@@ -10,6 +13,7 @@ import type {
 } from './api-types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1';
+const STATS_BASE = import.meta.env.VITE_REPORTING_API ?? '/stats';
 
 export interface ApiClientOptions {
   jwt?: string;
@@ -94,6 +98,19 @@ export class ApiClient {
     }
 
     return (await response.json()) as T;
+  }
+
+  async getGroupStats(groupId: string, signal?: AbortSignal) {
+    return this.request<GroupStatsResponse>(`${STATS_BASE}/groups/${groupId}`, {
+      signal,
+    });
+  }
+
+  async requestGroupExport(groupId: string, payload: ExportRequestPayload) {
+    return this.request<ExportResponsePayload>(`${STATS_BASE}/groups/${groupId}/export`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   }
 }
 

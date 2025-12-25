@@ -11,6 +11,14 @@ path = "src/lib.rs"
 name = "trainingground-api"
 path = "src/main.rs"
 
+[[bin]]
+name = "reporting-worker"
+path = "src/bin/reporting_worker.rs"
+
+[[bin]]
+name = "export-worker"
+path = "src/bin/export_worker.rs"
+
 [dependencies]
 # Web framework
 axum = "0.8.8"
@@ -21,7 +29,7 @@ hyper = "1.0"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0.146"
+serde_json = "1.0.147"
 
 # Database clients
 mongodb = "3.4.1"
@@ -46,6 +54,13 @@ chrono = { version = "0.4", features = ["serde"] }
 # HTTP client
 reqwest = { version = "0.12.28", features = ["json"] }
 
+# Object storage / cloud integrations
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+percent-encoding = "2.3"
+url = "2.5"
+
 # Validation
 validator = { version = "0.20.0", features = ["derive"] }
 
@@ -54,10 +69,14 @@ rand = "0.9.2"
 base64 = "0.22"
 
 # JWT & Auth
-# ИЗВЕСТНАЯ УЯЗВИМОСТЬ: RUSTSEC-2023-0071 в rsa 0.9.9 (Marvin timing attack, severity 5.9 medium)
-# Решения пока нет, но риск низкий т.к. эксплуатация требует точного timing анализа
-# aws-lc-rs требует NASM/CMAKE на Windows, остаемся на rust_crypto до исправления в rsa
-jsonwebtoken = { version = "10.2.0", default-features = false, features = ["use_pem", "rust_crypto"] }
+# SECURITY NOTE: cargo audit показывает RUSTSEC-2023-0071 в rsa 0.9.9 (Marvin timing attack)
+# Но это НЕ применимо к проекту, т.к.:
+# 1. Мы используем ТОЛЬКО HMAC (HS256) через EncodingKey::from_secret() - см. middlewares/auth.rs:51
+# 2. RSA алгоритмы (RS256/RS384/RS512) НЕ используются в коде
+# 3. Уязвимость затрагивает только RSA PKCS#1 v1.5 decryption operations
+# 4. jsonwebtoken требует rsa в rust_crypto feature из-за бага в JWK коде
+# БЕЗОПАСНО для production - риск отсутствует. Warning помечен как NON-BLOCKING.
+jsonwebtoken = { version = "10.2.0", default-features = false, features = ["rust_crypto"] }
 
 # Async utilities
 futures = "0.3"

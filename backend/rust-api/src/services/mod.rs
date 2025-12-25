@@ -2,10 +2,13 @@ use crate::config::Config;
 use mongodb::{Client as MongoClient, Database};
 use redis::aio::ConnectionManager;
 
+use self::object_storage::ObjectStorageClient;
+
 pub struct AppState {
     pub config: Config,
     pub mongo: Database,
     pub redis: ConnectionManager,
+    pub object_storage: Option<ObjectStorageClient>,
 }
 
 impl AppState {
@@ -39,15 +42,31 @@ impl AppState {
 
         tracing::info!("Redis connection established successfully");
 
+        let object_storage = if let Some(storage_cfg) = config.object_storage.clone() {
+            tracing::info!(
+                "Initializing object storage client for bucket {}",
+                storage_cfg.bucket
+            );
+            Some(ObjectStorageClient::new(storage_cfg)?)
+        } else {
+            tracing::warn!("Object storage config is not set, report exports disabled");
+            None
+        };
+
         Ok(Self {
             config,
             mongo,
             redis,
+            object_storage,
         })
     }
 }
 
+pub mod analytics_worker;
 pub mod answer_service;
 pub mod anticheat_service;
+pub mod export_worker;
 pub mod hint_service;
+pub mod object_storage;
+pub mod reporting_service;
 pub mod session_service;

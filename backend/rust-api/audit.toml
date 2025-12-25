@@ -1,0 +1,18 @@
+# Cargo audit configuration
+# https://github.com/rustsec/rustsec/blob/main/cargo-audit/audit.toml.example
+
+[advisories]
+# Ignore specific advisories that are known and accepted
+ignore = [
+    # RUSTSEC-2023-0071: Marvin Attack in rsa 0.9.9
+    # Reason: Not applicable - we use ONLY HMAC (HS256) via EncodingKey::from_secret()
+    # RSA algorithms (RS256/RS384/RS512) are NOT used in the codebase
+    # Vulnerability only affects RSA PKCS#1 v1.5 decryption operations
+    # See: backend/rust-api/Cargo.toml lines 72-79 for detailed explanation
+    # Status: Accepted risk (severity 5.9 medium, no fix available)
+    "RUSTSEC-2023-0071",
+]
+
+[output]
+# Show full dependency tree for vulnerabilities
+deny = []

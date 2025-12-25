@@ -20,8 +20,83 @@
 3. Настроить `.env`:
    ```bash
    cp .env.example .env
-   # Отредактировать параметры
+   # Отредактировать параметры (см. ниже)
    ```
+
+### Обязательные переменные окружения
+
+После копирования `.env.example` в `.env` необходимо заполнить следующие переменные:
+
+#### Критические секреты (ОБЯЗАТЕЛЬНО изменить для production)
+
+```bash
+# JWT Secret - используется для подписи токенов аутентификации
+# Генерация: openssl rand -base64 32
+JWT_SECRET=<YOUR_JWT_SECRET_GENERATE_WITH_openssl_rand_base64_32>
+
+# MongoDB
+MONGO_PASSWORD=<YOUR_MONGO_PASSWORD>  # Генерация: openssl rand -base64 24
+
+# Redis
+REDIS_PASSWORD=<YOUR_REDIS_PASSWORD>  # Генерация: openssl rand -base64 24
+
+# Qdrant
+QDRANT_API_KEY=<YOUR_QDRANT_API_KEY>  # Генерация: openssl rand -base64 24
+
+# Grafana
+GRAFANA_PASSWORD=<YOUR_GRAFANA_PASSWORD>  # Для доступа в веб-интерфейс
+
+# Metrics endpoint authentication (format: username:password)
+METRICS_AUTH=prometheus:<YOUR_METRICS_PASSWORD>  # Для защиты /metrics endpoint
+```
+
+#### Object Storage (для экспорта отчетов)
+
+```bash
+# Development (локальный MinIO):
+OBJECT_STORAGE_BUCKET=<YOUR_PRODUCTION_BUCKET>
+OBJECT_STORAGE_REGION=ru-central1
+OBJECT_STORAGE_ENDPOINT=http://localhost:9000
+OBJECT_STORAGE_ACCESS_KEY=<YOUR_ACCESS_KEY>
+OBJECT_STORAGE_SECRET_KEY=<YOUR_ACCESS_KEY>
+OBJECT_STORAGE_REPORTS_PREFIX=reports/dev
+
+# Production (Yandex Cloud Object Storage):
+# Получить credentials: https://cloud.yandex.ru/docs/iam/operations/sa/create-access-key
+OBJECT_STORAGE_BUCKET=<YOUR_PRODUCTION_BUCKET>
+OBJECT_STORAGE_REGION=ru-central1
+OBJECT_STORAGE_ENDPOINT=https://storage.yandexcloud.net
+OBJECT_STORAGE_ACCESS_KEY=<YOUR_ACCESS_KEY>
+OBJECT_STORAGE_SECRET_KEY=<YOUR_SECRET_KEY>
+OBJECT_STORAGE_REPORTS_PREFIX=reports/prod
+```
+
+#### YandexGPT API (для объяснений ошибок)
+
+```bash
+# Получить API ключ: https://cloud.yandex.ru/docs/iam/operations/api-key/create
+YANDEXGPT_API_KEY=<YOUR_YANDEXGPT_API_KEY>
+YANDEXGPT_FOLDER_ID=<YOUR_YANDEX_FOLDER_ID>
+```
+
+#### Опциональные настройки (можно оставить по умолчанию)
+
+```bash
+# Reporting system defaults
+REPORTING_SIGNED_URL_TTL_HOURS=24
+REPORTING_EXPORT_TTL_HOURS=24
+REPORTING_EXPORT_RATE_LIMIT_PER_HOUR=5
+REPORTING_LIVE_POLLING_INTERVAL_SECS=30
+REPORTING_ENABLE_LIVE_UPDATES=true
+REPORTING_EXPORT_WORKER_INTERVAL_SECS=60
+REPORTING_WORKER_INTERVAL_SECS=3600
+```
+
+ВАЖНО:
+- НЕ коммитить файл `.env` в git (он в `.gitignore`)
+- Использовать `.env.example` как шаблон
+- В production обязательно генерировать уникальные секреты
+- См. подробнее: [docs/security/secrets.md](security/secrets.md)
 
 4. Запустить локальное окружение:
    ```bash
@@ -152,7 +227,35 @@ docker-compose down -v
 
 ## Секреты и ротация
 
-Секреты (JWT_SECRET, MONGO_PASSWORD, REDIS_PASSWORD, QDRANT_API_KEY, GRAFANA_PASSWORD) управляются через корневой файл `.env`. Смотрите `docs/security/secrets.md` для рекомендаций по ротации и использованию в продакшне.
+Все секреты управляются через корневой файл `.env`:
+- **JWT_SECRET** - подпись JWT токенов (КРИТИЧНО)
+- **MONGO_PASSWORD** - доступ к базе данных
+- **REDIS_PASSWORD** - доступ к кешу и сессиям
+- **QDRANT_API_KEY** - доступ к векторной БД
+- **GRAFANA_PASSWORD** - доступ к мониторингу
+- **METRICS_AUTH** - HTTP Basic Auth для /metrics endpoint (формат: username:password)
+- **OBJECT_STORAGE_ACCESS_KEY**, **OBJECT_STORAGE_SECRET_KEY** - доступ к хранилищу отчетов
+- **YANDEXGPT_API_KEY** - доступ к YandexGPT API
+
+### Доступ к метрикам
+
+Endpoint `/metrics` защищен HTTP Basic Authentication. Для доступа используйте:
+```bash
+curl -u prometheus:changeMePrometheus http://localhost:8080/metrics
+```
+
+Или настройте Prometheus в `infra/prometheus/prometheus.yml`:
+```yaml
+scrape_configs:
+  - job_name: 'trainingground-api'
+    static_configs:
+      - targets: ['api:8080']
+    basic_auth:
+      username: prometheus
+      password: changeMePrometheus  # Используйте значение из METRICS_AUTH
+```
+
+Смотрите `docs/security/secrets.md` для рекомендаций по ротации и использованию в продакшне.
 
 
 ### Установка Python зависимостей

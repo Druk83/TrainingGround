@@ -48,6 +48,7 @@ pub struct TaskInfo {
 pub mod answer;
 pub mod anticheat;
 pub mod hint;
+pub mod reporting;
 pub mod timer;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

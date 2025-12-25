@@ -42,3 +42,24 @@ ttl_secs = 3600
 [logging]
 level = "info"
 format = "json"
+
+[reporting]
+signed_url_ttl_hours = 24
+export_ttl_hours = 24
+export_rate_limit_per_hour = 10
+live_polling_interval_secs = 30
+enable_live_updates = true
+worker_interval_secs = 3600
+
+[object_storage]
+# Object Storage configuration for report exports
+# All values should be provided via environment variables
+bucket = "${OBJECT_STORAGE_BUCKET}"
+region = "${OBJECT_STORAGE_REGION}"
+endpoint = "${OBJECT_STORAGE_ENDPOINT}"
+access_key = "${OBJECT_STORAGE_ACCESS_KEY}"
+secret_key = "${OBJECT_STORAGE_SECRET_KEY}"
+reports_prefix = "reports/prod"
+
+[sso]
+enabled = false

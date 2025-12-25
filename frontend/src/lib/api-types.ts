@@ -89,3 +89,51 @@ export interface AnalyticsEnvelope {
   source: 'ui' | 'offline-sync';
   recordedAt: string;
 }
+
+export interface MaterializedStat {
+  id: string;
+  stat_type: 'group' | 'level' | 'topic';
+  entity_id: string;
+  metrics: {
+    avg_accuracy?: number;
+    avg_score?: number;
+    total_attempts?: number;
+    total_users?: number;
+  };
+  calculated_at: string;
+}
+
+export interface LeaderboardEntry {
+  user_id: string;
+  score: number;
+  rank: number;
+  name: string;
+}
+
+export interface LeaderboardDocument {
+  scope: 'global' | 'group' | 'level';
+  scope_id?: string | null;
+  rankings: LeaderboardEntry[];
+  generated_at: string;
+}
+
+export interface GroupStatsResponse {
+  group_id: string;
+  stats: MaterializedStat;
+  leaderboard?: LeaderboardDocument;
+}
+
+export interface ExportRequestPayload {
+  topic_ids: string[];
+  period: {
+    from: string;
+    to: string;
+  };
+  format: 'csv' | 'pdf';
+}
+
+export interface ExportResponsePayload {
+  export_id: string;
+  status: string;
+  expires_at: string;
+}

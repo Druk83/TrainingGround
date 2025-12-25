@@ -101,6 +101,27 @@ lazy_static! {
         &["violation_type"]
     )
     .unwrap();
+
+    pub static ref ANALYTICS_WORKER_TICKS_TOTAL: IntCounterVec = register_int_counter_vec!(
+        "analytics_worker_ticks_total",
+        "Total number of analytics worker ticks",
+        &["status"]
+    )
+    .unwrap();
+
+    pub static ref EXPORT_WORKER_TICKS_TOTAL: IntCounterVec = register_int_counter_vec!(
+        "export_worker_ticks_total",
+        "Total number of export worker ticks",
+        &["status"]
+    )
+    .unwrap();
+
+    pub static ref EXPORTS_GENERATED_TOTAL: IntCounterVec = register_int_counter_vec!(
+        "exports_generated_total",
+        "Total number of exports generated",
+        &["format"]
+    )
+    .unwrap();
 }
 
 /// Renders all metrics in Prometheus text format
