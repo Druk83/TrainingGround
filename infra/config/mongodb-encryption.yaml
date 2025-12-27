@@ -1,0 +1,150 @@
+# MongoDB Encryption at Rest Configuration
+# Для TrainingGround Platform
+
+# Стратегия шифрования:
+# 1. Application-Level Encryption (CSFLE) для PII полей
+# 2. Filesystem-Level Encryption для production deployments
+# 3. HashiCorp Vault для управления ключами
+
+encryption:
+  # Общие настройки
+  enabled: true
+  provider: vault  # vault | aws-kms | local (только для dev)
+
+  # Алгоритм шифрования
+  # AEAD_AES_256_CBC_HMAC_SHA_512-Random (детерминированное)
+  # AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic (для индексируемых полей)
+  algorithm: AEAD_AES_256_CBC_HMAC_SHA_512-Random
+
+  # Client-Side Field Level Encryption (CSFLE)
+  # Шифруются только чувствительные поля
+  field_level_encryption:
+    enabled: true
+
+    # Поля для шифрования в коллекции users
+    users:
+      - field: email
+        bsonType: string
+        algorithm: AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic  # Deterministic для поиска
+        keyId: user-email-key
+
+      - field: name
+        bsonType: string
+        algorithm: AEAD_AES_256_CBC_HMAC_SHA_512-Random
+        keyId: user-name-key
+
+    # Поля для шифрования в коллекции audit_log
+    audit_log:
+      - field: ip_address
+        bsonType: string
+        algorithm: AEAD_AES_256_CBC_HMAC_SHA_512-Random
+        keyId: audit-ip-key
+
+      - field: user_agent
+        bsonType: string
+        algorithm: AEAD_AES_256_CBC_HMAC_SHA_512-Random
+        keyId: audit-useragent-key
+
+# HashiCorp Vault Configuration
+vault:
+  # Vault адрес (Docker: http://vault:8200, Production: https://vault.example.com)
+  address: ${VAULT_ADDR:-http://vault:8200}
+
+  # Namespace для ключей MongoDB
+  namespace: mongodb-encryption
+
+  # Путь к секретам в Vault
+  secrets_path: secret/data/mongodb
+
+  # Ротация ключей
+  key_rotation:
+    enabled: true
+    # Автоматическая ротация каждые 90 дней
+    rotation_period_days: 90
+    # Сохранять старые версии ключей для расшифровки старых данных
+    keep_old_versions: 3
+
+  # Токен для доступа к Vault (в production использовать AppRole или Kubernetes auth)
+  # НЕ КОММИТИТЬ TOKEN В GIT! Использовать env var
+  token: ${VAULT_TOKEN}
+
+  # TLS настройки для production
+  tls:
+    enabled: false  # true для production
+    ca_cert: /vault/tls/ca.crt
+    client_cert: /vault/tls/client.crt
+    client_key: /vault/tls/client.key
+
+# AWS KMS Configuration (альтернатива Vault для production)
+aws_kms:
+  enabled: false
+  region: ${AWS_REGION:-us-east-1}
+  # Customer Master Key ARN
+  cmk_arn: ${AWS_KMS_CMK_ARN}
+  # AWS credentials
+  access_key_id: ${AWS_ACCESS_KEY_ID}
+  secret_access_key: ${AWS_SECRET_ACCESS_KEY}
+
+# Local Key Provider (ТОЛЬКО ДЛЯ DEV/TESTING)
+# В production ОБЯЗАТЕЛЬНО использовать Vault или AWS KMS
+local:
+  enabled: ${ENCRYPTION_LOCAL_MODE:-false}
+  # Ключи хранятся в файле (НЕ КОММИТИТЬ В GIT!)
+  key_file_path: /secrets/mongodb-master-key.bin
+  # WARNING: Этот режим НЕ БЕЗОПАСЕН для production!
+
+# Filesystem-Level Encryption (для production deployments)
+# Используется совместно с CSFLE для defense in depth
+filesystem_encryption:
+  # LUKS для Linux, BitLocker для Windows, FileVault для macOS
+  enabled: false  # true для production
+  provider: luks  # luks | bitlocker | filevault
+
+  # Путь к encrypted volumes
+  encrypted_volumes:
+    - /data/mongodb/primary
+    - /data/mongodb/secondary1
+    - /data/mongodb/secondary2
+
+  # Ключ для LUKS хранится в Vault
+  luks_key_path: ${VAULT_ADDR}/v1/secret/data/mongodb/luks-key
+
+# Мониторинг и аудит
+monitoring:
+  # Логировать все операции с ключами
+  audit_log_enabled: true
+  audit_log_path: /var/log/mongodb/encryption-audit.log
+
+  # Метрики для Prometheus
+  metrics_enabled: true
+  metrics_port: 9217
+
+  # Алерты
+  alerts:
+    # Оповещение при приближении срока ротации ключа (за 7 дней)
+    key_rotation_warning_days: 7
+    # Оповещение при неудачной ротации
+    rotation_failure_enabled: true
+    # Оповещение при unauthorized access к ключам
+    unauthorized_access_enabled: true
+
+# Compliance и governance
+compliance:
+  # GDPR right to be forgotten - шифрование позволяет "забыть" данные удалением ключа
+  gdpr_compliant: true
+
+  # Audit trail для всех операций с PII
+  pii_access_logging: true
+
+  # Автоматическое удаление ключей после удаления пользователя
+  auto_key_deletion_enabled: false  # false для возможности восстановления
+
+# Performance considerations
+performance:
+  # CSFLE добавляет overhead ~10-15%
+  # Кешировать расшифрованные данные в памяти (осторожно с PII!)
+  cache_decrypted_values: false
+
+  # Batch encryption для массовых операций
+  batch_encryption_enabled: true
+  batch_size: 100

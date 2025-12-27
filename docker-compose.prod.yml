@@ -1,4 +1,4 @@
-# TD-06 Task 26: Production Docker Compose with Nginx reverse proxy and Let's Encrypt
+# Production Docker Compose with Nginx reverse proxy and Let's Encrypt
 # Based on docker-compose.yml but with HTTPS termination and no exposed ports except 80/443
 #
 # Usage:

@@ -154,6 +154,7 @@ pub async fn metrics_auth_middleware(
 }
 
 pub mod admin;
+pub mod auth;
 pub mod reporting;
 pub mod sessions;
 pub mod sse;

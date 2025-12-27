@@ -10,6 +10,7 @@ pub struct Config {
     pub python_api_url: String,
     pub reporting: ReportingSettings,
     pub content: ContentSettings,
+    pub cookie: CookieSettings,
     pub superuser_seed_file: Option<String>,
     pub object_storage: Option<ObjectStorageSettings>,
     pub enable_sso: bool,
@@ -131,6 +132,54 @@ impl Default for ContentSettings {
     fn default() -> Self {
         Self {
             stream_name: Self::default_stream_name().to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CookieSettings {
+    #[serde(default = "CookieSettings::default_secure")]
+    pub secure: bool,
+    #[serde(default = "CookieSettings::default_same_site")]
+    pub same_site: String,
+}
+
+impl CookieSettings {
+    const fn default_secure() -> bool {
+        true
+    }
+
+    fn default_same_site() -> String {
+        "Strict".to_string()
+    }
+
+    pub fn from_env() -> Self {
+        let secure = parse_bool_env_var("COOKIE_SECURE").unwrap_or(Self::default_secure());
+        let same_site = env::var("COOKIE_SAME_SITE").unwrap_or_else(|_| Self::default_same_site());
+        Self { secure, same_site }
+    }
+
+    pub fn parse_same_site(&self) -> axum_extra::extract::cookie::SameSite {
+        match self.same_site.to_lowercase().as_str() {
+            "strict" => axum_extra::extract::cookie::SameSite::Strict,
+            "lax" => axum_extra::extract::cookie::SameSite::Lax,
+            "none" => axum_extra::extract::cookie::SameSite::None,
+            _ => {
+                tracing::warn!(
+                    "Invalid COOKIE_SAME_SITE value: {}, defaulting to Strict",
+                    self.same_site
+                );
+                axum_extra::extract::cookie::SameSite::Strict
+            }
+        }
+    }
+}
+
+impl Default for CookieSettings {
+    fn default() -> Self {
+        Self {
+            secure: Self::default_secure(),
+            same_site: Self::default_same_site(),
         }
     }
 }
@@ -273,6 +322,10 @@ impl Config {
             .get::<ContentSettings>("content")
             .unwrap_or_else(|_| ContentSettings::from_env());
 
+        let cookie = settings
+            .get::<CookieSettings>("cookie")
+            .unwrap_or_else(|_| CookieSettings::from_env());
+
         let superuser_seed_file = settings
             .get_string("superuser_seed_file")
             .ok()
@@ -292,6 +345,7 @@ impl Config {
             python_api_url,
             reporting,
             content,
+            cookie,
             superuser_seed_file,
             object_storage,
             enable_sso,

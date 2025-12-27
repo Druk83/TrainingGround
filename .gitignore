@@ -126,5 +126,4 @@ tests/performance/mongo_server_status.txt
 tests/performance/results_smoke.jsondocker
 tests/performance/rust-api-logs.txtk6
 tasks/SECURITY-AUDIT-2025-12-22.md
-tasks/TD-05.md
-tasks/done/TD-05.md
+.claude/

@@ -2,6 +2,7 @@ import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
 import { ApiClient } from '@/lib/api-client';
+import { authService } from '@/lib/auth-service';
 import type {
   AdminTemplateSummary,
   QueueStatus,
@@ -9,6 +10,7 @@ import type {
   TemplateFilterParams,
   TemplateRevertPayload,
 } from '@/lib/api-types';
+import '@/components/app-header';
 
 @customElement('admin-console')
 export class AdminConsole extends LitElement {
@@ -178,18 +180,12 @@ export class AdminConsole extends LitElement {
   `;
 
   private client: ApiClient;
-  @state()
-  private templates: AdminTemplateSummary[];
-  @state()
-  private queue?: QueueStatus;
-  @state()
-  private featureFlags: FeatureFlagRecord[];
-  @state()
-  private loading: boolean;
-  @state()
-  private error?: string;
-  @state()
-  private filter: TemplateFilterParams;
+  @state() declare private templates: AdminTemplateSummary[];
+  @state() declare private queue?: QueueStatus;
+  @state() declare private featureFlags: FeatureFlagRecord[];
+  @state() declare private loading: boolean;
+  @state() declare private error?: string;
+  @state() declare private filter: TemplateFilterParams;
 
   constructor() {
     super();
@@ -199,8 +195,8 @@ export class AdminConsole extends LitElement {
     this.loading = false;
     this.filter = {};
 
-    // Read JWT token from localStorage
-    const token = localStorage.getItem('auth_token');
+    // Read JWT token from AuthService
+    const token = authService.getToken();
     this.client = new ApiClient({ jwt: token ?? undefined });
   }
 
@@ -211,6 +207,7 @@ export class AdminConsole extends LitElement {
 
   render() {
     return html`
+      <app-header></app-header>
       <div class="header">
         <div>
           <h1>Админка: шаблоны и эмбеддинги</h1>

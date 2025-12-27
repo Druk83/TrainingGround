@@ -30,13 +30,35 @@ export interface ApiClientOptions {
 
 export class ApiClient {
   private jwt?: string;
+  private csrfToken?: string;
 
   constructor(options: ApiClientOptions = {}) {
     this.jwt = options.jwt;
+    // Fetch CSRF token on initialization
+    this.fetchCsrfToken();
   }
 
   setToken(token?: string) {
     this.jwt = token;
+  }
+
+  /**
+   * Fetch CSRF token from server
+   * Called on initialization and can be called manually if needed
+   */
+  async fetchCsrfToken(): Promise<void> {
+    try {
+      const response = await fetch('/api/v1/auth/csrf-token', {
+        credentials: 'include', // Include cookies
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        this.csrfToken = data.csrf_token;
+      }
+    } catch (error) {
+      console.warn('Failed to fetch CSRF token', error);
+    }
   }
 
   async createSession(payload: CreateSessionPayload, signal?: AbortSignal) {
@@ -92,10 +114,44 @@ export class ApiClient {
       headers.set('Authorization', `Bearer ${this.jwt}`);
     }
 
+    // Add CSRF token for state-changing operations
+    const method = init.method?.toUpperCase() || 'GET';
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && this.csrfToken) {
+      headers.set('X-CSRF-Token', this.csrfToken);
+    }
+
     const response = await fetch(url, {
       ...init,
       headers,
+      credentials: 'include', // Include cookies in all requests
     });
+
+    // Handle 401 Unauthorized - attempt token refresh
+    if (response.status === 401) {
+      // Try to refresh token (only once to avoid infinite loop)
+      if (
+        !init.headers ||
+        !(init.headers as Record<string, string>)['X-Retry-After-Refresh']
+      ) {
+        const refreshed = await this.attemptTokenRefresh();
+        if (refreshed) {
+          // Retry original request with new token
+          const retryHeaders = new Headers(init.headers ?? {});
+          retryHeaders.set('X-Retry-After-Refresh', 'true');
+          return this.request<T>(url, { ...init, headers: retryHeaders });
+        }
+      }
+
+      // Refresh failed or already retried - redirect to login
+      window.location.href = '/login';
+      throw new Error('Authentication required');
+    }
+
+    // Handle 403 Forbidden
+    if (response.status === 403) {
+      window.location.href = '/forbidden';
+      throw new Error('Access forbidden');
+    }
 
     if (!response.ok) {
       const detail = await safeParseJson(response);
@@ -107,6 +163,35 @@ export class ApiClient {
     }
 
     return (await response.json()) as T;
+  }
+
+  /**
+   * Attempt to refresh access token (refresh_token read from HTTP-only cookie)
+   * Returns true if successful, false otherwise
+   */
+  private async attemptTokenRefresh(): Promise<boolean> {
+    try {
+      const response = await fetch('/api/v1/auth/refresh', {
+        method: 'POST',
+        credentials: 'include', // Include HTTP-only cookie
+      });
+
+      if (!response.ok) {
+        return false;
+      }
+
+      const data = await response.json();
+      const newToken = data.access_token;
+
+      // Update token
+      this.setToken(newToken);
+      localStorage.setItem('access_token', newToken);
+
+      return true;
+    } catch (error) {
+      console.error('Token refresh failed', error);
+      return false;
+    }
   }
 
   async getGroupStats(groupId: string, signal?: AbortSignal) {

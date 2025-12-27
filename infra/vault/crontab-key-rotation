@@ -1,0 +1,20 @@
+# Crontab для автоматической ротации ключей шифрования MongoDB
+# Установка: crontab -u root infra/vault/crontab-key-rotation
+
+# Переменные окружения для cron
+VAULT_ADDR=http://localhost:8200
+VAULT_TOKEN=<YOUR_VAULT_TOKEN>
+PATH=/usr/local/bin:/usr/bin:/bin
+
+# Ротация ключей каждые 90 дней (в 02:00 первого числа каждого квартала)
+# Январь, Апрель, Июль, Октябрь
+0 2 1 1,4,7,10 * /opt/trainingground/infra/vault/rotate-encryption-keys.sh >> /var/log/mongodb/key-rotation.log 2>&1
+
+# Проверка срока ротации (за 7 дней до истечения) - каждый день в 09:00
+0 9 * * * /opt/trainingground/infra/vault/check-rotation-deadline.sh >> /var/log/mongodb/rotation-check.log 2>&1
+
+# Бэкап ключей в безопасное хранилище (ежедневно в 03:00)
+0 3 * * * /opt/trainingground/infra/vault/backup-vault.sh >> /var/log/vault/backup.log 2>&1
+
+# Аудит доступа к ключам (каждый час)
+0 * * * * /opt/trainingground/infra/vault/audit-key-access.sh >> /var/log/vault/access-audit.log 2>&1

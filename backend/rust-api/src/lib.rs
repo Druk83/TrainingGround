@@ -53,18 +53,23 @@ pub fn create_router(app_state: std::sync::Arc<services::AppState>) -> Router {
             get(handlers::metrics_handler)
                 .layer(middleware::from_fn(handlers::metrics_auth_middleware)),
         )
+        // Auth endpoints (mixed: some public, some protected)
+        .nest("/api/v1/auth", auth_routes(app_state.clone()))
         // Protected endpoints (require JWT)
         .nest(
             "/api/v1/sessions",
-            sessions_routes().layer(middleware::from_fn_with_state(
-                app_state.clone(),
-                middlewares::rate_limit::rate_limit_middleware,
-            )),
+            sessions_routes()
+                .layer(middleware::from_fn(middlewares::csrf::csrf_middleware))
+                .layer(middleware::from_fn_with_state(
+                    app_state.clone(),
+                    middlewares::rate_limit::rate_limit_middleware,
+                )),
         )
         .nest(
             "/stats",
             reporting_routes()
                 .layer(cors) // Apply CORS to reporting endpoints
+                .layer(middleware::from_fn(middlewares::csrf::csrf_middleware))
                 .layer(middleware::from_fn_with_state(
                     app_state.clone(),
                     middlewares::auth::auth_middleware,
@@ -73,13 +78,14 @@ pub fn create_router(app_state: std::sync::Arc<services::AppState>) -> Router {
         .nest(
             "/admin",
             admin_routes()
+                .layer(middleware::from_fn(
+                    middlewares::auth::admin_guard_middleware,
+                ))
                 .layer(middleware::from_fn_with_state(
                     app_state.clone(),
                     middlewares::auth::auth_middleware,
                 ))
-                .layer(middleware::from_fn(
-                    middlewares::auth::admin_guard_middleware,
-                )),
+                .layer(middleware::from_fn(middlewares::csrf::csrf_middleware)),
         )
         .with_state(app_state)
         .layer(middleware::from_fn(csp_middleware)) // Apply CSP to all responses
@@ -130,4 +136,68 @@ fn admin_routes() -> Router<std::sync::Arc<services::AppState>> {
             "/feature-flags/{flag_name}",
             put(handlers::admin::update_feature_flag),
         )
+}
+
+fn auth_routes(
+    app_state: std::sync::Arc<services::AppState>,
+) -> Router<std::sync::Arc<services::AppState>> {
+    // Public routes with rate limiting
+    let register_route = Router::new()
+        .route("/register", post(handlers::auth::register))
+        .route_layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            middlewares::rate_limit::register_rate_limit_middleware,
+        ));
+
+    let login_route = Router::new()
+        .route("/login", post(handlers::auth::login))
+        .route_layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            middlewares::rate_limit::login_rate_limit_middleware,
+        ));
+
+    let refresh_route = Router::new().route("/refresh", post(handlers::auth::refresh_token));
+
+    // CSRF token endpoint (public, no auth required)
+    let csrf_route = Router::new().route("/csrf-token", get(handlers::auth::get_csrf_token));
+
+    let public_routes = register_route
+        .merge(login_route)
+        .merge(refresh_route)
+        .merge(csrf_route);
+
+    // Protected routes (require JWT auth + CSRF protection)
+    let protected_routes = Router::new()
+        .route("/me", get(handlers::auth::get_current_user))
+        .route("/logout", post(handlers::auth::logout))
+        .route("/sessions", get(handlers::auth::get_active_sessions))
+        .route(
+            "/sessions/revoke",
+            post(handlers::auth::revoke_other_sessions),
+        )
+        .route("/change-password", post(handlers::auth::change_password))
+        .route_layer(middleware::from_fn(middlewares::csrf::csrf_middleware))
+        .route_layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            middlewares::auth::auth_middleware,
+        ));
+
+    // Admin-only routes (require JWT auth + admin role + CSRF protection)
+    let admin_routes = Router::new()
+        .route("/users", get(handlers::auth::list_users))
+        .route(
+            "/users/{id}",
+            get(handlers::auth::get_user_by_id_admin).patch(handlers::auth::update_user),
+        )
+        .route_layer(middleware::from_fn(middlewares::csrf::csrf_middleware))
+        .route_layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            middlewares::auth::auth_middleware,
+        ))
+        .route_layer(middleware::from_fn(
+            middlewares::auth::admin_guard_middleware,
+        ));
+
+    // Merge public, protected, and admin routes
+    public_routes.merge(protected_routes).merge(admin_routes)
 }

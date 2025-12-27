@@ -67,6 +67,8 @@ impl AppState {
 pub mod analytics_worker;
 pub mod answer_service;
 pub mod anticheat_service;
+pub mod audit_service;
+pub mod auth_service;
 pub mod content_service;
 pub mod export_worker;
 pub mod hint_service;

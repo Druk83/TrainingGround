@@ -2,8 +2,10 @@ import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
 import { ApiClient } from '@/lib/api-client';
+import { authService } from '@/lib/auth-service';
 import type { ExportRequestPayload, GroupStatsResponse } from '@/lib/api-types';
 import { sanitizeDisplayName } from '@/lib/sanitization';
+import '@/components/app-header';
 
 type PeriodKey = 'day' | 'week' | 'month';
 
@@ -176,22 +178,14 @@ export class TeacherDashboard extends LitElement {
     }
   `;
 
-  @state()
-  private loading = false;
-  @state()
-  private error?: string;
-  @state()
-  private stats?: GroupStatsResponse;
-  @state()
-  private topicFilter = '';
-  @state()
-  private exportFormat: 'csv' | 'pdf' = 'csv';
-  @state()
-  private period: PeriodKey = 'day';
-  @state()
-  private exportMessage?: string;
-  @state()
-  private lastUpdated?: string;
+  @state() declare private loading: boolean;
+  @state() declare private error?: string;
+  @state() declare private stats?: GroupStatsResponse;
+  @state() declare private topicFilter: string;
+  @state() declare private exportFormat: 'csv' | 'pdf';
+  @state() declare private period: PeriodKey;
+  @state() declare private exportMessage?: string;
+  @state() declare private lastUpdated?: string;
 
   private client: ApiClient;
   private pollingHandle?: number;
@@ -201,8 +195,16 @@ export class TeacherDashboard extends LitElement {
     super();
     const params = new URLSearchParams(window.location.search);
     this.groupId = params.get('groupId');
-    const token = params.get('token') ?? undefined;
-    this.client = new ApiClient({ jwt: token });
+
+    // Initialize state properties
+    this.loading = false;
+    this.topicFilter = '';
+    this.exportFormat = 'csv';
+    this.period = 'day';
+
+    // Read JWT token from AuthService
+    const token = authService.getToken();
+    this.client = new ApiClient({ jwt: token ?? undefined });
   }
 
   connectedCallback() {
@@ -221,6 +223,7 @@ export class TeacherDashboard extends LitElement {
   render() {
     if (!this.groupId) {
       return html`
+        <app-header></app-header>
         <div class="page">
           <h1>Teacher Dashboard</h1>
           <p class="muted">Укажите идентификатор группы через ?groupId=...</p>
@@ -229,6 +232,7 @@ export class TeacherDashboard extends LitElement {
     }
 
     return html`
+      <app-header></app-header>
       <div class="page">
         <header>
           <div>

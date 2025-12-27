@@ -14,6 +14,7 @@ path = "src/main.rs"
 [dependencies]
 # Web framework
 axum = "0.8.8"
+axum-extra = { version = "0.12.3", features = ["cookie"] }
 tokio = { version = "1", features = ["full"] }
 tower = "0.5.2"
 tower-http = { version = "0.6.8", features = ["trace", "cors", "compression-gzip"] }
@@ -41,6 +42,7 @@ opentelemetry-otlp = { version = "0.31.0", features = ["http-proto", "trace"] }
 # UUID & DateTime
 uuid = { version = "1.6", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
+time = "0.3"
 
 # HTTP client
 reqwest = { version = "0.12.28", features = ["json"] }

@@ -1,6 +1,6 @@
 # Nginx Reverse Proxy with Let's Encrypt SSL
 
-TD-06 Task 26: Production HTTPS setup with TLS 1.3/1.2, strong cipher suites, and automatic certificate renewal.
+Production HTTPS setup with TLS 1.3/1.2, strong cipher suites, and automatic certificate renewal.
 
 ## Quick Start (Production Deployment)
 
@@ -52,7 +52,7 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ### 5. Verify SSL Configuration
 
-- Visit: https://trainingground.ru
+- Visit: https://trainingground.ru (внимание не настоящий адрес!!!)
 - Test SSL: https://www.ssllabs.com/ssltest/analyze.html?d=trainingground.ru
 - Expected grade: **A or A+**
 
@@ -90,7 +90,7 @@ docker-compose -f docker-compose.prod.yml exec nginx nginx -s reload
 
 ### Security Headers
 
-- **HSTS:** `max-age=31536000; includeSubDomains; preload`
+- **HSTS:** `max-age=31536000; includeSubDomains` (без `preload` для соответствия ФЗ-152 - HSTS Preload List управляется Google (США), что может противоречить требованиям локализации данных)
 - **X-Frame-Options:** DENY
 - **X-Content-Type-Options:** nosniff
 - **X-XSS-Protection:** 1; mode=block
@@ -230,10 +230,10 @@ Before going live:
 - [ ] Let's Encrypt production certificate obtained (not staging)
 - [ ] Cron job for certificate renewal configured
 - [ ] SSL Labs test passed (grade A or A+)
-- [ ] HSTS preload submitted: https://hstspreload.org/
 - [ ] Firewall rules allow ports 80, 443
 - [ ] MongoDB keyfile permissions: 400
 - [ ] Admin superuser seed file exists and secured
+- [ ] HSTS header configured without `preload` (ФЗ-152 compliance)
 
 ## References
 
@@ -241,3 +241,15 @@ Before going live:
 - Let's Encrypt Documentation: https://letsencrypt.org/docs/
 - Nginx Docker Hub: https://hub.docker.com/_/nginx
 - SSL Labs Test: https://www.ssllabs.com/ssltest/
+- DuckDNS (free staging domain): https://www.duckdns.org/
+
+## Deployment с реальным доменом
+
+Проверка SSL конфигурации на реальном домене (staging или production) вынесена в отдельную задачу:
+- [tasks/TD-06-27.md](../../tasks/TD-06-27.md) - HSTS header configuration и SSL deployment проверка
+
+В этом документе описаны:
+- Варианты доменов (DuckDNS для staging, покупка домена для production)
+- Чек-лист deployment
+- Проверка через SSL Labs и http.itsoft.ru
+- Правовое обоснование по ФЗ-152 (почему без preload)
