@@ -77,6 +77,83 @@ npm run storybook      # Storybook с интерактивными story ком�
 npm run build-storybook # статическая сборка Storybook для публикации
 ```
 
+## Git Hooks и безопасность
+
+Проект использует pre-commit hooks для автоматической проверки кода перед коммитом.
+
+### Настройка Git Hooks
+
+```powershell
+# Один раз после клонирования репозитория
+git config core.hooksPath .githooks
+
+# Проверка настройки
+git config --get core.hooksPath
+# Должно вывести: .githooks
+```
+
+### Что проверяют Pre-commit Hooks
+
+**Security Checks (`.githooks/pre-commit-secrets`):**
+- Хардкоденные секреты (JWT_SECRET, API keys, пароли)
+- Попытки закоммитить `.env`, `.env.prod`, `.env.production`
+- Реальные секреты в `.env.example` (вместо placeholders)
+- MongoDB keyfiles (`mongo-keyfile`, `mongo-keyfile.secure`)
+- Credential files (`credentials.json`, `*.pem`, `*.key`, `admin-superuser.json`)
+- Проверяет что используются env vars: `process.env.JWT_SECRET`, `std::env::var("JWT_SECRET")`
+
+**Component-specific Checks:**
+- **Frontend** (`.githooks/pre-commit-frontend`) - ESLint, TypeScript, форматирование
+- **Rust API** (`.githooks/pre-commit-rust`) - cargo clippy, cargo fmt, cargo test
+- **Python** (`.githooks/pre-commit-python`) - ruff, black, pytest
+
+### Примеры ошибок безопасности
+
+```typescript
+// ПЛОХО - коммит будет заблокирован
+const JWT_SECRET = "my_super_secret_key_12345";
+const apiKey = "sk-1234567890abcdef";
+
+// ХОРОШО - используйте environment variables
+const JWT_SECRET = process.env.JWT_SECRET;
+const apiKey = process.env.API_KEY;
+```
+
+```bash
+# ПЛОХО - попытка закоммитить production .env
+git add .env
+git commit -m "Add config"
+# [ERROR] Attempting to commit production .env file: .env
+
+# ХОРОШО - используйте .env.example с placeholders
+# .env.example
+JWT_SECRET=changeme_generate_with_openssl_rand_base64_32
+API_KEY=your_api_key_here
+```
+
+### Обход hooks (только для экстренных случаев)
+
+```powershell
+# Пропустить ВСЕ pre-commit проверки (не рекомендуется!)
+git commit --no-verify -m "Emergency fix"
+
+# Лучше: исправьте проблему и закоммитьте нормально
+```
+
+**ВНИМАНИЕ:** Использование `--no-verify` может привести к утечке секретов в репозиторий! Используйте только в критических ситуациях и обязательно проверьте изменения вручную.
+
+### Генерация безопасных секретов
+
+```powershell
+# Windows, Linux, macOS
+openssl rand -base64 32
+
+# Пример вывода:
+# xK9v2Lm+3Qw8Rp5Yt7Hn6Jk4Fg1Ds0Az9Cx8Bv7Nm5=
+```
+
+Используйте сгенерированные секреты в `.env` файле (но НЕ коммитьте `.env`!).
+
 ## Кому и зачем
 - **Ученики** систематизируют знания «от простого к сложному», набирают ≥80 % правильных ответов, чтобы двигаться по темам, и мотивируются за счёт достижений и рейтингов.
 - **Учителя и кураторы** отслеживают прогресс групп, находят уязвимые темы и готовят подборки заданий.

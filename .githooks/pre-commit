@@ -18,6 +18,9 @@ if [ -n "$STAGED_KEYFILES" ]; then
     exit 1
 fi
 
+# TD-06 Task 25: Check for hardcoded secrets (JWT_SECRET, API keys, passwords, etc.)
+.githooks/pre-commit-secrets || exit 1
+
 # Определить измененные компоненты
 CHANGED_FILES=$(git diff --cached --name-only)
 

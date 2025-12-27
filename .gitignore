@@ -98,6 +98,11 @@ service-account*.json
 infra/mongo-keyfile
 infra/mongo-keyfile.secure
 infra/mongodb-keyfile
+
+# SSL certificates and Let's Encrypt data (CRITICAL SECURITY)
+infra/nginx/certbot/conf/
+infra/nginx/certbot/www/
+infra/nginx/ssl/
 # Sensitive filenames (excluding scripts and docs)
 password.txt
 passwords.txt
