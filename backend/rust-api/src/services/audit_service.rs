@@ -1,7 +1,11 @@
+use anyhow::{Context, Result};
 use chrono::Utc;
-use mongodb::Database;
+use mongodb::{
+    bson::{doc, DateTime as BsonDateTime, Regex},
+    Database,
+};
 
-use crate::models::audit_log::{AuditEventType, AuditLog};
+use crate::models::audit_log::{AuditEventType, AuditLog, AuditLogQuery};
 
 /// Parameters for audit event logging
 #[derive(Debug)]
@@ -444,4 +448,90 @@ impl AuditService {
         })
         .await
     }
+
+    pub async fn list_logs(&self, query: AuditLogQuery) -> Result<Vec<AuditLog>> {
+        self.fetch_logs(query, None).await
+    }
+
+    pub async fn export_logs(&self, query: AuditLogQuery, max_limit: u32) -> Result<Vec<AuditLog>> {
+        self.fetch_logs(query, Some(max_limit)).await
+    }
+
+    async fn fetch_logs(
+        &self,
+        query: AuditLogQuery,
+        override_limit: Option<u32>,
+    ) -> Result<Vec<AuditLog>> {
+        let collection = self.mongo.collection::<AuditLog>("audit_log");
+        let filter = build_filter(&query);
+
+        let limit = override_limit.unwrap_or_else(|| query.limit.unwrap_or(50).min(500)) as i64;
+        let skip = query.offset.unwrap_or(0) as u64;
+
+        let mut cursor = collection
+            .find(filter)
+            .sort(doc! { "createdAt": -1 })
+            .skip(skip)
+            .limit(limit)
+            .await
+            .context("Failed to query audit logs")?;
+
+        let mut result = Vec::new();
+        while cursor
+            .advance()
+            .await
+            .context("Failed to advance audit log cursor")?
+        {
+            let log = cursor
+                .deserialize_current()
+                .context("Failed to deserialize audit log")?;
+            result.push(log);
+        }
+
+        Ok(result)
+    }
+}
+
+fn build_filter(query: &AuditLogQuery) -> mongodb::bson::Document {
+    let mut filter = doc! {};
+
+    if let Some(event_type) = &query.event_type {
+        filter.insert("event_type", event_type.as_str());
+    }
+
+    if let Some(user_id) = &query.user_id {
+        filter.insert("user_id", user_id);
+    }
+
+    if let Some(success) = query.success {
+        filter.insert("success", success);
+    }
+
+    if query.from.is_some() || query.to.is_some() {
+        let mut range = doc! {};
+        if let Some(from) = query.from {
+            range.insert("$gte", BsonDateTime::from_millis(from.timestamp_millis()));
+        }
+        if let Some(to) = query.to {
+            range.insert("$lte", BsonDateTime::from_millis(to.timestamp_millis()));
+        }
+        filter.insert("createdAt", range);
+    }
+
+    if let Some(search) = &query.search {
+        let regex = Regex {
+            pattern: search.to_string(),
+            options: "i".into(),
+        };
+        filter.insert(
+            "$or",
+            vec![
+                doc! { "email": &regex },
+                doc! { "details": &regex },
+                doc! { "error_message": &regex },
+            ],
+        );
+    }
+
+    filter
 }

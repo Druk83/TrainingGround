@@ -14,6 +14,10 @@ const RATE_LIMIT_PER_USER: u32 = 100; // requests per minute
 const RATE_LIMIT_PER_IP: u32 = 200; // requests per minute
 const RATE_WINDOW_SECONDS: u64 = 60; // 1 minute
 
+const ADMIN_RATE_LIMIT_PER_USER: u32 = 10;
+const ADMIN_RATE_LIMIT_PER_IP: u32 = 10;
+const ADMIN_RATE_WINDOW_SECONDS: u64 = 60;
+
 // Auth-specific rate limits
 const LOGIN_RATE_LIMIT: u32 = 10; // 10 attempts per 5 minutes
 const LOGIN_RATE_WINDOW_SECONDS: u64 = 300; // 5 minutes
@@ -245,6 +249,73 @@ pub async fn register_rate_limit_middleware(
             tracing::warn!("Register rate limit exceeded for IP: {}", client_ip);
             return Err(StatusCode::TOO_MANY_REQUESTS);
         }
+    }
+
+    Ok(next.run(request).await)
+}
+
+pub async fn admin_rate_limit_middleware(
+    State(state): State<Arc<AppState>>,
+    request: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    if std::env::var("ADMIN_RATE_LIMIT_DISABLED").unwrap_or_default() == "1" {
+        return Ok(next.run(request).await);
+    }
+
+    let headers = request.headers();
+    let extensions = request.extensions();
+    let client_ip = extract_client_ip_from(headers, extensions);
+
+    let user_id = request
+        .extensions()
+        .get::<super::auth::JwtClaims>()
+        .map(|c| c.sub.clone());
+
+    if let Some(uid) = &user_id {
+        let limit = std::env::var("ADMIN_RATE_LIMIT_PER_USER")
+            .ok()
+            .and_then(|s| s.parse::<u32>().ok())
+            .unwrap_or(ADMIN_RATE_LIMIT_PER_USER);
+
+        let allowed = check_rate_limit_with_window(
+            &state.redis,
+            &format!("ratelimit:admin:user:{uid}"),
+            limit,
+            ADMIN_RATE_WINDOW_SECONDS,
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!("Admin rate limit check failed: {e}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+        if !allowed {
+            tracing::warn!("Admin user rate limit exceeded: {uid}");
+            return Err(StatusCode::TOO_MANY_REQUESTS);
+        }
+    }
+
+    let ip_limit = std::env::var("ADMIN_RATE_LIMIT_PER_IP")
+        .ok()
+        .and_then(|s| s.parse::<u32>().ok())
+        .unwrap_or(ADMIN_RATE_LIMIT_PER_IP);
+
+    let allowed = check_rate_limit_with_window(
+        &state.redis,
+        &format!("ratelimit:admin:ip:{client_ip}"),
+        ip_limit,
+        ADMIN_RATE_WINDOW_SECONDS,
+    )
+    .await
+    .map_err(|e| {
+        tracing::error!("Admin rate limit check failed: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    if !allowed {
+        tracing::warn!("Admin IP rate limit exceeded: {client_ip}");
+        return Err(StatusCode::TOO_MANY_REQUESTS);
     }
 
     Ok(next.run(request).await)

@@ -2,8 +2,9 @@ use crate::metrics::{track_cache_operation, SESSIONS_ACTIVE, SESSIONS_TOTAL};
 use crate::models::{
     CreateSessionRequest, CreateSessionResponse, Session, SessionStatus, TaskInfo,
 };
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
+use mongodb::bson::{doc, oid::ObjectId, Bson, Document};
 use mongodb::Database;
 use redis::aio::ConnectionManager;
 use uuid::Uuid;
@@ -20,15 +21,7 @@ impl SessionService {
 
     pub async fn create_session(&self, req: CreateSessionRequest) -> Result<CreateSessionResponse> {
         let session_id = Uuid::new_v4().to_string();
-
-        // TODO: Get task from MongoDB tasks collection
-        // For now, using mock data
-        let task = TaskInfo {
-            id: req.task_id.clone(),
-            title: "Sample Task".to_string(),
-            description: "Solve the programming problem".to_string(),
-            time_limit_seconds: 300,
-        };
+        let task = self.fetch_task(&req.task_id).await?;
 
         let now = Utc::now();
         let session_ttl = std::env::var("SESSION_DURATION_SECONDS")
@@ -76,7 +69,12 @@ impl SessionService {
 
         Ok(CreateSessionResponse {
             session_id,
-            task,
+            task: TaskInfo {
+                id: task.id,
+                title: task.title,
+                description: task.description,
+                time_limit_seconds: task.time_limit_seconds,
+            },
             expires_at,
         })
     }
@@ -124,4 +122,52 @@ impl SessionService {
 
         Ok(())
     }
+
+    async fn fetch_task(&self, task_id: &str) -> Result<FetchedTask> {
+        let tasks_collection = self.mongo.collection::<Document>("tasks");
+        let filter = if let Ok(object_id) = ObjectId::parse_str(task_id) {
+            doc! { "_id": object_id }
+        } else {
+            doc! { "_id": task_id }
+        };
+
+        let task = tasks_collection
+            .find_one(filter)
+            .await
+            .context("Failed to query task")?
+            .ok_or_else(|| anyhow!("Task not found"))?;
+
+        let id = match task.get("_id") {
+            Some(Bson::ObjectId(oid)) => oid.to_hex(),
+            Some(Bson::String(value)) => value.to_string(),
+            _ => return Err(anyhow!("Task has unsupported _id type")),
+        };
+
+        let title = task
+            .get_str("title")
+            .map_err(|_| anyhow!("Task title missing"))?
+            .to_string();
+        let description = task
+            .get_str("description")
+            .map_err(|_| anyhow!("Task description missing"))?
+            .to_string();
+        let time_limit_seconds = task
+            .get_i32("time_limit_seconds")
+            .or_else(|_| task.get_i64("time_limit_seconds").map(|v| v as i32))
+            .map_err(|_| anyhow!("Task time limit missing"))?;
+
+        Ok(FetchedTask {
+            id,
+            title,
+            description,
+            time_limit_seconds: time_limit_seconds as u32,
+        })
+    }
+}
+
+struct FetchedTask {
+    id: String,
+    title: String,
+    description: String,
+    time_limit_seconds: u32,
 }

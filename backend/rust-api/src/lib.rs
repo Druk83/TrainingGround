@@ -77,7 +77,7 @@ pub fn create_router(app_state: std::sync::Arc<services::AppState>) -> Router {
         )
         .nest(
             "/admin",
-            admin_routes()
+            admin_routes(app_state.clone())
                 .layer(middleware::from_fn(middlewares::csrf::csrf_middleware))
                 .layer(middleware::from_fn_with_state(
                     app_state.clone(),
@@ -113,7 +113,9 @@ fn reporting_routes() -> Router<std::sync::Arc<services::AppState>> {
         )
 }
 
-fn admin_routes() -> Router<std::sync::Arc<services::AppState>> {
+fn admin_routes(
+    app_state: std::sync::Arc<services::AppState>,
+) -> Router<std::sync::Arc<services::AppState>> {
     Router::new()
         // Content management
         .route(
@@ -134,11 +136,21 @@ fn admin_routes() -> Router<std::sync::Arc<services::AppState>> {
             "/feature-flags/{flag_name}",
             put(handlers::admin::update_feature_flag),
         )
+        // Backups
+        .route(
+            "/backups",
+            get(handlers::admin::list_backups).post(handlers::admin::create_backup),
+        )
+        .route(
+            "/backups/{id}/restore",
+            post(handlers::admin::restore_backup),
+        )
         // User management
         .route(
             "/users",
             get(handlers::admin::list_users).post(handlers::admin::create_user),
         )
+        .route("/users/bulk", post(handlers::admin::bulk_user_action))
         .route(
             "/users/{id}",
             get(handlers::admin::get_user)
@@ -147,17 +159,68 @@ fn admin_routes() -> Router<std::sync::Arc<services::AppState>> {
         )
         .route("/users/{id}/block", post(handlers::admin::block_user))
         .route("/users/{id}/unblock", post(handlers::admin::unblock_user))
+        .route(
+            "/users/{id}/reset-password",
+            post(handlers::admin::reset_user_password),
+        )
         // Group management
         .route(
             "/groups",
             get(handlers::admin::list_groups).post(handlers::admin::create_group),
         )
+        .route("/groups/export", get(handlers::admin::export_groups))
         .route(
             "/groups/{id}",
             get(handlers::admin::get_group)
                 .patch(handlers::admin::update_group)
                 .delete(handlers::admin::delete_group),
         )
+        // Anticheat incidents
+        .route("/incidents", get(handlers::admin::list_incidents))
+        .route(
+            "/incidents/{id}",
+            get(handlers::admin::get_incident).put(handlers::admin::update_incident),
+        )
+        .route(
+            "/incidents/{id}/unblock",
+            post(handlers::admin::unblock_incident_user),
+        )
+        // System metrics
+        .route("/system/metrics", get(handlers::admin::get_system_metrics))
+        // System settings
+        .route("/settings", get(handlers::admin::get_system_settings))
+        .route(
+            "/settings/yandexgpt",
+            put(handlers::admin::update_yandexgpt_settings),
+        )
+        .route("/settings/sso", put(handlers::admin::update_sso_settings))
+        .route(
+            "/settings/email",
+            put(handlers::admin::update_email_settings),
+        )
+        .route(
+            "/settings/anticheat",
+            put(handlers::admin::update_anticheat_settings),
+        )
+        .route(
+            "/settings/test/yandexgpt",
+            post(handlers::admin::test_yandexgpt_settings),
+        )
+        .route(
+            "/settings/test/sso",
+            post(handlers::admin::test_sso_settings),
+        )
+        .route(
+            "/settings/test/email",
+            post(handlers::admin::test_email_settings),
+        )
+        // Audit logs
+        .route("/audit", get(handlers::admin::list_audit_logs))
+        .route("/audit/export", get(handlers::admin::export_audit_logs))
+        .layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            middlewares::rate_limit::admin_rate_limit_middleware,
+        ))
         .route_layer(middleware::from_fn(
             middlewares::auth::admin_guard_middleware,
         ))

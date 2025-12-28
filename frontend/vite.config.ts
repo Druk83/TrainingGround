@@ -1,7 +1,51 @@
-﻿import { defineConfig } from "vite";
+import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import path from "node:path";
 import { viteSRIPlugin } from "./vite-plugin-sri";
+
+const DEFAULT_BACKEND = "http://localhost:8081";
+
+function resolveBackendOrigin(): string {
+  const candidates = [
+    process.env.VITE_BACKEND_ORIGIN,
+    process.env.VITE_ADMIN_BASE,
+    process.env.VITE_API_BASE,
+  ].filter(Boolean) as string[];
+
+  for (const value of candidates) {
+    try {
+      return new URL(value).origin;
+    } catch {
+      // ignore and try the next value
+    }
+  }
+
+  return DEFAULT_BACKEND;
+}
+
+const backendOrigin = resolveBackendOrigin();
+
+const createProxy = () => ({
+  "/api": {
+    target: backendOrigin,
+    changeOrigin: true,
+  },
+  "/admin": {
+    target: backendOrigin,
+    changeOrigin: true,
+    bypass(req) {
+      const acceptHeader = req.headers["accept"];
+      if (acceptHeader && acceptHeader.includes("text/html")) {
+        return req.url;
+      }
+      return null;
+    },
+  },
+  "/stats": {
+    target: backendOrigin,
+    changeOrigin: true,
+  },
+});
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -21,7 +65,7 @@ export default defineConfig({
       manifest: {
         name: "TrainingGround Lessons",
         short_name: "Lessons",
-        description: "PWA-сценарий ученика с таймерами, подсказками и офлайн-режимом",
+        description: "PWA-???????? ??????? ? ?????????, ??????????? ? ??????-???????",
         start_url: "/",
         display: "standalone",
         background_color: "#0b1521",
@@ -57,53 +101,11 @@ export default defineConfig({
   server: {
     port: 5173,  // Changed to default Vite dev server port
     open: false,
-    proxy: {
-      "/api": {
-        target: process.env.VITE_API_BASE ?? "http://localhost:8081",
-        changeOrigin: true
-      },
-      "/admin/templates": {
-        target: "http://localhost:8081",
-        changeOrigin: true
-      },
-      "/admin/queue": {
-        target: "http://localhost:8081",
-        changeOrigin: true
-      },
-      "/admin/feature-flags": {
-        target: "http://localhost:8081",
-        changeOrigin: true
-      },
-      "/stats": {
-        target: "http://localhost:8081",
-        changeOrigin: true
-      }
-    }
+    proxy: createProxy(),
   },
   preview: {
     port: 4173,
-    proxy: {
-      "/api": {
-        target: process.env.VITE_API_BASE ?? "http://localhost:8081",
-        changeOrigin: true
-      },
-      "/admin/templates": {
-        target: "http://localhost:8081",
-        changeOrigin: true
-      },
-      "/admin/queue": {
-        target: "http://localhost:8081",
-        changeOrigin: true
-      },
-      "/admin/feature-flags": {
-        target: "http://localhost:8081",
-        changeOrigin: true
-      },
-      "/stats": {
-        target: "http://localhost:8081",
-        changeOrigin: true
-      }
-    }
+    proxy: createProxy(),
   },
   build: {
     rollupOptions: {

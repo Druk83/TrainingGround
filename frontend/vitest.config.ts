@@ -8,47 +8,52 @@ const dirname =
     ? __dirname
     : path.dirname(fileURLToPath(import.meta.url));
 
-// More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
-export default defineConfig({
-  plugins: [],
+const unitProject = {
   test: {
+    name: 'unit',
+    include: ['src/**/*.{test,spec}.{ts,tsx,js}'],
+    exclude: ['src/**/*.stories.*', 'src/**/*.mdx'],
     environment: 'happy-dom',
-    setupFiles: [path.resolve(__dirname, 'vitest.setup.ts')],
+    setupFiles: [path.resolve(dirname, 'vitest.setup.ts')],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
       reportsDirectory: 'coverage',
     },
-    projects: [
-      {
-        extends: true,
-        plugins: [
-          // The plugin will run tests for the stories defined in your Storybook config
-          // See options at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon#storybooktest
-          storybookTest({
-            configDir: path.join(dirname, '.storybook'),
-          }),
-        ],
-        test: {
-          name: 'storybook',
-          browser: {
-            enabled: true,
-            headless: true,
-            provider: playwright({}),
-            instances: [
-              {
-                browser: 'chromium',
-              },
-            ],
-          },
-          setupFiles: ['.storybook/vitest.setup.ts'],
+  },
+};
+
+const storybookPlugins = await storybookTest({
+  configDir: path.join(dirname, '.storybook'),
+});
+
+const storybookProject = {
+  plugins: storybookPlugins,
+  test: {
+    name: 'storybook',
+    browser: {
+      enabled: true,
+      headless: true,
+      provider: playwright({}),
+      instances: [
+        {
+          browser: 'chromium' as const,
         },
-      },
-    ],
+      ],
+    },
+    setupFiles: ['.storybook/vitest.setup.ts'],
+  },
+};
+
+// More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
+export default defineConfig({
+  plugins: [],
+  test: {
+    projects: [unitProject, storybookProject],
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'src'),
+      '@': path.resolve(dirname, 'src'),
     },
   },
 });

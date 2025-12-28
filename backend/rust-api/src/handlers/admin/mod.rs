@@ -1,7 +1,17 @@
+mod audit;
+mod backups;
 mod groups;
+mod incidents;
+mod settings;
+mod system;
 mod users;
 
+pub use audit::*;
+pub use backups::*;
 pub use groups::*;
+pub use incidents::*;
+pub use settings::*;
+pub use system::*;
 pub use users::*;
 
 use axum::{

@@ -48,11 +48,14 @@ pub struct TaskInfo {
 pub mod answer;
 pub mod anticheat;
 pub mod audit_log;
+pub mod backup;
 pub mod content;
 pub mod group;
 pub mod hint;
 pub mod refresh_token;
 pub mod reporting;
+pub mod system_metrics;
+pub mod system_settings;
 pub mod timer;
 pub mod user;
 

@@ -121,6 +121,30 @@ impl GroupService {
         Ok(groups)
     }
 
+    /// Экспорт всех групп без пагинации
+    pub async fn export_groups(&self) -> Result<Vec<GroupResponse>> {
+        let groups_collection = self.mongo.collection::<Group>("groups");
+        let mut cursor = groups_collection
+            .find(doc! {})
+            .await
+            .context("Failed to query groups for export")?;
+
+        let mut groups = Vec::new();
+        while cursor
+            .advance()
+            .await
+            .context("Failed to advance export cursor")?
+        {
+            let group = cursor
+                .deserialize_current()
+                .context("Failed to deserialize group during export")?;
+            let group_response = self.populate_group_response(group).await?;
+            groups.push(group_response);
+        }
+
+        Ok(groups)
+    }
+
     /// Получить группу по ID
     pub async fn get_group(&self, group_id: &str) -> Result<GroupResponse> {
         let groups_collection = self.mongo.collection::<Group>("groups");
@@ -267,5 +291,125 @@ impl GroupService {
         response.student_count = student_count as usize;
 
         Ok(response)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{config::Config, models::user::UserRole};
+    use mongodb::bson::{self, DateTime as BsonDateTime, Document};
+    use serial_test::serial;
+
+    async fn create_service() -> (GroupService, mongodb::Client, String) {
+        let _ = dotenvy::from_filename(".env.test");
+        let config = Config::load().expect("test config");
+        let mongo_client = mongodb::Client::with_uri_str(&config.mongo_uri)
+            .await
+            .expect("mongo");
+        let db = mongo_client.database(&config.mongo_database);
+        db.collection::<Document>("groups")
+            .delete_many(doc! {})
+            .await
+            .expect("cleanup groups");
+        db.collection::<Document>("users")
+            .delete_many(doc! {})
+            .await
+            .expect("cleanup users");
+        (
+            GroupService::new(db.clone()),
+            mongo_client,
+            config.mongo_database,
+        )
+    }
+
+    async fn insert_user(client: &mongodb::Client, db_name: &str, role: UserRole) -> ObjectId {
+        let collection = client
+            .database(db_name)
+            .collection::<bson::Document>("users");
+        let user_doc = doc! {
+            "name": format!("{role:?}-curator"),
+            "email": format!("{}-{}@test.com", role.as_str(), uuid::Uuid::new_v4()),
+            "password_hash": "hash",
+            "role": role.as_str(),
+            "group_ids": [],
+            "is_blocked": false,
+            "createdAt": BsonDateTime::now(),
+            "updatedAt": BsonDateTime::now()
+        };
+        let result = collection.insert_one(user_doc).await.expect("insert user");
+        result
+            .inserted_id
+            .as_object_id()
+            .expect("object id for user")
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn create_group_requires_teacher_curator() {
+        let (service, client, db_name) = create_service().await;
+        let curator_id = insert_user(&client, &db_name, UserRole::Student).await;
+
+        let request = CreateGroupRequest {
+            name: "Group A".into(),
+            school: "School 1".into(),
+            curator_id: Some(curator_id.to_hex()),
+            description: None,
+        };
+
+        let err = service
+            .create_group(request)
+            .await
+            .expect_err("should fail");
+        assert!(
+            err.to_string().to_lowercase().contains("teacher"),
+            "error should mention teacher role: {err:?}"
+        );
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn list_groups_supports_school_filter() {
+        let (service, client, db_name) = create_service().await;
+        let groups_collection = client
+            .database(&db_name)
+            .collection::<bson::Document>("groups");
+
+        groups_collection
+            .insert_many(vec![
+                doc! {
+                    "name": "Alpha",
+                    "school": "School X",
+                    "createdAt": BsonDateTime::now(),
+                    "updatedAt": BsonDateTime::now(),
+                },
+                doc! {
+                    "name": "Beta",
+                    "school": "School Y",
+                    "createdAt": BsonDateTime::now(),
+                    "updatedAt": BsonDateTime::now(),
+                },
+            ])
+            .await
+            .expect("seed groups");
+
+        let mut query = ListGroupsQuery {
+            search: None,
+            school: Some("School X".into()),
+            limit: None,
+            offset: None,
+        };
+        let results = service
+            .list_groups(query.clone())
+            .await
+            .expect("list groups");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].school, "School X");
+
+        query.school = None;
+        query.search = Some("beta".into());
+        let results = service.list_groups(query).await.expect("search groups");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "Beta");
     }
 }

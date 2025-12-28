@@ -5,7 +5,8 @@ use redis::aio::ConnectionManager;
 use uuid::Uuid;
 
 use crate::models::anticheat::{
-    ActionTaken, AnticheatStatus, IncidentDetails, IncidentRecord, IncidentSeverity, IncidentType,
+    ActionTaken, AnticheatStatus, IncidentDetails, IncidentRecord, IncidentSeverity,
+    IncidentStatus, IncidentType,
 };
 
 use crate::utils::retry::{retry_async_with_config, RetryConfig};
@@ -191,6 +192,10 @@ impl AnticheatService {
             },
             timestamp: Utc::now(),
             action_taken: action,
+            status: IncidentStatus::Open,
+            resolved_by: None,
+            resolved_at: None,
+            resolution_note: None,
         };
 
         tracing::warn!(

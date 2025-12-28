@@ -117,7 +117,7 @@ pub struct UpdateGroupRequest {
 }
 
 /// Query параметры для списка групп
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ListGroupsQuery {
     /// Фильтр по школе
     pub school: Option<String>,

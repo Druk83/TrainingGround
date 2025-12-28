@@ -1,8 +1,14 @@
 ﻿import { nanoid } from 'nanoid';
 import type {
+  AuditLogEntry,
+  AuditLogQueryParams,
   AdminTemplateDetail,
   AdminTemplateSummary,
   AdminTemplateUpdatePayload,
+  AnticheatSettings,
+  BulkUserActionRequest,
+  BulkUserActionResult,
+  ResetPasswordResponse,
   BlockUserRequest,
   CreateGroupRequest,
   CreateSessionPayload,
@@ -10,10 +16,13 @@ import type {
   CreateUserRequest,
   ExportRequestPayload,
   ExportResponsePayload,
+  EmailSettings,
   FeatureFlagRecord,
   FeatureFlagUpdatePayload,
   GroupResponse,
   GroupStatsResponse,
+  IncidentWithUser,
+  ListIncidentsQuery,
   ListGroupsQuery,
   ListUsersQuery,
   QueueStatus,
@@ -24,14 +33,79 @@ import type {
   SubmitAnswerPayload,
   TemplateFilterParams,
   TemplateRevertPayload,
+  SettingsTestResponse,
+  SsoSettings,
+  SystemMetrics,
+  SystemSettingsResponse,
+  BackupRecord,
+  BackupCreateRequest,
+  BackupCreateResponse,
+  BackupRestoreResponse,
+  UpdateIncidentRequest,
   UpdateGroupRequest,
   UpdateUserRequest,
   UserDetailResponse,
+  YandexGptSettings,
 } from './api-types';
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1';
-const STATS_BASE = import.meta.env.VITE_REPORTING_API ?? '/stats';
-const ADMIN_BASE = '/admin';
+const stripTrailingSlash = (value: string) => value.replace(/\/+$/, '');
+
+const rawApiBase =
+  import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? undefined;
+
+const backendOriginFromApi =
+  rawApiBase && rawApiBase.startsWith('http')
+    ? rawApiBase.replace(/\/api\/?.*$/, '')
+    : undefined;
+
+const inferredLocalBackend =
+  typeof window !== 'undefined'
+    ? `${window.location.protocol}//${window.location.hostname}:8081`
+    : undefined;
+
+const BACKEND_ORIGIN =
+  import.meta.env.VITE_BACKEND_ORIGIN ??
+  backendOriginFromApi ??
+  inferredLocalBackend ??
+  'http://localhost:8081';
+
+const shouldUseDevProxy =
+  import.meta.env.DEV && import.meta.env.VITE_USE_PROXY !== 'false';
+
+const API_BASE = stripTrailingSlash(
+  shouldUseDevProxy ? '/api/v1' : (rawApiBase ?? `${BACKEND_ORIGIN}/api/v1`),
+);
+const STATS_BASE = stripTrailingSlash(
+  shouldUseDevProxy
+    ? '/stats'
+    : (import.meta.env.VITE_REPORTING_API ?? `${BACKEND_ORIGIN}/stats`),
+);
+const ADMIN_BASE = stripTrailingSlash(
+  shouldUseDevProxy
+    ? '/admin'
+    : (import.meta.env.VITE_ADMIN_BASE ??
+        import.meta.env.VITE_ADMIN_URL ??
+        `${BACKEND_ORIGIN}/admin`),
+);
+
+type MongoObjectId = {
+  $oid?: string;
+};
+
+type RawAuditLogResponse = {
+  _id?: string | MongoObjectId | null;
+  id?: string;
+  event_type: AuditLogEntry['event_type'];
+  user_id?: string;
+  email?: string;
+  success: boolean;
+  ip?: string;
+  user_agent?: string;
+  details?: string;
+  error_message?: string;
+  createdAt?: string;
+  created_at?: string;
+};
 
 export interface ApiClientOptions {
   jwt?: string;
@@ -57,7 +131,7 @@ export class ApiClient {
    */
   async fetchCsrfToken(): Promise<void> {
     try {
-      const response = await fetch('/api/v1/auth/csrf-token', {
+      const response = await fetch(`${API_BASE}/auth/csrf-token`, {
         credentials: 'include', // Include cookies
       });
 
@@ -114,6 +188,21 @@ export class ApiClient {
   }
 
   private async request<T>(url: string, init: RequestInit = {}): Promise<T> {
+    const response = await this.requestRaw(url, init);
+
+    if (!response.ok) {
+      const detail = await safeParseJson(response);
+      throw new Error(detail?.message ?? `Request failed with ${response.status}`);
+    }
+
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
+    return (await response.json()) as T;
+  }
+
+  private async requestRaw(url: string, init: RequestInit = {}): Promise<Response> {
     const headers = new Headers(init.headers ?? {});
     if (!headers.has('Content-Type')) {
       headers.set('Content-Type', 'application/json');
@@ -147,7 +236,7 @@ export class ApiClient {
           // Retry original request with new token
           const retryHeaders = new Headers(init.headers ?? {});
           retryHeaders.set('X-Retry-After-Refresh', 'true');
-          return this.request<T>(url, { ...init, headers: retryHeaders });
+          return this.requestRaw(url, { ...init, headers: retryHeaders });
         }
       }
 
@@ -162,16 +251,7 @@ export class ApiClient {
       throw new Error('Access forbidden');
     }
 
-    if (!response.ok) {
-      const detail = await safeParseJson(response);
-      throw new Error(detail?.message ?? `Request failed with ${response.status}`);
-    }
-
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    return (await response.json()) as T;
+    return response;
   }
 
   /**
@@ -332,6 +412,20 @@ export class ApiClient {
     });
   }
 
+  async bulkUserAction(payload: BulkUserActionRequest) {
+    return this.request<BulkUserActionResult>(`${ADMIN_BASE}/users/bulk`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async resetUserPassword(userId: string) {
+    return this.request<ResetPasswordResponse>(
+      `${ADMIN_BASE}/users/${userId}/reset-password`,
+      { method: 'POST' },
+    );
+  }
+
   async listGroups(query?: ListGroupsQuery) {
     const params = new URLSearchParams();
     if (query?.search) params.set('search', query.search);
@@ -367,6 +461,187 @@ export class ApiClient {
     return this.request<void>(`${ADMIN_BASE}/groups/${groupId}`, {
       method: 'DELETE',
     });
+  }
+
+  async getSystemSettings() {
+    return this.request<SystemSettingsResponse>(`${ADMIN_BASE}/settings`);
+  }
+
+  async updateYandexGptSettings(payload: YandexGptSettings) {
+    return this.request<YandexGptSettings>(`${ADMIN_BASE}/settings/yandexgpt`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateSsoSettings(payload: SsoSettings) {
+    return this.request<SsoSettings>(`${ADMIN_BASE}/settings/sso`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateEmailSettings(payload: EmailSettings) {
+    return this.request<EmailSettings>(`${ADMIN_BASE}/settings/email`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateAnticheatSettings(payload: AnticheatSettings) {
+    return this.request<AnticheatSettings>(`${ADMIN_BASE}/settings/anticheat`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async testYandexGptSettings() {
+    return this.request<SettingsTestResponse>(`${ADMIN_BASE}/settings/test/yandexgpt`, {
+      method: 'POST',
+    });
+  }
+
+  async testSsoSettings() {
+    return this.request<SettingsTestResponse>(`${ADMIN_BASE}/settings/test/sso`, {
+      method: 'POST',
+    });
+  }
+
+  async testEmailSettings() {
+    return this.request<SettingsTestResponse>(`${ADMIN_BASE}/settings/test/email`, {
+      method: 'POST',
+    });
+  }
+
+  async getSystemMetrics() {
+    return this.request<SystemMetrics>(`${ADMIN_BASE}/system/metrics`);
+  }
+
+  async listBackups() {
+    return this.request<BackupRecord[]>(`${ADMIN_BASE}/backups`);
+  }
+
+  async createBackup(payload: BackupCreateRequest) {
+    return this.request<BackupCreateResponse>(`${ADMIN_BASE}/backups`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async restoreBackup(backupId: string) {
+    return this.request<BackupRestoreResponse>(
+      `${ADMIN_BASE}/backups/${backupId}/restore`,
+      {
+        method: 'POST',
+      },
+    );
+  }
+
+  async exportGroups() {
+    const response = await this.requestRaw(`${ADMIN_BASE}/groups/export`);
+    if (!response.ok) {
+      const detail = await safeParseJson(response);
+      throw new Error(detail?.message ?? `Request failed with ${response.status}`);
+    }
+    return response.blob();
+  }
+
+  async listIncidents(query?: ListIncidentsQuery) {
+    const queryString = this.buildIncidentQueryString(query);
+    return this.request<IncidentWithUser[]>(`${ADMIN_BASE}/incidents${queryString}`);
+  }
+
+  async getIncident(incidentId: string) {
+    return this.request<IncidentWithUser>(`${ADMIN_BASE}/incidents/${incidentId}`);
+  }
+
+  async updateIncident(incidentId: string, payload: UpdateIncidentRequest) {
+    return this.request<IncidentWithUser>(`${ADMIN_BASE}/incidents/${incidentId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async unblockIncidentUser(incidentId: string) {
+    return this.request<UserDetailResponse>(
+      `${ADMIN_BASE}/incidents/${incidentId}/unblock`,
+      {
+        method: 'POST',
+      },
+    );
+  }
+
+  async listAuditLogs(query?: AuditLogQueryParams) {
+    const queryString = this.buildAuditQueryString(query);
+    const rawLogs = await this.request<RawAuditLogResponse[]>(
+      `${ADMIN_BASE}/audit${queryString}`,
+    );
+    return rawLogs.map((entry) => this.normalizeAuditLogEntry(entry));
+  }
+
+  async exportAuditLogs(query?: AuditLogQueryParams) {
+    const queryString = this.buildAuditQueryString(query);
+    const response = await this.requestRaw(`${ADMIN_BASE}/audit/export${queryString}`);
+    if (!response.ok) {
+      const detail = await safeParseJson(response);
+      throw new Error(detail?.message ?? `Request failed with ${response.status}`);
+    }
+    return response.blob();
+  }
+
+  private buildAuditQueryString(query?: AuditLogQueryParams) {
+    if (!query) {
+      return '';
+    }
+
+    const params = new URLSearchParams();
+    if (query.event_type) params.set('event_type', query.event_type);
+    if (query.user_id) params.set('user_id', query.user_id);
+    if (typeof query.success === 'boolean') params.set('success', String(query.success));
+    if (query.search) params.set('search', query.search);
+    if (query.from) params.set('from', query.from);
+    if (query.to) params.set('to', query.to);
+    if (typeof query.limit === 'number') params.set('limit', String(query.limit));
+    if (typeof query.offset === 'number') params.set('offset', String(query.offset));
+
+    const queryString = params.toString();
+    return queryString ? `?${queryString}` : '';
+  }
+
+  private buildIncidentQueryString(query?: ListIncidentsQuery) {
+    if (!query) return '';
+    const params = new URLSearchParams();
+    if (query.incident_type) params.set('incident_type', query.incident_type);
+    if (query.severity) params.set('severity', query.severity);
+    if (query.status) params.set('status', query.status);
+    if (query.user_id) params.set('user_id', query.user_id);
+    if (typeof query.limit === 'number') params.set('limit', String(query.limit));
+    if (typeof query.offset === 'number') params.set('offset', String(query.offset));
+    const queryString = params.toString();
+    return queryString ? `?${queryString}` : '';
+  }
+
+  private normalizeAuditLogEntry(entry: RawAuditLogResponse): AuditLogEntry {
+    const rawId = entry.id ?? entry._id;
+    let normalizedId: string | undefined;
+    if (typeof rawId === 'string') {
+      normalizedId = rawId;
+    } else if (rawId && typeof rawId === 'object') {
+      normalizedId = rawId.$oid;
+    }
+
+    return {
+      id: normalizedId,
+      event_type: entry.event_type,
+      user_id: entry.user_id,
+      email: entry.email,
+      success: entry.success,
+      ip: entry.ip,
+      user_agent: entry.user_agent,
+      details: entry.details,
+      error_message: entry.error_message,
+      createdAt: entry.createdAt ?? entry.created_at ?? new Date().toISOString(),
+    };
   }
 }
 

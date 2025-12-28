@@ -1,0 +1,1323 @@
+openapi: 3.1.0
+info:
+  title: TrainingGround Admin API
+  version: 0.1.0
+  description: >
+    Спецификация ключевых REST-эндпоинтов панели суперадмина TrainingGround.
+    Все методы требуют JWT Bearer токен. Для изменяющих запросов также нужен
+    CSRF-токен в заголовке `x-csrf-token` и cookie `csrf_token`.
+servers:
+  - url: https://localhost:3000
+    description: Локальный backend
+security:
+  - BearerAuth: []
+paths:
+  /admin/users:
+    get:
+      tags: [Users]
+      summary: Список пользователей
+      parameters:
+        - $ref: '#/components/parameters/RoleParam'
+        - $ref: '#/components/parameters/GroupParam'
+        - $ref: '#/components/parameters/BlockedParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Массив пользователей
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /admin/users/bulk:
+    post:
+      tags: [Users]
+      summary: Массовые операции над пользователями
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkUserActionRequest'
+      responses:
+        '200':
+          description: Результат операции
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkUserActionResult'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /admin/users/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UserIdParam'
+    get:
+      tags: [Users]
+      summary: Получить пользователя
+      responses:
+        '200':
+          description: Пользователь
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Пользователь не найден
+    patch:
+      tags: [Users]
+      summary: Обновить пользователя
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Обновленный пользователь
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Пользователь не найден
+    delete:
+      tags: [Users]
+      summary: Удалить пользователя
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      responses:
+        '204':
+          description: Удалено
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Пользователь не найден
+  /admin/users/{id}/block:
+    post:
+      tags: [Users]
+      summary: Заблокировать пользователя
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlockUserRequest'
+      responses:
+        '200':
+          description: Пользователь заблокирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Пользователь не найден
+  /admin/users/{id}/unblock:
+    post:
+      tags: [Users]
+      summary: Разблокировать пользователя
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: Пользователь разблокирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Пользователь не найден
+  /admin/users/{id}/reset-password:
+    post:
+      tags: [Users]
+      summary: Сбросить пароль пользователя
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: Временный пароль
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResetPasswordResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Пользователь не найден
+  /admin/groups:
+    get:
+      tags: [Groups]
+      summary: Список групп
+      parameters:
+        - $ref: '#/components/parameters/GroupSearchParam'
+        - $ref: '#/components/parameters/SchoolParam'
+        - $ref: '#/components/parameters/CuratorParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Массив групп
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Group'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Groups]
+      summary: Создать группу
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGroupRequest'
+      responses:
+        '201':
+          description: Группа создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /admin/groups/{id}:
+    parameters:
+      - $ref: '#/components/parameters/GroupIdParam'
+    get:
+      tags: [Groups]
+      summary: Получить группу
+      responses:
+        '200':
+          description: Группа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Группа не найдена
+    patch:
+      tags: [Groups]
+      summary: Обновить группу
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGroupRequest'
+      responses:
+        '200':
+          description: Обновленная группа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Группа не найдена
+    delete:
+      tags: [Groups]
+      summary: Удалить группу
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      responses:
+        '204':
+          description: Удалено
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Группа не найдена
+  /admin/groups/export:
+    get:
+      tags: [Groups]
+      summary: Экспортировать группы в CSV
+      responses:
+        '200':
+          description: CSV файл
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /admin/system/metrics:
+    get:
+      tags: [System]
+      summary: Текущие системные метрики
+      responses:
+        '200':
+          description: Набор метрик
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemMetrics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /admin/settings:
+    get:
+      tags: [Settings]
+      summary: Получить сохраненные системные настройки
+      responses:
+        '200':
+          description: Настройки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemSettingsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /admin/settings/yandexgpt:
+    put:
+      tags: [Settings]
+      summary: Сохранить настройки YandexGPT
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/YandexGptSettings'
+      responses:
+        '200':
+          description: Обновленные настройки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/YandexGptSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /admin/settings/sso:
+    put:
+      tags: [Settings]
+      summary: Сохранить SSO-настройки
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SsoSettings'
+      responses:
+        '200':
+          description: Обновленные настройки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SsoSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /admin/settings/email:
+    put:
+      tags: [Settings]
+      summary: Сохранить SMTP-настройки
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailSettings'
+      responses:
+        '200':
+          description: Обновленные настройки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /admin/settings/anticheat:
+    put:
+      tags: [Settings]
+      summary: Сохранить параметры античита
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnticheatSettings'
+      responses:
+        '200':
+          description: Обновленные настройки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnticheatSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /admin/settings/test/yandexgpt:
+    post:
+      tags: [Settings]
+      summary: Тест подключения к YandexGPT
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      responses:
+        '200':
+          description: Результат теста
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsTestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /admin/settings/test/sso:
+    post:
+      tags: [Settings]
+      summary: Тест SSO-конфигурации
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      responses:
+        '200':
+          description: Результат теста
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsTestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /admin/settings/test/email:
+    post:
+      tags: [Settings]
+      summary: Тест отправки письма
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      responses:
+        '200':
+          description: Результат теста
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsTestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /admin/backups:
+    get:
+      tags: [Backups]
+      summary: Список резервных копий
+      responses:
+        '200':
+          description: Массив записей
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BackupRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Backups]
+      summary: Создать резервную копию
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BackupCreateRequest'
+      responses:
+        '201':
+          description: Созданный бэкап
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupCreateResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /admin/backups/{id}/restore:
+    post:
+      tags: [Backups]
+      summary: Запустить восстановление из бэкапа
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      parameters:
+        - $ref: '#/components/parameters/BackupIdParam'
+      responses:
+        '200':
+          description: Подтверждение
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupRestoreResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Бэкап не найден
+  /admin/incidents:
+    get:
+      tags: [Incidents]
+      summary: Список инцидентов античита
+      parameters:
+        - $ref: '#/components/parameters/IncidentTypeParam'
+        - $ref: '#/components/parameters/IncidentSeverityParam'
+        - $ref: '#/components/parameters/IncidentStatusParam'
+        - $ref: '#/components/parameters/UserParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Массив инцидентов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IncidentWithUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /admin/incidents/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IncidentIdParam'
+    get:
+      tags: [Incidents]
+      summary: Получить инцидент
+      responses:
+        '200':
+          description: Инцидент
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentWithUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Инцидент не найден
+    put:
+      tags: [Incidents]
+      summary: Обновить статус инцидента
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateIncidentRequest'
+      responses:
+        '200':
+          description: Обновленный инцидент
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentWithUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Инцидент не найден
+  /admin/incidents/{id}/unblock:
+    post:
+      tags: [Incidents]
+      summary: Разблокировать пользователя из инцидента
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      parameters:
+        - $ref: '#/components/parameters/IncidentIdParam'
+      responses:
+        '200':
+          description: Пользователь
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Инцидент не найден
+  /admin/audit:
+    get:
+      tags: [Audit]
+      summary: Получить аудит-логи
+      parameters:
+        - $ref: '#/components/parameters/AuditEventParam'
+        - $ref: '#/components/parameters/UserParam'
+        - $ref: '#/components/parameters/SuccessParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/FromDateParam'
+        - $ref: '#/components/parameters/ToDateParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Массив событий
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditLogEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /admin/audit/export:
+    get:
+      tags: [Audit]
+      summary: Экспорт аудит-логов в CSV
+      parameters:
+        - $ref: '#/components/parameters/AuditEventParam'
+        - $ref: '#/components/parameters/UserParam'
+        - $ref: '#/components/parameters/SuccessParam'
+        - $ref: '#/components/parameters/FromDateParam'
+        - $ref: '#/components/parameters/ToDateParam'
+      responses:
+        '200':
+          description: CSV файл
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    CsrfToken:
+      type: apiKey
+      in: header
+      name: x-csrf-token
+      description: Значение должно совпадать с cookie `csrf_token`.
+  parameters:
+    UserIdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: ObjectId пользователя
+    GroupIdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: ObjectId группы
+    IncidentIdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: ObjectId инцидента
+    BackupIdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: ObjectId бэкапа
+    RoleParam:
+      name: role
+      in: query
+      schema:
+        $ref: '#/components/schemas/UserRole'
+      description: Фильтр по роли
+    GroupParam:
+      name: group_id
+      in: query
+      schema:
+        type: string
+    BlockedParam:
+      name: is_blocked
+      in: query
+      schema:
+        type: boolean
+    SearchParam:
+      name: search
+      in: query
+      schema:
+        type: string
+      description: Поиск по email/имени
+    GroupSearchParam:
+      name: search
+      in: query
+      schema:
+        type: string
+      description: Поиск по названию группы
+    SchoolParam:
+      name: school
+      in: query
+      schema:
+        type: string
+    CuratorParam:
+      name: curator_id
+      in: query
+      schema:
+        type: string
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+      description: Количество записей (по умолчанию 50)
+    OffsetParam:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+      description: Смещение постраничного вывода
+    IncidentTypeParam:
+      name: incident_type
+      in: query
+      schema:
+        $ref: '#/components/schemas/IncidentType'
+    IncidentSeverityParam:
+      name: severity
+      in: query
+      schema:
+        $ref: '#/components/schemas/IncidentSeverity'
+    IncidentStatusParam:
+      name: status
+      in: query
+      schema:
+        $ref: '#/components/schemas/IncidentStatus'
+    UserParam:
+      name: user_id
+      in: query
+      schema:
+        type: string
+    SuccessParam:
+      name: success
+      in: query
+      schema:
+        type: boolean
+    FromDateParam:
+      name: from
+      in: query
+      schema:
+        type: string
+        format: date-time
+    ToDateParam:
+      name: to
+      in: query
+      schema:
+        type: string
+        format: date-time
+    AuditEventParam:
+      name: event_type
+      in: query
+      schema:
+        $ref: '#/components/schemas/AuditEventType'
+  responses:
+    Unauthorized:
+      description: Требуется аутентификация
+    ValidationError:
+      description: Ошибка валидации входных данных
+  schemas:
+    UserRole:
+      type: string
+      enum: [student, teacher, content_admin, admin]
+    User:
+      type: object
+      required: [id, email, name, role, group_ids, is_blocked, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          description: ObjectId
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+        group_ids:
+          type: array
+          items:
+            type: string
+        is_blocked:
+          type: boolean
+        blocked_until:
+          type: string
+          format: date-time
+          nullable: true
+        block_reason:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        last_login_at:
+          type: string
+          format: date-time
+          nullable: true
+    CreateUserRequest:
+      type: object
+      required: [email, password, name, role]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        name:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+        group_ids:
+          type: array
+          items:
+            type: string
+    UpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+        group_ids:
+          type: array
+          items:
+            type: string
+        is_blocked:
+          type: boolean
+    BlockUserRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+        duration_hours:
+          type: integer
+          minimum: 1
+    BulkUserActionRequest:
+      type: object
+      required: [user_ids, operation]
+      properties:
+        user_ids:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        operation:
+          oneOf:
+            - type: object
+              required: [type, reason]
+              properties:
+                type:
+                  type: string
+                  enum: [block]
+                reason:
+                  type: string
+                duration_hours:
+                  type: integer
+            - type: object
+              required: [type]
+              properties:
+                type:
+                  type: string
+                  enum: [unblock]
+            - type: object
+              required: [type, group_ids]
+              properties:
+                type:
+                  type: string
+                  enum: [set_groups]
+                group_ids:
+                  type: array
+                  items:
+                    type: string
+    BulkUserActionResult:
+      type: object
+      required: [processed, failed]
+      properties:
+        processed:
+          type: integer
+        failed:
+          type: array
+          items:
+            type: object
+            required: [user_id, error]
+            properties:
+              user_id:
+                type: string
+              error:
+                type: string
+    ResetPasswordResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        temporary_password:
+          type: string
+          description: Возвращается, если SMTP отключен
+    Group:
+      type: object
+      required: [id, name, school, student_count, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        school:
+          type: string
+        curator_id:
+          type: string
+          nullable: true
+        curator_name:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        student_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CreateGroupRequest:
+      type: object
+      required: [name, school]
+      properties:
+        name:
+          type: string
+        school:
+          type: string
+        curator_id:
+          type: string
+        description:
+          type: string
+    UpdateGroupRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        school:
+          type: string
+        curator_id:
+          type: string
+        description:
+          type: string
+    SystemMetrics:
+      type: object
+      required:
+        [
+          uptime_seconds,
+          total_users,
+          blocked_users,
+          total_groups,
+          total_incidents,
+          open_incidents,
+          critical_incidents,
+          audit_events_24h,
+          active_sessions,
+        ]
+      properties:
+        uptime_seconds:
+          type: integer
+        total_users:
+          type: integer
+        blocked_users:
+          type: integer
+        total_groups:
+          type: integer
+        total_incidents:
+          type: integer
+        open_incidents:
+          type: integer
+        critical_incidents:
+          type: integer
+        audit_events_24h:
+          type: integer
+        active_sessions:
+          type: integer
+    SystemSettingsResponse:
+      type: object
+      properties:
+        yandexgpt:
+          $ref: '#/components/schemas/YandexGptSettings'
+        sso:
+          $ref: '#/components/schemas/SsoSettings'
+        email:
+          $ref: '#/components/schemas/EmailSettings'
+        anticheat:
+          $ref: '#/components/schemas/AnticheatSettings'
+    YandexGptSettings:
+      type: object
+      required: [api_key, folder_id, model, temperature, max_tokens]
+      properties:
+        api_key:
+          type: string
+        folder_id:
+          type: string
+        model:
+          type: string
+          enum: [yandexgpt, yandexgpt-lite]
+        temperature:
+          type: number
+        max_tokens:
+          type: integer
+    SsoSettings:
+      type: object
+      required: [enabled, provider, client_id, client_secret, redirect_uri]
+      properties:
+        enabled:
+          type: boolean
+        provider:
+          type: string
+        client_id:
+          type: string
+        client_secret:
+          type: string
+        redirect_uri:
+          type: string
+          format: uri
+    EmailSettings:
+      type: object
+      required: [server, port, login, password, from_email, from_name, use_tls]
+      properties:
+        server:
+          type: string
+        port:
+          type: integer
+        login:
+          type: string
+        password:
+          type: string
+        from_email:
+          type: string
+          format: email
+        from_name:
+          type: string
+        use_tls:
+          type: boolean
+    AnticheatSettings:
+      type: object
+      required:
+        [
+          speed_threshold_seconds,
+          max_speed_hits,
+          max_repeated_hits,
+          block_duration_hours,
+          captcha_enabled,
+          captcha_threshold,
+        ]
+      properties:
+        speed_threshold_seconds:
+          type: integer
+        max_speed_hits:
+          type: integer
+        max_repeated_hits:
+          type: integer
+        block_duration_hours:
+          type: integer
+        captcha_enabled:
+          type: boolean
+        captcha_threshold:
+          type: integer
+    SettingsTestResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+    BackupRecord:
+      type: object
+      required: [id, label, status, created_at]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        status:
+          type: string
+          enum: [Pending, Completed, Failed]
+        storage_path:
+          type: string
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    BackupCreateRequest:
+      type: object
+      properties:
+        label:
+          type: string
+    BackupCreateResponse:
+      type: object
+      required: [id, status]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [Pending, Completed, Failed]
+        storage_path:
+          type: string
+          nullable: true
+    BackupRestoreResponse:
+      type: object
+      required: [id, status, message]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [Pending, Completed, Failed]
+        storage_path:
+          type: string
+          nullable: true
+        message:
+          type: string
+    IncidentType:
+      type: string
+      enum: [speed_violation, repeated_answers, suspicious_pattern]
+    IncidentSeverity:
+      type: string
+      enum: [low, medium, high, critical]
+    IncidentStatus:
+      type: string
+      enum: [open, resolved, false_positive]
+    IncidentActionTaken:
+      type: string
+      enum: [none, flagged, suspended, blocked]
+    IncidentDetails:
+      type: object
+      properties:
+        speed_hits:
+          type: integer
+        repeated_hits:
+          type: integer
+        time_window_seconds:
+          type: integer
+        additional_info:
+          type: string
+    IncidentRecord:
+      type: object
+      required:
+        [
+          id,
+          user_id,
+          incident_type,
+          severity,
+          details,
+          timestamp,
+          action_taken,
+          status,
+        ]
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        incident_type:
+          $ref: '#/components/schemas/IncidentType'
+        severity:
+          $ref: '#/components/schemas/IncidentSeverity'
+        details:
+          $ref: '#/components/schemas/IncidentDetails'
+        timestamp:
+          type: string
+          format: date-time
+        action_taken:
+          $ref: '#/components/schemas/IncidentActionTaken'
+        status:
+          $ref: '#/components/schemas/IncidentStatus'
+        resolved_by:
+          type: string
+          nullable: true
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+        resolution_note:
+          type: string
+          nullable: true
+    IncidentUserInfo:
+      type: object
+      required: [id, email, name, role, is_blocked]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+        is_blocked:
+          type: boolean
+    IncidentWithUser:
+      type: object
+      required: [incident]
+      properties:
+        incident:
+          $ref: '#/components/schemas/IncidentRecord'
+        user:
+          $ref: '#/components/schemas/IncidentUserInfo'
+    UpdateIncidentRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [resolve, false_positive]
+        note:
+          type: string
+    AuditEventType:
+      type: string
+      enum:
+        [
+          login,
+          login_failed,
+          register,
+          register_failed,
+          logout,
+          refresh_token,
+          refresh_token_failed,
+          change_password,
+          change_password_failed,
+          revoke_session,
+          update_user,
+          access_denied,
+          create_user,
+          delete_user,
+          block_user,
+          unblock_user,
+          create_group,
+          update_group,
+          delete_group,
+        ]
+    AuditLogEntry:
+      type: object
+      required: [event_type, success, createdAt]
+      properties:
+        id:
+          type: string
+        event_type:
+          $ref: '#/components/schemas/AuditEventType'
+        user_id:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+          nullable: true
+        success:
+          type: boolean
+        ip:
+          type: string
+          nullable: true
+        user_agent:
+          type: string
+          nullable: true
+        details:
+          type: string
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    post:
+      tags: [Users]
+      summary: Создать пользователя
+      security:
+        - BearerAuth: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: Пользователь создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'

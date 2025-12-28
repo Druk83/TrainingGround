@@ -1,5 +1,6 @@
 use crate::models::user::{
-    BlockUserRequest, CreateUserRequest, ListUsersQuery, UpdateUserRequest, User,
+    BlockUserRequest, BulkUserActionError, BulkUserActionRequest, BulkUserActionResult,
+    BulkUserOperation, CreateUserRequest, ListUsersQuery, UpdateUserRequest, User,
     UserDetailResponse,
 };
 use anyhow::{anyhow, Context, Result};
@@ -339,5 +340,203 @@ impl UserManagementService {
             .ok_or_else(|| anyhow!("User not found after unblocking"))?;
 
         Ok(UserDetailResponse::from(unblocked_user))
+    }
+
+    pub async fn reset_password(
+        &self,
+        user_id: &str,
+        new_password: &str,
+    ) -> Result<UserDetailResponse> {
+        let users_collection = self.mongo.collection::<User>("users");
+        let object_id = ObjectId::parse_str(user_id).context("Invalid user ID format")?;
+
+        let password_hash =
+            hash(new_password, DEFAULT_COST).context("Failed to hash temporary password")?;
+
+        let update_doc = doc! {
+            "$set": {
+                "password_hash": password_hash,
+                "updatedAt": Utc::now().to_rfc3339(),
+            }
+        };
+
+        let result = users_collection
+            .update_one(doc! { "_id": object_id }, update_doc)
+            .await
+            .context("Failed to reset password")?;
+
+        if result.matched_count == 0 {
+            return Err(anyhow!("User not found"));
+        }
+
+        let updated_user = users_collection
+            .find_one(doc! { "_id": object_id })
+            .await
+            .context("Failed to fetch updated user after password reset")?
+            .ok_or_else(|| anyhow!("User not found after password reset"))?;
+
+        Ok(UserDetailResponse::from(updated_user))
+    }
+
+    pub async fn bulk_user_action(
+        &self,
+        req: BulkUserActionRequest,
+    ) -> Result<BulkUserActionResult> {
+        let mut processed = 0usize;
+        let mut failed = Vec::new();
+
+        for user_id in req.user_ids {
+            let outcome = match &req.operation {
+                BulkUserOperation::Block {
+                    reason,
+                    duration_hours,
+                } => {
+                    let block_request = BlockUserRequest {
+                        reason: reason.clone(),
+                        duration_hours: *duration_hours,
+                    };
+                    self.block_user(&user_id, block_request).await.map(|_| ())
+                }
+                BulkUserOperation::Unblock => self.unblock_user(&user_id).await.map(|_| ()),
+                BulkUserOperation::SetGroups { group_ids } => {
+                    self.set_user_groups(&user_id, group_ids.clone()).await
+                }
+            };
+
+            match outcome {
+                Ok(_) => processed += 1,
+                Err(err) => failed.push(BulkUserActionError {
+                    user_id,
+                    error: err.to_string(),
+                }),
+            }
+        }
+
+        Ok(BulkUserActionResult { processed, failed })
+    }
+
+    async fn set_user_groups(&self, user_id: &str, group_ids: Vec<String>) -> Result<()> {
+        let users_collection = self.mongo.collection::<User>("users");
+        let object_id = ObjectId::parse_str(user_id).context("Invalid user ID format")?;
+
+        let update_doc = doc! {
+            "$set": {
+                "group_ids": group_ids,
+                "updatedAt": Utc::now().to_rfc3339(),
+            }
+        };
+
+        let result = users_collection
+            .update_one(doc! { "_id": object_id }, update_doc)
+            .await
+            .context("Failed to update user groups")?;
+
+        if result.matched_count == 0 {
+            return Err(anyhow!("User not found"));
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{config::Config, models::user::UserRole};
+    use mongodb::bson::Document;
+    use redis::Client;
+    use serial_test::serial;
+    use uuid::Uuid;
+
+    async fn create_service() -> UserManagementService {
+        let _ = dotenvy::from_filename(".env.test");
+        let config = Config::load().expect("test config");
+        let mongo_client = mongodb::Client::with_uri_str(&config.mongo_uri)
+            .await
+            .expect("mongo");
+        let db = mongo_client.database(&config.mongo_database);
+        db.collection::<Document>("users")
+            .delete_many(doc! {})
+            .await
+            .expect("cleanup users");
+        let redis_client = Client::open(config.redis_uri).expect("redis client");
+        let redis_manager = redis_client
+            .get_connection_manager()
+            .await
+            .expect("redis manager");
+        UserManagementService::new(db, redis_manager)
+    }
+
+    fn build_request(email: String, name: &str) -> CreateUserRequest {
+        CreateUserRequest {
+            email,
+            password: "Test123!@#".into(),
+            name: name.into(),
+            role: UserRole::Student,
+            group_ids: None,
+        }
+    }
+
+    fn base_query() -> ListUsersQuery {
+        ListUsersQuery {
+            role: None,
+            group_id: None,
+            is_blocked: None,
+            search: None,
+            limit: None,
+            offset: None,
+        }
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn create_user_rejects_duplicate_email() {
+        let service = create_service().await;
+        let email = format!("dup-{}@test.com", Uuid::new_v4());
+        let request = build_request(email.clone(), "Duplicate User");
+        service
+            .create_user(request.clone())
+            .await
+            .expect("first user created");
+
+        let err = service
+            .create_user(request)
+            .await
+            .expect_err("expected error");
+        assert!(
+            err.to_string().to_lowercase().contains("already exists"),
+            "error should mention duplicate email: {err:?}"
+        );
+
+        let list = service.list_users(base_query()).await.expect("list users");
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].email, email);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn list_users_supports_case_insensitive_search() {
+        let service = create_service().await;
+        service
+            .create_user(build_request(
+                format!("alice-{}@test.com", Uuid::new_v4()),
+                "Alice Example",
+            ))
+            .await
+            .expect("alice created");
+        service
+            .create_user(build_request(
+                format!("bob-{}@test.com", Uuid::new_v4()),
+                "Bob Example",
+            ))
+            .await
+            .expect("bob created");
+
+        let mut query = base_query();
+        query.search = Some("alice".into());
+        let results = service.list_users(query).await.expect("search results");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "Alice Example");
     }
 }

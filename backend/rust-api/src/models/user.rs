@@ -266,6 +266,37 @@ pub struct BlockUserRequest {
     pub duration_hours: Option<u32>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct BulkUserActionRequest {
+    pub user_ids: Vec<String>,
+    pub operation: BulkUserOperation,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum BulkUserOperation {
+    Block {
+        reason: String,
+        duration_hours: Option<u32>,
+    },
+    Unblock,
+    SetGroups {
+        group_ids: Vec<String>,
+    },
+}
+
+#[derive(Debug, Serialize)]
+pub struct BulkUserActionResult {
+    pub processed: usize,
+    pub failed: Vec<BulkUserActionError>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BulkUserActionError {
+    pub user_id: String,
+    pub error: String,
+}
+
 /// User detail response для админа (полная информация)
 #[derive(Debug, Serialize)]
 pub struct UserDetailResponse {

@@ -9,6 +9,7 @@ import type {
   ListGroupsQuery,
   UserDetailResponse,
 } from '@/lib/api-types';
+import { sanitizeDisplayName, sanitizeHTML } from '@/lib/sanitization';
 
 import '../components/app-header';
 
@@ -245,20 +246,30 @@ export class GroupsManagement extends LitElement {
     }
   `;
 
-  @state() private groups: GroupResponse[] = [];
-  @state() private curators: UserDetailResponse[] = [];
-  @state() private loading = false;
-  @state() private error: string | null = null;
-  @state() private filters: ListGroupsQuery = { limit: 50, offset: 0 };
-  @state() private showModal = false;
-  @state() private modalMode: 'create' | 'edit' = 'create';
-  @state() private selectedGroup: GroupResponse | null = null;
+  @state() declare private groups: GroupResponse[];
+  @state() declare private curators: UserDetailResponse[];
+  @state() declare private loading: boolean;
+  @state() declare private error: string | null;
+  @state() declare private filters: ListGroupsQuery;
+  @state() declare private showModal: boolean;
+  @state() declare private modalMode: 'create' | 'edit';
+  @state() declare private selectedGroup: GroupResponse | null;
+  @state() declare private exporting: boolean;
 
   private apiClient: ApiClient;
 
   constructor() {
     super();
     this.apiClient = new ApiClient({ jwt: authService.getToken() || undefined });
+    this.groups = [];
+    this.curators = [];
+    this.loading = false;
+    this.error = null;
+    this.filters = { limit: 50, offset: 0 };
+    this.showModal = false;
+    this.modalMode = 'create';
+    this.selectedGroup = null;
+    this.exporting = false;
   }
 
   connectedCallback() {
@@ -291,6 +302,25 @@ export class GroupsManagement extends LitElement {
     }
   }
 
+  private async handleExportCsv() {
+    this.exporting = true;
+    this.error = null;
+    try {
+      const blob = await this.apiClient.exportGroups();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `groups-export-${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export groups', err);
+      this.error = err instanceof Error ? err.message : 'Failed to export groups';
+    } finally {
+      this.exporting = false;
+    }
+  }
+
   private openCreateModal() {
     this.modalMode = 'create';
     this.selectedGroup = null;
@@ -312,12 +342,15 @@ export class GroupsManagement extends LitElement {
     e.preventDefault();
     const form = e.target as HTMLFormElement;
     const formData = new FormData(form);
+    const name = sanitizeDisplayName(formData.get('name') as string);
+    const school = sanitizeDisplayName(formData.get('school') as string, 200);
+    const descriptionRaw = (formData.get('description') as string) || undefined;
 
     const payload: CreateGroupRequest = {
-      name: formData.get('name') as string,
-      school: formData.get('school') as string,
+      name,
+      school,
       curator_id: (formData.get('curator_id') as string) || undefined,
-      description: (formData.get('description') as string) || undefined,
+      description: descriptionRaw ? sanitizeHTML(descriptionRaw) : undefined,
     };
 
     try {
@@ -337,10 +370,13 @@ export class GroupsManagement extends LitElement {
     const formData = new FormData(form);
 
     const payload: UpdateGroupRequest = {
-      name: formData.get('name') as string,
-      school: formData.get('school') as string,
+      name: sanitizeDisplayName((formData.get('name') as string) || ''),
+      school: sanitizeDisplayName((formData.get('school') as string) || '', 200),
       curator_id: (formData.get('curator_id') as string) || undefined,
-      description: (formData.get('description') as string) || undefined,
+      description: (() => {
+        const value = formData.get('description') as string;
+        return value ? sanitizeHTML(value) : undefined;
+      })(),
     };
 
     try {
@@ -367,7 +403,8 @@ export class GroupsManagement extends LitElement {
 
   private handleSearchChange(e: Event) {
     const input = e.target as HTMLInputElement;
-    this.filters = { ...this.filters, search: input.value || undefined, offset: 0 };
+    const sanitized = sanitizeDisplayName(input.value || '');
+    this.filters = { ...this.filters, search: sanitized || undefined, offset: 0 };
     this.loadGroups();
   }
 
@@ -439,7 +476,18 @@ export class GroupsManagement extends LitElement {
             </select>
           </div>
 
-          <button class="btn-primary" @click=${this.openCreateModal}>Create Group</button>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button
+              class="btn-secondary"
+              @click=${this.handleExportCsv}
+              ?disabled=${this.exporting}
+            >
+              ${this.exporting ? 'Exporting...' : 'Export CSV'}
+            </button>
+            <button class="btn-primary" @click=${this.openCreateModal}>
+              Создать группу
+            </button>
+          </div>
         </div>
 
         ${this.loading
@@ -455,7 +503,7 @@ export class GroupsManagement extends LitElement {
                         <th>School</th>
                         <th>Curator</th>
                         <th>Students</th>
-                        <th>Created</th>
+                        <th>Создана</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
@@ -501,12 +549,12 @@ export class GroupsManagement extends LitElement {
 
   private renderModal() {
     const isCreate = this.modalMode === 'create';
-    const title = isCreate ? 'Create Group' : 'Edit Group';
+    const title = isCreate ? 'Создать группу' : 'Редактировать группу';
     const modalTitleId = isCreate ? 'group-modal-title-create' : 'group-modal-title-edit';
 
     return html`
       <div
-        class="modal"
+        class="modal open"
         role="dialog"
         aria-modal="true"
         aria-labelledby=${modalTitleId}
@@ -580,7 +628,7 @@ export class GroupsManagement extends LitElement {
                 Cancel
               </button>
               <button type="submit" class="btn-primary">
-                ${isCreate ? 'Create' : 'Update'}
+                ${isCreate ? 'Создать' : 'Обновить'}
               </button>
             </div>
           </form>

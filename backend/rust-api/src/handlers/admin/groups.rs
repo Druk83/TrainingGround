@@ -1,7 +1,7 @@
 use axum::{
     extract::{Extension, Path, Query, State},
-    http::StatusCode,
-    response::IntoResponse,
+    http::{header, HeaderValue, StatusCode},
+    response::{IntoResponse, Response},
     Json,
 };
 use std::sync::Arc;
@@ -154,4 +154,50 @@ pub async fn delete_group(
         .await;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /admin/groups/export - Экспорт всех групп в CSV
+pub async fn export_groups(
+    State(state): State<Arc<AppState>>,
+) -> Result<Response, (StatusCode, String)> {
+    let group_service = GroupService::new(state.mongo.clone());
+    let groups = group_service
+        .export_groups()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let mut csv = String::from("id,name,school,curator_name,student_count,created_at\n");
+
+    for group in groups {
+        let id = escape_csv(&group.id);
+        let name = escape_csv(&group.name);
+        let school = escape_csv(&group.school);
+        let curator = escape_csv(group.curator_name.as_deref().unwrap_or(""));
+        let count = group.student_count.to_string();
+        let created_at = escape_csv(&group.created_at.to_rfc3339());
+
+        csv.push_str(&format!(
+            "{id},{name},{school},{curator},{count},{created_at}\n"
+        ));
+    }
+
+    let mut response = Response::new(csv.into());
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/csv; charset=utf-8"),
+    );
+    response.headers_mut().insert(
+        header::CONTENT_DISPOSITION,
+        HeaderValue::from_static("attachment; filename=\"groups-export.csv\""),
+    );
+
+    Ok(response)
+}
+
+fn escape_csv(value: &str) -> String {
+    if value.is_empty() {
+        String::new()
+    } else {
+        format!("\"{}\"", value.replace('"', "\"\""))
+    }
 }

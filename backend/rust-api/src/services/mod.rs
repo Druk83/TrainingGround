@@ -1,6 +1,7 @@
 use crate::config::Config;
 use mongodb::{Client as MongoClient, Database};
 use redis::aio::ConnectionManager;
+use std::time::Instant;
 
 use self::object_storage::ObjectStorageClient;
 
@@ -9,6 +10,7 @@ pub struct AppState {
     pub mongo: Database,
     pub redis: ConnectionManager,
     pub object_storage: Option<ObjectStorageClient>,
+    pub start_time: Instant,
 }
 
 impl AppState {
@@ -60,6 +62,7 @@ impl AppState {
             mongo,
             redis,
             object_storage,
+            start_time: Instant::now(),
         })
     }
 }
@@ -69,12 +72,16 @@ pub mod answer_service;
 pub mod anticheat_service;
 pub mod audit_service;
 pub mod auth_service;
+pub mod backup_service;
 pub mod content_service;
+pub mod email_service;
 pub mod export_worker;
 pub mod group_service;
 pub mod hint_service;
+pub mod incidents_service;
 pub mod object_storage;
 pub mod reporting_service;
 pub mod session_service;
 pub mod superuser_seed;
+pub mod system_settings_service;
 pub mod user_management_service;

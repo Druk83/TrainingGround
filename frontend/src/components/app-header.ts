@@ -446,6 +446,21 @@ export class AppHeader extends LitElement {
         href: '/admin',
         active: currentPath.startsWith('/admin-console') || currentPath === '/admin',
       });
+      items.push({
+        label: 'Настройки',
+        href: '/admin/settings',
+        active: currentPath.startsWith('/admin/settings'),
+      });
+      items.push({
+        label: 'Античит',
+        href: '/admin/anticheat',
+        active: currentPath.startsWith('/admin/anticheat'),
+      });
+      items.push({
+        label: 'Аудит',
+        href: '/admin/audit',
+        active: currentPath.startsWith('/admin/audit'),
+      });
     }
 
     return items;

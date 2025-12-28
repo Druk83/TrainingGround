@@ -36,6 +36,9 @@ const isProfile = pathname.startsWith('/profile');
 const isTeacherDashboard = pathname.startsWith('/teacher-dashboard');
 const isUsersManagement = pathname.startsWith('/admin/users');
 const isGroupsManagement = pathname.startsWith('/admin/groups');
+const isSystemSettings = pathname.startsWith('/admin/settings');
+const isAnticheat = pathname.startsWith('/admin/anticheat');
+const isAuditLogs = pathname.startsWith('/admin/audit');
 const isAdminConsole = pathname.startsWith('/admin-console') || pathname === '/admin';
 
 // Router logic
@@ -52,6 +55,9 @@ const isAdminConsole = pathname.startsWith('/admin-console') || pathname === '/a
     !isAdminConsole &&
     !isUsersManagement &&
     !isGroupsManagement &&
+    !isAnticheat &&
+    !isAuditLogs &&
+    !isSystemSettings &&
     !isTeacherDashboard;
 
   if (appShell) {
@@ -104,6 +110,27 @@ const isAdminConsole = pathname.startsWith('/admin-console') || pathname === '/a
 
     import('./pages/groups-management').then(() => {
       document.body.appendChild(document.createElement('groups-management'));
+    });
+  } else if (isSystemSettings) {
+    if (!requireAuth()) return;
+    if (!requireRole(['admin'])) return;
+
+    import('./pages/system-settings').then(() => {
+      document.body.appendChild(document.createElement('system-settings-page'));
+    });
+  } else if (isAnticheat) {
+    if (!requireAuth()) return;
+    if (!requireRole(['admin'])) return;
+
+    import('./pages/anticheat-incidents').then(() => {
+      document.body.appendChild(document.createElement('anticheat-incidents-page'));
+    });
+  } else if (isAuditLogs) {
+    if (!requireAuth()) return;
+    if (!requireRole(['admin'])) return;
+
+    import('./pages/audit-logs').then(() => {
+      document.body.appendChild(document.createElement('audit-logs-page'));
     });
   } else if (isAdminConsole) {
     console.log('[Router] /admin or /admin-console route matched');

@@ -561,3 +561,57 @@ async fn test_create_group_without_admin_role_forbidden() {
     // Должен вернуть 403 Forbidden
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }
+
+#[tokio::test]
+async fn test_export_groups_returns_csv() {
+    let app = common::create_test_app().await;
+    let (_admin_id, admin_token) = create_admin_with_token(&app).await;
+    let (csrf_token, csrf_cookie) = get_csrf_token(&app).await;
+
+    // Создаем хотя бы одну группу
+    let create_group_body = json!({
+        "name": "CSV Group",
+        "school": "Export School",
+    });
+
+    let _ = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/groups")
+                .header("content-type", "application/json")
+                .header("authorization", format!("Bearer {}", admin_token))
+                .header("x-csrf-token", csrf_token.as_str())
+                .header("cookie", format!("csrf_token={}", csrf_cookie))
+                .body(Body::from(create_group_body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/admin/groups/export")
+                .header("authorization", format!("Bearer {}", admin_token))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert!(response.status().is_success());
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let csv = String::from_utf8(body.to_vec()).unwrap();
+    assert!(
+        csv.contains("CSV Group"),
+        "export CSV should contain created group: {csv}"
+    );
+    assert!(
+        csv.starts_with("id,name,school"),
+        "export CSV should contain header"
+    );
+}

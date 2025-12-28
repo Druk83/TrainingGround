@@ -92,6 +92,18 @@ impl AuditEventType {
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct AuditLogQuery {
+    pub event_type: Option<AuditEventType>,
+    pub user_id: Option<String>,
+    pub success: Option<bool>,
+    pub search: Option<String>,
+    pub from: Option<DateTime<Utc>>,
+    pub to: Option<DateTime<Utc>>,
+    pub limit: Option<u32>,
+    pub offset: Option<u32>,
+}
+
 // Serde converter for chrono::DateTime <-> mongodb::bson::DateTime
 mod bson_datetime_as_chrono {
     use chrono::{DateTime, Utc};

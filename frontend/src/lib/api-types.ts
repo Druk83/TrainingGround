@@ -259,6 +259,26 @@ export interface BlockUserRequest {
   duration_hours?: number;
 }
 
+export type BulkUserOperation =
+  | { type: 'block'; reason: string; duration_hours?: number }
+  | { type: 'unblock' }
+  | { type: 'set_groups'; group_ids: string[] };
+
+export interface BulkUserActionRequest {
+  user_ids: string[];
+  operation: BulkUserOperation;
+}
+
+export interface BulkUserActionResult {
+  processed: number;
+  failed: Array<{ user_id: string; error: string }>;
+}
+
+export interface ResetPasswordResponse {
+  status: string;
+  temporary_password?: string;
+}
+
 export interface ListUsersQuery {
   role?: string;
   group_id?: string;
@@ -300,4 +320,192 @@ export interface ListGroupsQuery {
   curator_id?: string;
   limit?: number;
   offset?: number;
+}
+
+export interface YandexGptSettings {
+  api_key: string;
+  folder_id: string;
+  model: string;
+  temperature: number;
+  max_tokens: number;
+}
+
+export interface SsoSettings {
+  enabled: boolean;
+  provider: string;
+  client_id: string;
+  client_secret: string;
+  redirect_uri: string;
+}
+
+export interface EmailSettings {
+  server: string;
+  port: number;
+  login: string;
+  password: string;
+  from_email: string;
+  from_name: string;
+  use_tls: boolean;
+}
+
+export interface AnticheatSettings {
+  speed_threshold_seconds: number;
+  max_speed_hits: number;
+  max_repeated_hits: number;
+  block_duration_hours: number;
+  captcha_enabled: boolean;
+  captcha_threshold: number;
+}
+
+export interface SystemSettingsResponse {
+  yandexgpt?: YandexGptSettings;
+  sso?: SsoSettings;
+  email?: EmailSettings;
+  anticheat?: AnticheatSettings;
+}
+
+export interface SettingsTestResponse {
+  success: boolean;
+  message?: string;
+}
+
+export interface SystemMetrics {
+  uptime_seconds: number;
+  total_users: number;
+  blocked_users: number;
+  total_groups: number;
+  total_incidents: number;
+  open_incidents: number;
+  critical_incidents: number;
+  audit_events_24h: number;
+  active_sessions: number;
+}
+
+export interface BackupRecord {
+  id?: string;
+  label: string;
+  status: 'Pending' | 'Completed' | 'Failed';
+  storage_path?: string;
+  error?: string;
+  created_at: string;
+}
+
+export interface BackupCreateRequest {
+  label?: string;
+}
+
+export interface BackupCreateResponse {
+  id: string;
+  status: 'Pending' | 'Completed' | 'Failed';
+  storage_path?: string;
+}
+
+export interface BackupRestoreResponse {
+  id: string;
+  status: 'Pending' | 'Completed' | 'Failed';
+  storage_path?: string;
+  message: string;
+}
+
+export type AuditEventType =
+  | 'login'
+  | 'login_failed'
+  | 'register'
+  | 'register_failed'
+  | 'logout'
+  | 'refresh_token'
+  | 'refresh_token_failed'
+  | 'change_password'
+  | 'change_password_failed'
+  | 'revoke_session'
+  | 'update_user'
+  | 'access_denied'
+  | 'create_user'
+  | 'delete_user'
+  | 'block_user'
+  | 'unblock_user'
+  | 'create_group'
+  | 'update_group'
+  | 'delete_group';
+
+export interface AuditLogEntry {
+  id?: string;
+  event_type: AuditEventType;
+  user_id?: string;
+  email?: string;
+  success: boolean;
+  ip?: string;
+  user_agent?: string;
+  details?: string;
+  error_message?: string;
+  createdAt: string;
+}
+
+export interface AuditLogQueryParams {
+  event_type?: AuditEventType;
+  user_id?: string;
+  success?: boolean;
+  search?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export type IncidentType = 'speed_violation' | 'repeated_answers' | 'suspicious_pattern';
+
+export type IncidentSeverity = 'low' | 'medium' | 'high' | 'critical';
+
+export type IncidentStatus = 'open' | 'resolved' | 'false_positive';
+
+export type IncidentActionTaken = 'none' | 'flagged' | 'suspended' | 'blocked';
+
+export interface IncidentDetails {
+  speed_hits?: number;
+  repeated_hits?: number;
+  time_window_seconds?: number;
+  additional_info?: string;
+}
+
+export interface IncidentRecord {
+  id: string;
+  user_id: string;
+  incident_type: IncidentType;
+  severity: IncidentSeverity;
+  details: IncidentDetails;
+  timestamp: string;
+  action_taken: IncidentActionTaken;
+  status: IncidentStatus;
+  resolved_by?: string | null;
+  resolved_at?: string | null;
+  resolution_note?: string | null;
+}
+
+export interface IncidentUserInfo {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  is_blocked: boolean;
+}
+
+export interface IncidentWithUser {
+  incident: IncidentRecord;
+  user?: IncidentUserInfo | null;
+}
+
+export interface ListIncidentsQuery {
+  incident_type?: IncidentType;
+  severity?: IncidentSeverity;
+  status?: IncidentStatus;
+  user_id?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export type IncidentResolutionAction = 'resolve' | 'false_positive';
+
+export interface UpdateIncidentRequest {
+  action: IncidentResolutionAction;
+  note?: string;
 }

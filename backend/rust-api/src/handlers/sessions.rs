@@ -30,7 +30,13 @@ pub async fn create_session(
         Ok(response) => Ok((StatusCode::CREATED, Json(response))),
         Err(e) => {
             tracing::error!("Failed to create session: {}", e);
-            Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+            let msg = e.to_string();
+            let status = if msg.contains("Task not found") {
+                StatusCode::NOT_FOUND
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+            Err((status, msg))
         }
     }
 }

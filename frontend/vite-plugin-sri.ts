@@ -1,7 +1,7 @@
 import type { Plugin } from 'vite';
 import { createHash } from 'crypto';
-import { readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { readFileSync, readdirSync, statSync, writeFileSync } from 'fs';
+import { join, relative } from 'path';
 
 interface SRIManifest {
   [filename: string]: {
@@ -14,9 +14,22 @@ interface SRIManifest {
  * Vite plugin for generating Subresource Integrity (SRI) hashes
  * Generates sha384 hashes for all bundled assets and creates a manifest
  */
+function collectFiles(dir: string, baseDir: string): string[] {
+  const files: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const fullPath = join(dir, entry);
+    const stats = statSync(fullPath);
+    if (stats.isDirectory()) {
+      files.push(...collectFiles(fullPath, baseDir));
+    } else {
+      files.push(relative(baseDir, fullPath).replace(/\\/g, '/'));
+    }
+  }
+  return files;
+}
+
 export function viteSRIPlugin(): Plugin {
   let outDir = 'dist';
-  const sriManifest: SRIManifest = {};
 
   return {
     name: 'vite-plugin-sri',
@@ -26,39 +39,25 @@ export function viteSRIPlugin(): Plugin {
       outDir = config.build.outDir;
     },
 
-    // Generate SRI hashes for all output files
-    generateBundle(_options, bundle) {
-      for (const [fileName, chunk] of Object.entries(bundle)) {
-        if (chunk.type === 'chunk' || chunk.type === 'asset') {
-          const source =
-            chunk.type === 'chunk' ? chunk.code : chunk.source;
-          const buffer = Buffer.from(source);
-          const hash = createHash('sha384').update(buffer).digest('base64');
-          const integrity = `sha384-${hash}`;
-
-          sriManifest[fileName] = {
-            integrity,
-            size: buffer.length,
-          };
-
-          // Add comment to chunk with integrity hash
-          if (chunk.type === 'chunk') {
-            chunk.code = `/* SRI: ${integrity} */\n${chunk.code}`;
-          }
-        }
-      }
-    },
-
-    // Write SRI manifest after build completes
     closeBundle() {
-      const manifestPath = join(outDir, 'sri-manifest.json');
-      writeFileSync(
-        manifestPath,
-        JSON.stringify(sriManifest, null, 2),
-        'utf-8'
+      const manifest: SRIManifest = {};
+      const assetFiles = collectFiles(outDir, outDir).filter((file) =>
+        /\.(css|js|mjs|cjs)$/.test(file)
       );
+
+      for (const file of assetFiles) {
+        const contents = readFileSync(join(outDir, file));
+        const hash = createHash('sha384').update(contents).digest('base64');
+        manifest[file] = {
+          integrity: `sha384-${hash}`,
+          size: contents.length,
+        };
+      }
+
+      const manifestPath = join(outDir, 'sri-manifest.json');
+      writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
       console.log(
-        `\n✓ Generated SRI manifest with ${Object.keys(sriManifest).length} entries`
+        `\n✓ Generated SRI manifest with ${Object.keys(manifest).length} entries`
       );
     },
 
