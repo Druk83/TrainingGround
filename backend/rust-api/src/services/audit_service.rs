@@ -273,4 +273,172 @@ impl AuditService {
         })
         .await
     }
+
+    /// Log user creation (admin action)
+    pub async fn log_user_create(
+        &self,
+        admin_user_id: &str,
+        created_user_id: &str,
+        email: &str,
+        role: &str,
+        ip: Option<String>,
+        user_agent: Option<String>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.log_event(AuditEventParams {
+            event_type: AuditEventType::CreateUser,
+            user_id: Some(admin_user_id.to_string()),
+            email: Some(email.to_string()),
+            success: true,
+            ip,
+            user_agent,
+            details: Some(format!("Created user {} with role {}", created_user_id, role)),
+            error_message: None,
+        })
+        .await
+    }
+
+    /// Log user deletion (admin action)
+    pub async fn log_user_delete(
+        &self,
+        admin_user_id: &str,
+        deleted_user_id: &str,
+        email: &str,
+        ip: Option<String>,
+        user_agent: Option<String>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.log_event(AuditEventParams {
+            event_type: AuditEventType::DeleteUser,
+            user_id: Some(admin_user_id.to_string()),
+            email: Some(email.to_string()),
+            success: true,
+            ip,
+            user_agent,
+            details: Some(format!("Deleted user {}", deleted_user_id)),
+            error_message: None,
+        })
+        .await
+    }
+
+    /// Log user blocking (admin action)
+    pub async fn log_user_block(
+        &self,
+        admin_user_id: &str,
+        blocked_user_id: &str,
+        reason: &str,
+        duration_hours: Option<u32>,
+        ip: Option<String>,
+        user_agent: Option<String>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let duration_text = if let Some(hours) = duration_hours {
+            format!("{} hours", hours)
+        } else {
+            "permanent".to_string()
+        };
+
+        self.log_event(AuditEventParams {
+            event_type: AuditEventType::BlockUser,
+            user_id: Some(admin_user_id.to_string()),
+            email: None,
+            success: true,
+            ip,
+            user_agent,
+            details: Some(format!(
+                "Blocked user {} for {} - reason: {}",
+                blocked_user_id, duration_text, reason
+            )),
+            error_message: None,
+        })
+        .await
+    }
+
+    /// Log user unblocking (admin action)
+    pub async fn log_user_unblock(
+        &self,
+        admin_user_id: &str,
+        unblocked_user_id: &str,
+        ip: Option<String>,
+        user_agent: Option<String>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.log_event(AuditEventParams {
+            event_type: AuditEventType::UnblockUser,
+            user_id: Some(admin_user_id.to_string()),
+            email: None,
+            success: true,
+            ip,
+            user_agent,
+            details: Some(format!("Unblocked user {}", unblocked_user_id)),
+            error_message: None,
+        })
+        .await
+    }
+
+    /// Log group creation (admin action)
+    pub async fn log_group_create(
+        &self,
+        admin_user_id: &str,
+        group_id: &str,
+        group_name: &str,
+        school: &str,
+        ip: Option<String>,
+        user_agent: Option<String>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.log_event(AuditEventParams {
+            event_type: AuditEventType::CreateGroup,
+            user_id: Some(admin_user_id.to_string()),
+            email: None,
+            success: true,
+            ip,
+            user_agent,
+            details: Some(format!(
+                "Created group {} '{}' for school '{}'",
+                group_id, group_name, school
+            )),
+            error_message: None,
+        })
+        .await
+    }
+
+    /// Log group update (admin action)
+    pub async fn log_group_update(
+        &self,
+        admin_user_id: &str,
+        group_id: &str,
+        changes: &str,
+        ip: Option<String>,
+        user_agent: Option<String>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.log_event(AuditEventParams {
+            event_type: AuditEventType::UpdateGroup,
+            user_id: Some(admin_user_id.to_string()),
+            email: None,
+            success: true,
+            ip,
+            user_agent,
+            details: Some(format!("Updated group {}: {}", group_id, changes)),
+            error_message: None,
+        })
+        .await
+    }
+
+    /// Log group deletion (admin action)
+    pub async fn log_group_delete(
+        &self,
+        admin_user_id: &str,
+        group_id: &str,
+        group_name: &str,
+        ip: Option<String>,
+        user_agent: Option<String>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.log_event(AuditEventParams {
+            event_type: AuditEventType::DeleteGroup,
+            user_id: Some(admin_user_id.to_string()),
+            email: None,
+            success: true,
+            ip,
+            user_agent,
+            details: Some(format!("Deleted group {} '{}'", group_id, group_name)),
+            error_message: None,
+        })
+        .await
+    }
 }

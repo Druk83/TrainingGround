@@ -3,13 +3,19 @@ import type {
   AdminTemplateDetail,
   AdminTemplateSummary,
   AdminTemplateUpdatePayload,
+  BlockUserRequest,
+  CreateGroupRequest,
   CreateSessionPayload,
   CreateSessionResponse,
+  CreateUserRequest,
   ExportRequestPayload,
   ExportResponsePayload,
   FeatureFlagRecord,
   FeatureFlagUpdatePayload,
+  GroupResponse,
   GroupStatsResponse,
+  ListGroupsQuery,
+  ListUsersQuery,
   QueueStatus,
   RequestHintPayload,
   RequestHintResponse,
@@ -18,6 +24,9 @@ import type {
   SubmitAnswerPayload,
   TemplateFilterParams,
   TemplateRevertPayload,
+  UpdateGroupRequest,
+  UpdateUserRequest,
+  UserDetailResponse,
 } from './api-types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1';
@@ -268,6 +277,94 @@ export class ApiClient {
     return this.request<FeatureFlagRecord>(`${ADMIN_BASE}/feature-flags/${flagName}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
+    });
+  }
+
+  async listUsers(query?: ListUsersQuery) {
+    const params = new URLSearchParams();
+    if (query?.role) params.set('role', query.role);
+    if (query?.group_id) params.set('group_id', query.group_id);
+    if (query?.is_blocked !== undefined) params.set('is_blocked', String(query.is_blocked));
+    if (query?.search) params.set('search', query.search);
+    if (query?.limit) params.set('limit', String(query.limit));
+    if (query?.offset) params.set('offset', String(query.offset));
+
+    const queryString = params.toString();
+    const url = `${ADMIN_BASE}/users${queryString ? `?${queryString}` : ''}`;
+    return this.request<UserDetailResponse[]>(url);
+  }
+
+  async getUser(userId: string) {
+    return this.request<UserDetailResponse>(`${ADMIN_BASE}/users/${userId}`);
+  }
+
+  async createUser(payload: CreateUserRequest) {
+    return this.request<UserDetailResponse>(`${ADMIN_BASE}/users`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateUser(userId: string, payload: UpdateUserRequest) {
+    return this.request<UserDetailResponse>(`${ADMIN_BASE}/users/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteUser(userId: string) {
+    return this.request<void>(`${ADMIN_BASE}/users/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async blockUser(userId: string, payload: BlockUserRequest) {
+    return this.request<UserDetailResponse>(`${ADMIN_BASE}/users/${userId}/block`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async unblockUser(userId: string) {
+    return this.request<UserDetailResponse>(`${ADMIN_BASE}/users/${userId}/unblock`, {
+      method: 'POST',
+    });
+  }
+
+  async listGroups(query?: ListGroupsQuery) {
+    const params = new URLSearchParams();
+    if (query?.search) params.set('search', query.search);
+    if (query?.school) params.set('school', query.school);
+    if (query?.curator_id) params.set('curator_id', query.curator_id);
+    if (query?.limit) params.set('limit', String(query.limit));
+    if (query?.offset) params.set('offset', String(query.offset));
+
+    const queryString = params.toString();
+    const url = `${ADMIN_BASE}/groups${queryString ? `?${queryString}` : ''}`;
+    return this.request<GroupResponse[]>(url);
+  }
+
+  async getGroup(groupId: string) {
+    return this.request<GroupResponse>(`${ADMIN_BASE}/groups/${groupId}`);
+  }
+
+  async createGroup(payload: CreateGroupRequest) {
+    return this.request<GroupResponse>(`${ADMIN_BASE}/groups`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateGroup(groupId: string, payload: UpdateGroupRequest) {
+    return this.request<GroupResponse>(`${ADMIN_BASE}/groups/${groupId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteGroup(groupId: string) {
+    return this.request<void>(`${ADMIN_BASE}/groups/${groupId}`, {
+      method: 'DELETE',
     });
   }
 }

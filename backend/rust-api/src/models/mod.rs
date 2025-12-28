@@ -49,6 +49,7 @@ pub mod answer;
 pub mod anticheat;
 pub mod audit_log;
 pub mod content;
+pub mod group;
 pub mod hint;
 pub mod refresh_token;
 pub mod reporting;

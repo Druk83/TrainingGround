@@ -131,6 +131,7 @@ pub async fn admin_guard_middleware(request: Request, next: Next) -> Result<Resp
             return Ok(next.run(request).await);
         }
     }
+    tracing::warn!("Access denied: admin role required");
     Err(StatusCode::FORBIDDEN)
 }
 

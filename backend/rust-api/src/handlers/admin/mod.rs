@@ -1,3 +1,9 @@
+mod groups;
+mod users;
+
+pub use groups::*;
+pub use users::*;
+
 use axum::{
     extract::{Extension, Path, Query, State},
     http::StatusCode,

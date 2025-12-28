@@ -53,6 +53,17 @@ pub enum AuditEventType {
     RevokeSession,
     UpdateUser,
     AccessDenied,
+
+    // Admin actions для управления пользователями
+    CreateUser,
+    DeleteUser,
+    BlockUser,
+    UnblockUser,
+
+    // Admin actions для управления группами
+    CreateGroup,
+    UpdateGroup,
+    DeleteGroup,
 }
 
 impl AuditEventType {
@@ -70,6 +81,13 @@ impl AuditEventType {
             AuditEventType::RevokeSession => "revoke_session",
             AuditEventType::UpdateUser => "update_user",
             AuditEventType::AccessDenied => "access_denied",
+            AuditEventType::CreateUser => "create_user",
+            AuditEventType::DeleteUser => "delete_user",
+            AuditEventType::BlockUser => "block_user",
+            AuditEventType::UnblockUser => "unblock_user",
+            AuditEventType::CreateGroup => "create_group",
+            AuditEventType::UpdateGroup => "update_group",
+            AuditEventType::DeleteGroup => "delete_group",
         }
     }
 }

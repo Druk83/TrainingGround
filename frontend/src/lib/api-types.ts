@@ -222,3 +222,82 @@ export interface FeatureFlagRecord {
 export interface FeatureFlagUpdatePayload {
   enabled: boolean;
 }
+
+export type UserRole = 'student' | 'teacher' | 'content_admin' | 'admin';
+
+export interface UserDetailResponse {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  group_ids: string[];
+  is_blocked: boolean;
+  blocked_until?: string;
+  block_reason?: string;
+  created_at: string;
+  updated_at: string;
+  last_login_at?: string;
+}
+
+export interface CreateUserRequest {
+  email: string;
+  password: string;
+  name: string;
+  role: UserRole;
+  group_ids?: string[];
+}
+
+export interface UpdateUserRequest {
+  name?: string;
+  role?: UserRole;
+  group_ids?: string[];
+  is_blocked?: boolean;
+}
+
+export interface BlockUserRequest {
+  reason: string;
+  duration_hours?: number;
+}
+
+export interface ListUsersQuery {
+  role?: string;
+  group_id?: string;
+  is_blocked?: boolean;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface GroupResponse {
+  id: string;
+  name: string;
+  school: string;
+  curator_id?: string;
+  curator_name?: string;
+  description?: string;
+  student_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateGroupRequest {
+  name: string;
+  school: string;
+  curator_id?: string;
+  description?: string;
+}
+
+export interface UpdateGroupRequest {
+  name?: string;
+  school?: string;
+  curator_id?: string;
+  description?: string;
+}
+
+export interface ListGroupsQuery {
+  search?: string;
+  school?: string;
+  curator_id?: string;
+  limit?: number;
+  offset?: number;
+}

@@ -30,6 +30,19 @@ pub struct User {
     /// Optional metadata (used by superuser seed)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Document>,
+
+    /// Временная блокировка (до какого времени заблокирован)
+    #[serde(
+        rename = "blockedUntil",
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "bson_datetime_as_chrono_option"
+    )]
+    pub blocked_until: Option<DateTime<Utc>>,
+
+    /// Причина блокировки
+    #[serde(rename = "blockReason", default, skip_serializing_if = "Option::is_none")]
+    pub block_reason: Option<String>,
 }
 
 // Serde converters for chrono::DateTime <-> mongodb::bson::DateTime
@@ -84,15 +97,19 @@ pub(super) mod bson_datetime_as_chrono_option {
 }
 
 /// User roles matching requirements/архитектура/описание AL.md
+/// - Student: ученик
+/// - Teacher: учитель/куратор
+/// - ContentAdmin: администратор контента (шаблоны, темы, правила)
+/// - Admin: системный администратор (пользователи, группы, настройки)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum UserRole {
     #[default]
     Student,
     Teacher,
+    #[serde(rename = "content_admin")]
+    ContentAdmin,
     Admin,
-    #[serde(rename = "sysadmin")]
-    SysAdmin,
 }
 
 impl UserRole {
@@ -100,8 +117,8 @@ impl UserRole {
         match self {
             UserRole::Student => "student",
             UserRole::Teacher => "teacher",
+            UserRole::ContentAdmin => "content_admin",
             UserRole::Admin => "admin",
-            UserRole::SysAdmin => "sysadmin",
         }
     }
 }
@@ -193,7 +210,7 @@ pub struct ChangePasswordRequest {
 }
 
 /// Request to update user (admin only)
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Clone, Deserialize, Validate)]
 pub struct UpdateUserRequest {
     pub name: Option<String>,
     pub role: Option<UserRole>,
@@ -210,4 +227,71 @@ pub struct ListUsersQuery {
     pub search: Option<String>, // search by email or name
     pub limit: Option<u32>,
     pub offset: Option<u32>,
+}
+
+/// Request для создания пользователя (Admin)
+#[derive(Debug, Clone, Deserialize, Validate)]
+pub struct CreateUserRequest {
+    #[validate(email(message = "Invalid email format"))]
+    pub email: String,
+
+    #[validate(length(min = 8, message = "Password must be at least 8 characters"))]
+    pub password: String,
+
+    #[validate(length(
+        min = 1,
+        max = 100,
+        message = "Name must be between 1 and 100 characters"
+    ))]
+    pub name: String,
+
+    /// Роль пользователя (Admin может создавать любую роль)
+    pub role: UserRole,
+
+    /// Группы
+    pub group_ids: Option<Vec<String>>,
+}
+
+/// Request для блокировки пользователя
+#[derive(Debug, Clone, Deserialize, Validate)]
+pub struct BlockUserRequest {
+    #[validate(length(min = 1, message = "Reason is required"))]
+    pub reason: String,
+
+    /// Длительность блокировки в часах (None = permanent)
+    pub duration_hours: Option<u32>,
+}
+
+/// User detail response для админа (полная информация)
+#[derive(Debug, Serialize)]
+pub struct UserDetailResponse {
+    pub id: String,
+    pub email: String,
+    pub name: String,
+    pub role: UserRole,
+    pub group_ids: Vec<String>,
+    pub is_blocked: bool,
+    pub blocked_until: Option<DateTime<Utc>>,
+    pub block_reason: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub last_login_at: Option<DateTime<Utc>>,
+}
+
+impl From<User> for UserDetailResponse {
+    fn from(user: User) -> Self {
+        UserDetailResponse {
+            id: user.id.map(|id| id.to_hex()).unwrap_or_default(),
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            group_ids: user.group_ids,
+            is_blocked: user.is_blocked,
+            blocked_until: user.blocked_until,
+            block_reason: user.block_reason,
+            created_at: user.created_at,
+            updated_at: user.updated_at,
+            last_login_at: user.last_login_at,
+        }
+    }
 }

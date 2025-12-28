@@ -83,6 +83,8 @@ impl AuthService {
             updated_at: now,
             last_login_at: None,
             metadata: None,
+            blocked_until: None,
+            block_reason: None,
         };
 
         // Insert user

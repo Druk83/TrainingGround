@@ -78,14 +78,11 @@ pub fn create_router(app_state: std::sync::Arc<services::AppState>) -> Router {
         .nest(
             "/admin",
             admin_routes()
-                .layer(middleware::from_fn(
-                    middlewares::auth::admin_guard_middleware,
-                ))
+                .layer(middleware::from_fn(middlewares::csrf::csrf_middleware))
                 .layer(middleware::from_fn_with_state(
                     app_state.clone(),
                     middlewares::auth::auth_middleware,
-                ))
-                .layer(middleware::from_fn(middlewares::csrf::csrf_middleware)),
+                )),
         )
         .with_state(app_state)
         .layer(middleware::from_fn(csp_middleware)) // Apply CSP to all responses
@@ -118,6 +115,7 @@ fn reporting_routes() -> Router<std::sync::Arc<services::AppState>> {
 
 fn admin_routes() -> Router<std::sync::Arc<services::AppState>> {
     Router::new()
+        // Content management
         .route(
             "/templates",
             get(handlers::admin::list_templates).post(handlers::admin::create_template),
@@ -136,6 +134,33 @@ fn admin_routes() -> Router<std::sync::Arc<services::AppState>> {
             "/feature-flags/{flag_name}",
             put(handlers::admin::update_feature_flag),
         )
+        // User management
+        .route(
+            "/users",
+            get(handlers::admin::list_users).post(handlers::admin::create_user),
+        )
+        .route(
+            "/users/{id}",
+            get(handlers::admin::get_user)
+                .patch(handlers::admin::update_user)
+                .delete(handlers::admin::delete_user),
+        )
+        .route("/users/{id}/block", post(handlers::admin::block_user))
+        .route("/users/{id}/unblock", post(handlers::admin::unblock_user))
+        // Group management
+        .route(
+            "/groups",
+            get(handlers::admin::list_groups).post(handlers::admin::create_group),
+        )
+        .route(
+            "/groups/{id}",
+            get(handlers::admin::get_group)
+                .patch(handlers::admin::update_group)
+                .delete(handlers::admin::delete_group),
+        )
+        .route_layer(middleware::from_fn(
+            middlewares::auth::admin_guard_middleware,
+        ))
 }
 
 fn auth_routes(
@@ -182,22 +207,6 @@ fn auth_routes(
             middlewares::auth::auth_middleware,
         ));
 
-    // Admin-only routes (require JWT auth + admin role + CSRF protection)
-    let admin_routes = Router::new()
-        .route("/users", get(handlers::auth::list_users))
-        .route(
-            "/users/{id}",
-            get(handlers::auth::get_user_by_id_admin).patch(handlers::auth::update_user),
-        )
-        .route_layer(middleware::from_fn(middlewares::csrf::csrf_middleware))
-        .route_layer(middleware::from_fn_with_state(
-            app_state.clone(),
-            middlewares::auth::auth_middleware,
-        ))
-        .route_layer(middleware::from_fn(
-            middlewares::auth::admin_guard_middleware,
-        ));
-
-    // Merge public, protected, and admin routes
-    public_routes.merge(protected_routes).merge(admin_routes)
+    // Merge public and protected routes
+    public_routes.merge(protected_routes)
 }

@@ -397,8 +397,8 @@ export class AppHeader extends LitElement {
     const labels: Record<string, string> = {
       student: 'Студент',
       teacher: 'Учитель',
+      content_admin: 'Админ контента',
       admin: 'Администратор',
-      sysadmin: 'Системный админ',
     };
     return labels[role] || role;
   }
@@ -422,13 +422,29 @@ export class AppHeader extends LitElement {
         href: '/teacher-dashboard',
         active: currentPath.startsWith('/teacher-dashboard'),
       });
-    } else if (role === 'admin' || role === 'sysadmin') {
-      // Admin-specific navigation
+    } else if (role === 'content_admin') {
+      // Content admin navigation
       items.push({
-        label: 'Админ-панель',
+        label: 'Шаблоны',
         href: '/admin',
-        active:
-          currentPath.startsWith('/admin-console') || currentPath.startsWith('/admin'),
+        active: currentPath.startsWith('/admin-console') || currentPath === '/admin',
+      });
+    } else if (role === 'admin') {
+      // System admin navigation
+      items.push({
+        label: 'Пользователи',
+        href: '/admin/users',
+        active: currentPath.startsWith('/admin/users'),
+      });
+      items.push({
+        label: 'Группы',
+        href: '/admin/groups',
+        active: currentPath.startsWith('/admin/groups'),
+      });
+      items.push({
+        label: 'Шаблоны',
+        href: '/admin',
+        active: currentPath.startsWith('/admin-console') || currentPath === '/admin',
       });
     }
 

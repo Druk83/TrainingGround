@@ -34,8 +34,10 @@ const isRegister = pathname.startsWith('/register');
 const isForbidden = pathname.startsWith('/forbidden') || pathname.startsWith('/403');
 const isProfile = pathname.startsWith('/profile');
 const isTeacherDashboard = pathname.startsWith('/teacher-dashboard');
+const isUsersManagement = pathname.startsWith('/admin/users');
+const isGroupsManagement = pathname.startsWith('/admin/groups');
 const isAdminConsole =
-  pathname.startsWith('/admin-console') || pathname.startsWith('/admin');
+  pathname.startsWith('/admin-console') || pathname === '/admin';
 
 // Router logic
 (function initializeRouter() {
@@ -49,6 +51,8 @@ const isAdminConsole =
     !isForbidden &&
     !isProfile &&
     !isAdminConsole &&
+    !isUsersManagement &&
+    !isGroupsManagement &&
     !isTeacherDashboard;
 
   if (appShell) {
@@ -88,11 +92,25 @@ const isAdminConsole =
     import('./pages/user-profile').then(() => {
       document.body.appendChild(document.createElement('user-profile'));
     });
+  } else if (isUsersManagement) {
+    if (!requireAuth()) return;
+    if (!requireRole(['admin'])) return;
+
+    import('./pages/users-management').then(() => {
+      document.body.appendChild(document.createElement('users-management'));
+    });
+  } else if (isGroupsManagement) {
+    if (!requireAuth()) return;
+    if (!requireRole(['admin'])) return;
+
+    import('./pages/groups-management').then(() => {
+      document.body.appendChild(document.createElement('groups-management'));
+    });
   } else if (isAdminConsole) {
     console.log('[Router] /admin or /admin-console route matched');
     if (!requireAuth()) return;
     console.log('[Router] Auth check passed, checking role...');
-    if (!requireRole(['admin', 'sysadmin'])) return;
+    if (!requireRole(['admin', 'content_admin'])) return;
     console.log('[Router] Role check passed, loading admin console...');
 
     import('./pages/admin-console').then(() => {
@@ -100,7 +118,7 @@ const isAdminConsole =
     });
   } else if (isTeacherDashboard) {
     if (!requireAuth()) return;
-    if (!requireRole(['teacher', 'admin', 'sysadmin'])) return;
+    if (!requireRole(['teacher', 'admin'])) return;
 
     import('./pages/teacher-dashboard').then(() => {
       const wrapper = document.createElement('div');
