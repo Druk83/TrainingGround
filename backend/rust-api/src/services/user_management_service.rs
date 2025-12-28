@@ -102,10 +102,7 @@ impl UserManagementService {
             };
             filter.insert(
                 "$or",
-                vec![
-                    doc! { "email": &regex },
-                    doc! { "name": &regex },
-                ],
+                vec![doc! { "email": &regex }, doc! { "name": &regex }],
             );
         }
 
@@ -123,7 +120,9 @@ impl UserManagementService {
 
         let mut users = Vec::new();
         while cursor.advance().await.context("Failed to advance cursor")? {
-            let user = cursor.deserialize_current().context("Failed to deserialize user")?;
+            let user = cursor
+                .deserialize_current()
+                .context("Failed to deserialize user")?;
             users.push(UserDetailResponse::from(user));
         }
 
@@ -134,8 +133,7 @@ impl UserManagementService {
     pub async fn get_user(&self, user_id: &str) -> Result<UserDetailResponse> {
         let users_collection = self.mongo.collection::<User>("users");
 
-        let object_id = ObjectId::parse_str(user_id)
-            .context("Invalid user ID format")?;
+        let object_id = ObjectId::parse_str(user_id).context("Invalid user ID format")?;
 
         let user = users_collection
             .find_one(doc! { "_id": object_id })
@@ -154,8 +152,7 @@ impl UserManagementService {
     ) -> Result<UserDetailResponse> {
         let users_collection = self.mongo.collection::<User>("users");
 
-        let object_id = ObjectId::parse_str(user_id)
-            .context("Invalid user ID format")?;
+        let object_id = ObjectId::parse_str(user_id).context("Invalid user ID format")?;
 
         // Построение update document
         let mut update_doc = doc! {
@@ -169,15 +166,21 @@ impl UserManagementService {
         }
 
         if let Some(role) = req.role {
-            update_doc.get_document_mut("$set")?.insert("role", role.as_str());
+            update_doc
+                .get_document_mut("$set")?
+                .insert("role", role.as_str());
         }
 
         if let Some(group_ids) = req.group_ids {
-            update_doc.get_document_mut("$set")?.insert("group_ids", group_ids);
+            update_doc
+                .get_document_mut("$set")?
+                .insert("group_ids", group_ids);
         }
 
         if let Some(is_blocked) = req.is_blocked {
-            update_doc.get_document_mut("$set")?.insert("is_blocked", is_blocked);
+            update_doc
+                .get_document_mut("$set")?
+                .insert("is_blocked", is_blocked);
         }
 
         // Обновление в MongoDB
@@ -203,10 +206,11 @@ impl UserManagementService {
     /// Удалить пользователя
     pub async fn delete_user(&self, user_id: &str) -> Result<()> {
         let users_collection = self.mongo.collection::<User>("users");
-        let refresh_tokens_collection = self.mongo.collection::<mongodb::bson::Document>("refresh_tokens");
+        let refresh_tokens_collection = self
+            .mongo
+            .collection::<mongodb::bson::Document>("refresh_tokens");
 
-        let object_id = ObjectId::parse_str(user_id)
-            .context("Invalid user ID format")?;
+        let object_id = ObjectId::parse_str(user_id).context("Invalid user ID format")?;
 
         // Удаление пользователя
         let result = users_collection
@@ -238,13 +242,16 @@ impl UserManagementService {
         req: BlockUserRequest,
     ) -> Result<UserDetailResponse> {
         let users_collection = self.mongo.collection::<User>("users");
-        let refresh_tokens_collection = self.mongo.collection::<mongodb::bson::Document>("refresh_tokens");
+        let refresh_tokens_collection = self
+            .mongo
+            .collection::<mongodb::bson::Document>("refresh_tokens");
 
-        let object_id = ObjectId::parse_str(user_id)
-            .context("Invalid user ID format")?;
+        let object_id = ObjectId::parse_str(user_id).context("Invalid user ID format")?;
 
         // Вычисление blocked_until
-        let blocked_until = req.duration_hours.map(|duration_hours| Utc::now() + Duration::hours(duration_hours as i64));
+        let blocked_until = req
+            .duration_hours
+            .map(|duration_hours| Utc::now() + Duration::hours(duration_hours as i64));
 
         // Обновление пользователя
         let mut update_doc = doc! {
@@ -256,9 +263,13 @@ impl UserManagementService {
         };
 
         if let Some(until) = blocked_until {
-            update_doc.get_document_mut("$set")?.insert("blockedUntil", until.to_rfc3339());
+            update_doc
+                .get_document_mut("$set")?
+                .insert("blockedUntil", until.to_rfc3339());
         } else {
-            update_doc.get_document_mut("$set")?.insert("blockedUntil", mongodb::bson::Bson::Null);
+            update_doc
+                .get_document_mut("$set")?
+                .insert("blockedUntil", mongodb::bson::Bson::Null);
         }
 
         let result = users_collection
@@ -297,8 +308,7 @@ impl UserManagementService {
     pub async fn unblock_user(&self, user_id: &str) -> Result<UserDetailResponse> {
         let users_collection = self.mongo.collection::<User>("users");
 
-        let object_id = ObjectId::parse_str(user_id)
-            .context("Invalid user ID format")?;
+        let object_id = ObjectId::parse_str(user_id).context("Invalid user ID format")?;
 
         // Обновление пользователя
         let update_doc = doc! {

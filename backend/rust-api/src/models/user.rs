@@ -41,7 +41,11 @@ pub struct User {
     pub blocked_until: Option<DateTime<Utc>>,
 
     /// Причина блокировки
-    #[serde(rename = "blockReason", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "blockReason",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub block_reason: Option<String>,
 }
 

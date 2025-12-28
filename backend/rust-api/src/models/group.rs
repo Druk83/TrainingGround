@@ -73,10 +73,18 @@ impl From<Group> for GroupResponse {
 /// Request для создания группы
 #[derive(Debug, Clone, Deserialize, Validate)]
 pub struct CreateGroupRequest {
-    #[validate(length(min = 1, max = 100, message = "Name must be between 1 and 100 characters"))]
+    #[validate(length(
+        min = 1,
+        max = 100,
+        message = "Name must be between 1 and 100 characters"
+    ))]
     pub name: String,
 
-    #[validate(length(min = 1, max = 200, message = "School must be between 1 and 200 characters"))]
+    #[validate(length(
+        min = 1,
+        max = 200,
+        message = "School must be between 1 and 200 characters"
+    ))]
     pub school: String,
 
     /// ID куратора (ObjectId as string)
@@ -88,10 +96,18 @@ pub struct CreateGroupRequest {
 /// Request для обновления группы
 #[derive(Debug, Clone, Deserialize, Validate)]
 pub struct UpdateGroupRequest {
-    #[validate(length(min = 1, max = 100, message = "Name must be between 1 and 100 characters"))]
+    #[validate(length(
+        min = 1,
+        max = 100,
+        message = "Name must be between 1 and 100 characters"
+    ))]
     pub name: Option<String>,
 
-    #[validate(length(min = 1, max = 200, message = "School must be between 1 and 200 characters"))]
+    #[validate(length(
+        min = 1,
+        max = 200,
+        message = "School must be between 1 and 200 characters"
+    ))]
     pub school: Option<String>,
 
     /// ID куратора (ObjectId as string)

@@ -72,10 +72,7 @@ async fn create_admin_with_token(app: &axum::Router) -> (String, String) {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let body_str = String::from_utf8(body.to_vec()).unwrap();
     let response_json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
-    let access_token = response_json["access_token"]
-        .as_str()
-        .unwrap()
-        .to_string();
+    let access_token = response_json["access_token"].as_str().unwrap().to_string();
 
     (user_id, access_token)
 }
@@ -186,10 +183,7 @@ async fn test_create_user_without_admin_role_forbidden() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let body_str = String::from_utf8(body.to_vec()).unwrap();
     let response_json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
-    let student_token = response_json["access_token"]
-        .as_str()
-        .unwrap()
-        .to_string();
+    let student_token = response_json["access_token"].as_str().unwrap().to_string();
 
     let (csrf_token, csrf_cookie) = get_csrf_token(&app).await;
 

@@ -9,9 +9,7 @@ use validator::Validate;
 
 use crate::{
     middlewares::auth::JwtClaims,
-    models::user::{
-        BlockUserRequest, CreateUserRequest, ListUsersQuery, UpdateUserRequest,
-    },
+    models::user::{BlockUserRequest, CreateUserRequest, ListUsersQuery, UpdateUserRequest},
     services::{
         audit_service::AuditService, user_management_service::UserManagementService, AppState,
     },
@@ -72,16 +70,13 @@ pub async fn get_user(
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let user_service = UserManagementService::new(state.mongo.clone(), state.redis.clone());
 
-    let user = user_service
-        .get_user(&user_id)
-        .await
-        .map_err(|e| {
-            if e.to_string().contains("not found") {
-                (StatusCode::NOT_FOUND, e.to_string())
-            } else {
-                (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-            }
-        })?;
+    let user = user_service.get_user(&user_id).await.map_err(|e| {
+        if e.to_string().contains("not found") {
+            (StatusCode::NOT_FOUND, e.to_string())
+        } else {
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        }
+    })?;
 
     Ok(Json(user))
 }
@@ -116,8 +111,14 @@ pub async fn update_user(
         "name: {}, role: {}, group_ids: {}, is_blocked: {}",
         req.name.as_deref().unwrap_or("unchanged"),
         req.role.as_ref().map(|r| r.as_str()).unwrap_or("unchanged"),
-        req.group_ids.as_ref().map(|_| "updated").unwrap_or("unchanged"),
-        req.is_blocked.as_ref().map(|b| b.to_string()).unwrap_or("unchanged".to_string()),
+        req.group_ids
+            .as_ref()
+            .map(|_| "updated")
+            .unwrap_or("unchanged"),
+        req.is_blocked
+            .as_ref()
+            .map(|b| b.to_string())
+            .unwrap_or("unchanged".to_string()),
     );
 
     let _ = audit_service
@@ -205,16 +206,13 @@ pub async fn unblock_user(
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     // Разблокировка пользователя
     let user_service = UserManagementService::new(state.mongo.clone(), state.redis.clone());
-    let unblocked_user = user_service
-        .unblock_user(&user_id)
-        .await
-        .map_err(|e| {
-            if e.to_string().contains("not found") {
-                (StatusCode::NOT_FOUND, e.to_string())
-            } else {
-                (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-            }
-        })?;
+    let unblocked_user = user_service.unblock_user(&user_id).await.map_err(|e| {
+        if e.to_string().contains("not found") {
+            (StatusCode::NOT_FOUND, e.to_string())
+        } else {
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        }
+    })?;
 
     // Audit log
     let audit_service = AuditService::new(state.mongo.clone());

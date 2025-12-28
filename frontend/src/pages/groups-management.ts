@@ -281,7 +281,10 @@ export class GroupsManagement extends LitElement {
 
   private async loadCurators() {
     try {
-      const allCurators = await this.apiClient.listUsers({ role: 'teacher', limit: 1000 });
+      const allCurators = await this.apiClient.listUsers({
+        role: 'teacher',
+        limit: 1000,
+      });
       this.curators = allCurators;
     } catch (err) {
       console.error('Failed to load curators:', err);
@@ -313,8 +316,8 @@ export class GroupsManagement extends LitElement {
     const payload: CreateGroupRequest = {
       name: formData.get('name') as string,
       school: formData.get('school') as string,
-      curator_id: formData.get('curator_id') as string || undefined,
-      description: formData.get('description') as string || undefined,
+      curator_id: (formData.get('curator_id') as string) || undefined,
+      description: (formData.get('description') as string) || undefined,
     };
 
     try {
@@ -336,8 +339,8 @@ export class GroupsManagement extends LitElement {
     const payload: UpdateGroupRequest = {
       name: formData.get('name') as string,
       school: formData.get('school') as string,
-      curator_id: formData.get('curator_id') as string || undefined,
-      description: formData.get('description') as string || undefined,
+      curator_id: (formData.get('curator_id') as string) || undefined,
+      description: (formData.get('description') as string) || undefined,
     };
 
     try {
@@ -394,6 +397,16 @@ export class GroupsManagement extends LitElement {
     return Array.from(schools).sort();
   }
 
+  private handleModalBackdropKeyDown(event: KeyboardEvent) {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+    if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      this.closeModal();
+    }
+  }
+
   render() {
     return html`
       <app-header></app-header>
@@ -421,15 +434,12 @@ export class GroupsManagement extends LitElement {
             <select @change=${this.handleCuratorChange}>
               <option value="">All curators</option>
               ${this.curators.map(
-                (curator) =>
-                  html`<option value=${curator.id}>${curator.name}</option>`,
+                (curator) => html`<option value=${curator.id}>${curator.name}</option>`,
               )}
             </select>
           </div>
 
-          <button class="btn-primary" @click=${this.openCreateModal}>
-            Create Group
-          </button>
+          <button class="btn-primary" @click=${this.openCreateModal}>Create Group</button>
         </div>
 
         ${this.loading
@@ -457,9 +467,7 @@ export class GroupsManagement extends LitElement {
                             <td>${group.school}</td>
                             <td>${group.curator_name || '-'}</td>
                             <td>
-                              <span class="student-count"
-                                >${group.student_count}</span
-                              >
+                              <span class="student-count">${group.student_count}</span>
                             </td>
                             <td>${this.formatDate(group.created_at)}</td>
                             <td>
@@ -486,7 +494,6 @@ export class GroupsManagement extends LitElement {
                   </table>
                 </div>
               `}
-
         ${this.showModal ? this.renderModal() : ''}
       </div>
     `;
@@ -495,20 +502,27 @@ export class GroupsManagement extends LitElement {
   private renderModal() {
     const isCreate = this.modalMode === 'create';
     const title = isCreate ? 'Create Group' : 'Edit Group';
+    const modalTitleId = isCreate ? 'group-modal-title-create' : 'group-modal-title-edit';
 
     return html`
-      <div class="modal" @click=${(e: MouseEvent) => {
-        if (e.target === e.currentTarget) this.closeModal();
-      }}>
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby=${modalTitleId}
+        tabindex="0"
+        @click=${(e: MouseEvent) => {
+          if (e.target === e.currentTarget) this.closeModal();
+        }}
+        @keydown=${this.handleModalBackdropKeyDown}
+      >
         <div class="modal-content">
           <div class="modal-header">
-            <h2>${title}</h2>
+            <h2 id=${modalTitleId}>${title}</h2>
             <button class="close-btn" @click=${this.closeModal}>&times;</button>
           </div>
 
-          <form
-            @submit=${isCreate ? this.handleCreateGroup : this.handleUpdateGroup}
-          >
+          <form @submit=${isCreate ? this.handleCreateGroup : this.handleUpdateGroup}>
             <div class="form-group">
               <label for="name">Name *</label>
               <input

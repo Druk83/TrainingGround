@@ -247,7 +247,10 @@ export class UsersManagement extends LitElement {
     }
   }
 
-  private handleFilterChange(field: keyof ListUsersQuery, value: string | boolean | undefined) {
+  private handleFilterChange(
+    field: keyof ListUsersQuery,
+    value: string | boolean | undefined,
+  ) {
     this.filters = { ...this.filters, [field]: value, offset: 0 };
     this.loadUsers();
   }
@@ -273,6 +276,16 @@ export class UsersManagement extends LitElement {
   private closeModal() {
     this.showModal = false;
     this.selectedUser = null;
+  }
+
+  private handleModalBackdropKeyDown(event: KeyboardEvent) {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+    if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      this.closeModal();
+    }
   }
 
   private async handleCreateUser(e: Event) {
@@ -327,7 +340,9 @@ export class UsersManagement extends LitElement {
 
     const payload: BlockUserRequest = {
       reason: formData.get('reason') as string,
-      duration_hours: formData.get('duration') ? Number(formData.get('duration')) : undefined,
+      duration_hours: formData.get('duration')
+        ? Number(formData.get('duration'))
+        : undefined,
     };
 
     try {
@@ -402,7 +417,10 @@ export class UsersManagement extends LitElement {
           <select
             @change=${(e: Event) => {
               const value = (e.target as HTMLSelectElement).value;
-              this.handleFilterChange('is_blocked', value === '' ? undefined : value === 'true');
+              this.handleFilterChange(
+                'is_blocked',
+                value === '' ? undefined : value === 'true',
+              );
             }}
           >
             <option value="">Все</option>
@@ -455,12 +473,18 @@ export class UsersManagement extends LitElement {
                     </button>
                     ${user.is_blocked
                       ? html`
-                          <button class="primary" @click=${() => this.handleUnblockUser(user.id)}>
+                          <button
+                            class="primary"
+                            @click=${() => this.handleUnblockUser(user.id)}
+                          >
                             Разблокировать
                           </button>
                         `
                       : html`
-                          <button class="secondary" @click=${() => this.openBlockModal(user)}>
+                          <button
+                            class="secondary"
+                            @click=${() => this.openBlockModal(user)}
+                          >
                             Заблокировать
                           </button>
                         `}
@@ -481,10 +505,19 @@ export class UsersManagement extends LitElement {
     if (!this.showModal) return null;
 
     if (this.modalMode === 'create') {
+      const titleId = 'create-user-modal-title';
       return html`
-        <div class="modal open" @click=${(e: Event) => e.target === e.currentTarget && this.closeModal()}>
+        <div
+          class="modal open"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby=${titleId}
+          tabindex="0"
+          @click=${(e: Event) => e.target === e.currentTarget && this.closeModal()}
+          @keydown=${this.handleModalBackdropKeyDown}
+        >
           <div class="modal-content">
-            <h2>Создать пользователя</h2>
+            <h2 id=${titleId}>Создать пользователя</h2>
             <form @submit=${this.handleCreateUser}>
               <div class="form-group">
                 <label>Email</label>
@@ -514,7 +547,9 @@ export class UsersManagement extends LitElement {
               ${this.error ? html`<div class="error">${this.error}</div>` : null}
 
               <div class="form-actions">
-                <button type="button" class="secondary" @click=${this.closeModal}>Отмена</button>
+                <button type="button" class="secondary" @click=${this.closeModal}>
+                  Отмена
+                </button>
                 <button type="submit" class="primary">Создать</button>
               </div>
             </form>
@@ -524,10 +559,19 @@ export class UsersManagement extends LitElement {
     }
 
     if (this.modalMode === 'edit' && this.selectedUser) {
+      const titleId = 'edit-user-modal-title';
       return html`
-        <div class="modal open" @click=${(e: Event) => e.target === e.currentTarget && this.closeModal()}>
+        <div
+          class="modal open"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby=${titleId}
+          tabindex="0"
+          @click=${(e: Event) => e.target === e.currentTarget && this.closeModal()}
+          @keydown=${this.handleModalBackdropKeyDown}
+        >
           <div class="modal-content">
-            <h2>Редактировать пользователя</h2>
+            <h2 id=${titleId}>Редактировать пользователя</h2>
             <form @submit=${this.handleUpdateUser}>
               <div class="form-group">
                 <label>Email (только для чтения)</label>
@@ -536,7 +580,12 @@ export class UsersManagement extends LitElement {
 
               <div class="form-group">
                 <label>Имя</label>
-                <input type="text" name="name" .value=${this.selectedUser.name} required />
+                <input
+                  type="text"
+                  name="name"
+                  .value=${this.selectedUser.name}
+                  required
+                />
               </div>
 
               <div class="form-group">
@@ -552,7 +601,9 @@ export class UsersManagement extends LitElement {
               ${this.error ? html`<div class="error">${this.error}</div>` : null}
 
               <div class="form-actions">
-                <button type="button" class="secondary" @click=${this.closeModal}>Отмена</button>
+                <button type="button" class="secondary" @click=${this.closeModal}>
+                  Отмена
+                </button>
                 <button type="submit" class="primary">Сохранить</button>
               </div>
             </form>
@@ -562,14 +613,27 @@ export class UsersManagement extends LitElement {
     }
 
     if (this.modalMode === 'block' && this.selectedUser) {
+      const titleId = 'block-user-modal-title';
       return html`
-        <div class="modal open" @click=${(e: Event) => e.target === e.currentTarget && this.closeModal()}>
+        <div
+          class="modal open"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby=${titleId}
+          tabindex="0"
+          @click=${(e: Event) => e.target === e.currentTarget && this.closeModal()}
+          @keydown=${this.handleModalBackdropKeyDown}
+        >
           <div class="modal-content">
-            <h2>Заблокировать пользователя</h2>
+            <h2 id=${titleId}>Заблокировать пользователя</h2>
             <form @submit=${this.handleBlockUser}>
               <div class="form-group">
                 <label>Пользователь</label>
-                <input type="text" .value=${`${this.selectedUser.name} (${this.selectedUser.email})`} disabled />
+                <input
+                  type="text"
+                  .value=${`${this.selectedUser.name} (${this.selectedUser.email})`}
+                  disabled
+                />
               </div>
 
               <div class="form-group">
@@ -578,14 +642,18 @@ export class UsersManagement extends LitElement {
               </div>
 
               <div class="form-group">
-                <label>Длительность (часы, оставьте пустым для постоянной блокировки)</label>
+                <label
+                  >Длительность (часы, оставьте пустым для постоянной блокировки)</label
+                >
                 <input type="number" name="duration" min="1" />
               </div>
 
               ${this.error ? html`<div class="error">${this.error}</div>` : null}
 
               <div class="form-actions">
-                <button type="button" class="secondary" @click=${this.closeModal}>Отмена</button>
+                <button type="button" class="secondary" @click=${this.closeModal}>
+                  Отмена
+                </button>
                 <button type="submit" class="danger">Заблокировать</button>
               </div>
             </form>
@@ -604,7 +672,9 @@ export class UsersManagement extends LitElement {
       <div class="header">
         <div>
           <h1>Управление пользователями</h1>
-          <p style="color: var(--text-muted); margin: 0;">Создание, редактирование и управление пользователями</p>
+          <p style="color: var(--text-muted); margin: 0;">
+            Создание, редактирование и управление пользователями
+          </p>
         </div>
         <button class="primary" @click=${this.openCreateModal}>
           Создать пользователя

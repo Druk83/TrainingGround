@@ -36,8 +36,7 @@ const isProfile = pathname.startsWith('/profile');
 const isTeacherDashboard = pathname.startsWith('/teacher-dashboard');
 const isUsersManagement = pathname.startsWith('/admin/users');
 const isGroupsManagement = pathname.startsWith('/admin/groups');
-const isAdminConsole =
-  pathname.startsWith('/admin-console') || pathname === '/admin';
+const isAdminConsole = pathname.startsWith('/admin-console') || pathname === '/admin';
 
 // Router logic
 (function initializeRouter() {

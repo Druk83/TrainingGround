@@ -284,7 +284,8 @@ export class ApiClient {
     const params = new URLSearchParams();
     if (query?.role) params.set('role', query.role);
     if (query?.group_id) params.set('group_id', query.group_id);
-    if (query?.is_blocked !== undefined) params.set('is_blocked', String(query.is_blocked));
+    if (query?.is_blocked !== undefined)
+      params.set('is_blocked', String(query.is_blocked));
     if (query?.search) params.set('search', query.search);
     if (query?.limit) params.set('limit', String(query.limit));
     if (query?.offset) params.set('offset', String(query.offset));

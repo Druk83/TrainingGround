@@ -277,6 +277,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[serial_test::serial]
     fn test_https_required_in_prod() {
         // Set APP_ENV=prod to enforce HTTPS requirement
         std::env::set_var("APP_ENV", "prod");
@@ -301,6 +302,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_http_allowed_in_dev() {
         // Set APP_ENV=dev to allow HTTP endpoints
         std::env::set_var("APP_ENV", "dev");

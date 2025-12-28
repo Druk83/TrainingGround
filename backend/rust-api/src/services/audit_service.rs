@@ -291,7 +291,10 @@ impl AuditService {
             success: true,
             ip,
             user_agent,
-            details: Some(format!("Created user {} with role {}", created_user_id, role)),
+            details: Some(format!(
+                "Created user {} with role {}",
+                created_user_id, role
+            )),
             error_message: None,
         })
         .await

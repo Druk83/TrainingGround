@@ -68,16 +68,13 @@ pub async fn get_group(
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let group_service = GroupService::new(state.mongo.clone());
 
-    let group = group_service
-        .get_group(&group_id)
-        .await
-        .map_err(|e| {
-            if e.to_string().contains("not found") {
-                (StatusCode::NOT_FOUND, e.to_string())
-            } else {
-                (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-            }
-        })?;
+    let group = group_service.get_group(&group_id).await.map_err(|e| {
+        if e.to_string().contains("not found") {
+            (StatusCode::NOT_FOUND, e.to_string())
+        } else {
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        }
+    })?;
 
     Ok(Json(group))
 }
@@ -112,8 +109,14 @@ pub async fn update_group(
         "name: {}, school: {}, curator_id: {}, description: {}",
         req.name.as_deref().unwrap_or("unchanged"),
         req.school.as_deref().unwrap_or("unchanged"),
-        req.curator_id.as_ref().map(|_| "updated").unwrap_or("unchanged"),
-        req.description.as_ref().map(|_| "updated").unwrap_or("unchanged"),
+        req.curator_id
+            .as_ref()
+            .map(|_| "updated")
+            .unwrap_or("unchanged"),
+        req.description
+            .as_ref()
+            .map(|_| "updated")
+            .unwrap_or("unchanged"),
     );
 
     let _ = audit_service

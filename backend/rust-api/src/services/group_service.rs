@@ -22,8 +22,8 @@ impl GroupService {
 
         // Валидация curator_id (должен существовать и быть teacher)
         let curator_id = if let Some(curator_id_str) = &req.curator_id {
-            let curator_oid = ObjectId::parse_str(curator_id_str)
-                .context("Invalid curator ID format")?;
+            let curator_oid =
+                ObjectId::parse_str(curator_id_str).context("Invalid curator ID format")?;
 
             // Проверка существования curator
             let users_collection = self.mongo.collection::<User>("users");
@@ -111,7 +111,9 @@ impl GroupService {
 
         let mut groups = Vec::new();
         while cursor.advance().await.context("Failed to advance cursor")? {
-            let group = cursor.deserialize_current().context("Failed to deserialize group")?;
+            let group = cursor
+                .deserialize_current()
+                .context("Failed to deserialize group")?;
             let group_response = self.populate_group_response(group).await?;
             groups.push(group_response);
         }
@@ -123,8 +125,7 @@ impl GroupService {
     pub async fn get_group(&self, group_id: &str) -> Result<GroupResponse> {
         let groups_collection = self.mongo.collection::<Group>("groups");
 
-        let object_id = ObjectId::parse_str(group_id)
-            .context("Invalid group ID format")?;
+        let object_id = ObjectId::parse_str(group_id).context("Invalid group ID format")?;
 
         let group = groups_collection
             .find_one(doc! { "_id": object_id })
@@ -143,13 +144,12 @@ impl GroupService {
     ) -> Result<GroupResponse> {
         let groups_collection = self.mongo.collection::<Group>("groups");
 
-        let object_id = ObjectId::parse_str(group_id)
-            .context("Invalid group ID format")?;
+        let object_id = ObjectId::parse_str(group_id).context("Invalid group ID format")?;
 
         // Валидация curator_id если указан
         if let Some(ref curator_id_str) = req.curator_id {
-            let curator_oid = ObjectId::parse_str(curator_id_str)
-                .context("Invalid curator ID format")?;
+            let curator_oid =
+                ObjectId::parse_str(curator_id_str).context("Invalid curator ID format")?;
 
             let users_collection = self.mongo.collection::<User>("users");
             let curator = users_collection
@@ -175,17 +175,23 @@ impl GroupService {
         }
 
         if let Some(school) = req.school {
-            update_doc.get_document_mut("$set")?.insert("school", school);
+            update_doc
+                .get_document_mut("$set")?
+                .insert("school", school);
         }
 
         if let Some(curator_id) = req.curator_id {
             if let Ok(oid) = ObjectId::parse_str(&curator_id) {
-                update_doc.get_document_mut("$set")?.insert("curatorId", oid);
+                update_doc
+                    .get_document_mut("$set")?
+                    .insert("curatorId", oid);
             }
         }
 
         if let Some(description) = req.description {
-            update_doc.get_document_mut("$set")?.insert("description", description);
+            update_doc
+                .get_document_mut("$set")?
+                .insert("description", description);
         }
 
         // Обновление в MongoDB
@@ -213,8 +219,7 @@ impl GroupService {
         let groups_collection = self.mongo.collection::<Group>("groups");
         let users_collection = self.mongo.collection::<User>("users");
 
-        let object_id = ObjectId::parse_str(group_id)
-            .context("Invalid group ID format")?;
+        let object_id = ObjectId::parse_str(group_id).context("Invalid group ID format")?;
 
         // Удаление group_id из всех users.group_ids
         let group_id_str = object_id.to_hex();
@@ -246,10 +251,7 @@ impl GroupService {
         // Populate curator_name
         if let Some(curator_id) = group.curator_id {
             let users_collection = self.mongo.collection::<User>("users");
-            if let Ok(Some(curator)) = users_collection
-                .find_one(doc! { "_id": curator_id })
-                .await
-            {
+            if let Ok(Some(curator)) = users_collection.find_one(doc! { "_id": curator_id }).await {
                 response.curator_name = Some(curator.name);
             }
         }
