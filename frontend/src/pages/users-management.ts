@@ -10,7 +10,9 @@ import type {
   BlockUserRequest,
   ListUsersQuery,
   UserRole,
+  GroupResponse,
 } from '@/lib/api-types';
+import { sanitizeDisplayName } from '@/lib/sanitization';
 import '@/components/app-header';
 
 @customElement('users-management')
@@ -211,15 +213,49 @@ export class UsersManagement extends LitElement {
       padding: 2rem;
       color: var(--text-muted);
     }
+
+    .bulk-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      background: var(--surface-2);
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-large);
+      margin-bottom: 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .bulk-actions select {
+      min-width: 200px;
+    }
+
+    .notice {
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-large);
+      margin-bottom: 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+    }
+
+    .notice.success {
+      background: rgba(46, 204, 113, 0.15);
+      border-color: rgba(46, 204, 113, 0.4);
+    }
   `;
 
-  @state() private users: UserDetailResponse[] = [];
-  @state() private loading = false;
-  @state() private error: string | null = null;
-  @state() private filters: ListUsersQuery = { limit: 50, offset: 0 };
-  @state() private showModal = false;
-  @state() private modalMode: 'create' | 'edit' | 'block' = 'create';
-  @state() private selectedUser: UserDetailResponse | null = null;
+  @state() declare private users: UserDetailResponse[];
+  @state() declare private loading: boolean;
+  @state() declare private error: string | null;
+  @state() declare private filters: ListUsersQuery;
+  @state() declare private showModal: boolean;
+  @state() declare private modalMode: 'create' | 'edit' | 'block';
+  @state() declare private selectedUser: UserDetailResponse | null;
+  @state() declare private selectedUserIds: Set<string>;
+  @state() declare private bulkGroupId: string;
+  @state() declare private groupOptions: GroupResponse[];
+  @state() declare private notice: string | null;
+  @state() declare private resettingUserId: string | null;
 
   private client: ApiClient;
 
@@ -227,11 +263,24 @@ export class UsersManagement extends LitElement {
     super();
     const token = authService.getToken();
     this.client = new ApiClient({ jwt: token ?? undefined });
+    this.users = [];
+    this.loading = false;
+    this.error = null;
+    this.filters = { limit: 50, offset: 0 };
+    this.showModal = false;
+    this.modalMode = 'create';
+    this.selectedUser = null;
+    this.selectedUserIds = new Set();
+    this.bulkGroupId = '';
+    this.groupOptions = [];
+    this.notice = null;
+    this.resettingUserId = null;
   }
 
   connectedCallback() {
     super.connectedCallback();
     this.loadUsers();
+    this.loadGroupOptions();
   }
 
   private async loadUsers() {
@@ -240,10 +289,20 @@ export class UsersManagement extends LitElement {
 
     try {
       this.users = await this.client.listUsers(this.filters);
+      this.selectedUserIds = new Set();
     } catch (err) {
       this.error = err instanceof Error ? err.message : 'Failed to load users';
     } finally {
       this.loading = false;
+    }
+  }
+
+  private async loadGroupOptions() {
+    try {
+      const groups = await this.client.listGroups({ limit: 200 });
+      this.groupOptions = groups;
+    } catch (error) {
+      console.error('Failed to load groups for bulk assignment', error);
     }
   }
 
@@ -253,6 +312,148 @@ export class UsersManagement extends LitElement {
   ) {
     this.filters = { ...this.filters, [field]: value, offset: 0 };
     this.loadUsers();
+  }
+
+  private clearSelection() {
+    this.selectedUserIds = new Set();
+  }
+
+  private toggleSelectAll(event: Event) {
+    const target = event.currentTarget as HTMLInputElement;
+    if (target.checked) {
+      this.selectedUserIds = new Set(this.users.map((user) => user.id));
+    } else {
+      this.clearSelection();
+    }
+  }
+
+  private toggleSelectUser(userId: string, checked: boolean) {
+    const next = new Set(this.selectedUserIds);
+    if (checked) {
+      next.add(userId);
+    } else {
+      next.delete(userId);
+    }
+    this.selectedUserIds = next;
+  }
+
+  private async handleBulkBlock() {
+    const ids = Array.from(this.selectedUserIds);
+    if (!ids.length) return;
+    const reason = window.prompt('Укажите причину блокировки');
+    if (!reason) {
+      return;
+    }
+    const durationInput = window.prompt(
+      'Длительность блокировки в часах (оставьте пустым для бессрочной)',
+    );
+    const duration = durationInput ? Number(durationInput) : undefined;
+    if (durationInput && Number.isNaN(duration)) {
+      window.alert('Введите число для длительности');
+      return;
+    }
+
+    try {
+      await this.client.bulkUserAction({
+        user_ids: ids,
+        operation: { type: 'block', reason, duration_hours: duration },
+      });
+      this.notice = `Заблокировано пользователей: ${ids.length}`;
+      await this.loadUsers();
+      this.clearSelection();
+    } catch (error) {
+      this.error = error instanceof Error ? error.message : 'Failed to block users';
+    }
+  }
+
+  private async handleBulkUnblock() {
+    const ids = Array.from(this.selectedUserIds);
+    if (!ids.length) return;
+    try {
+      await this.client.bulkUserAction({
+        user_ids: ids,
+        operation: { type: 'unblock' },
+      });
+      this.notice = `Разблокировано пользователей: ${ids.length}`;
+      await this.loadUsers();
+      this.clearSelection();
+    } catch (error) {
+      this.error = error instanceof Error ? error.message : 'Failed to unblock users';
+    }
+  }
+
+  private async handleBulkAssignGroup() {
+    const ids = Array.from(this.selectedUserIds);
+    if (!ids.length || !this.bulkGroupId) return;
+    try {
+      await this.client.bulkUserAction({
+        user_ids: ids,
+        operation: { type: 'set_groups', group_ids: [this.bulkGroupId] },
+      });
+      const groupName =
+        this.groupOptions.find((group) => group.id === this.bulkGroupId)?.name ??
+        'selected group';
+      this.notice = `Назначена группа "${groupName}" для ${ids.length} пользователей`;
+      await this.loadUsers();
+      this.clearSelection();
+      this.bulkGroupId = '';
+    } catch (error) {
+      this.error = error instanceof Error ? error.message : 'Failed to assign group';
+    }
+  }
+
+  private renderBulkActions() {
+    if (this.selectedUserIds.size === 0) {
+      return null;
+    }
+    return html`
+      <div class="bulk-actions" role="region" aria-label="Массовые операции">
+        <strong>Выбрано: ${this.selectedUserIds.size}</strong>
+        <button class="secondary" @click=${this.handleBulkUnblock}>Разблокировать</button>
+        <button class="danger" @click=${this.handleBulkBlock}>Заблокировать</button>
+        <select
+          aria-label="Выберите группу для назначения"
+          .value=${this.bulkGroupId}
+          @change=${(event: Event) => {
+            this.bulkGroupId = (event.currentTarget as HTMLSelectElement).value;
+          }}
+        >
+          <option value="">Назначить группу...</option>
+          ${this.groupOptions.map(
+            (group) =>
+              html`<option value=${group.id}>${group.name} (${group.school})</option>`,
+          )}
+        </select>
+        <button
+          class="primary"
+          @click=${this.handleBulkAssignGroup}
+          ?disabled=${!this.bulkGroupId}
+        >
+          Назначить группу
+        </button>
+      </div>
+    `;
+  }
+
+  private async handleResetPassword(user: UserDetailResponse) {
+    if (!window.confirm(`Сбросить пароль для ${user.email}?`)) {
+      return;
+    }
+
+    this.resettingUserId = user.id;
+    this.error = null;
+    try {
+      const response = await this.client.resetUserPassword(user.id);
+      if (response.temporary_password) {
+        this.notice = `Временный пароль для ${user.email}: ${response.temporary_password}`;
+      } else {
+        this.notice = `Временный пароль отправлен на ${user.email}`;
+      }
+    } catch (error) {
+      this.error = error instanceof Error ? error.message : 'Failed to reset password';
+    } finally {
+      this.resettingUserId = null;
+    }
   }
 
   private openCreateModal() {
@@ -296,7 +497,7 @@ export class UsersManagement extends LitElement {
     const payload: CreateUserRequest = {
       email: formData.get('email') as string,
       password: formData.get('password') as string,
-      name: formData.get('name') as string,
+      name: sanitizeDisplayName(formData.get('name') as string),
       role: formData.get('role') as UserRole,
       group_ids: [],
     };
@@ -318,7 +519,7 @@ export class UsersManagement extends LitElement {
     const formData = new FormData(form);
 
     const payload: UpdateUserRequest = {
-      name: formData.get('name') as string,
+      name: sanitizeDisplayName(formData.get('name') as string),
       role: formData.get('role') as UserRole,
     };
 
@@ -339,7 +540,7 @@ export class UsersManagement extends LitElement {
     const formData = new FormData(form);
 
     const payload: BlockUserRequest = {
-      reason: formData.get('reason') as string,
+      reason: sanitizeDisplayName(formData.get('reason') as string, 200),
       duration_hours: formData.get('duration')
         ? Number(formData.get('duration'))
         : undefined,
@@ -445,6 +646,15 @@ export class UsersManagement extends LitElement {
       <table>
         <thead>
           <tr>
+            <th>
+              <input
+                type="checkbox"
+                aria-label="Выбрать всех пользователей"
+                .checked=${this.selectedUserIds.size > 0 &&
+                this.selectedUserIds.size === this.users.length}
+                @change=${this.toggleSelectAll}
+              />
+            </th>
             <th>Email</th>
             <th>Имя</th>
             <th>Роль</th>
@@ -457,6 +667,18 @@ export class UsersManagement extends LitElement {
           ${this.users.map(
             (user) => html`
               <tr>
+                <td>
+                  <input
+                    type="checkbox"
+                    aria-label="Выбрать ${user.email}"
+                    .checked=${this.selectedUserIds.has(user.id)}
+                    @change=${(event: Event) =>
+                      this.toggleSelectUser(
+                        user.id,
+                        (event.currentTarget as HTMLInputElement).checked,
+                      )}
+                  />
+                </td>
                 <td>${user.email}</td>
                 <td>${user.name}</td>
                 <td>${user.role}</td>
@@ -470,6 +692,13 @@ export class UsersManagement extends LitElement {
                   <div class="actions">
                     <button class="secondary" @click=${() => this.openEditModal(user)}>
                       Изменить
+                    </button>
+                    <button
+                      class="secondary"
+                      @click=${() => this.handleResetPassword(user)}
+                      ?disabled=${this.resettingUserId === user.id}
+                    >
+                      ${this.resettingUserId === user.id ? 'Сброс...' : 'Сбросить пароль'}
                     </button>
                     ${user.is_blocked
                       ? html`
@@ -526,7 +755,13 @@ export class UsersManagement extends LitElement {
 
               <div class="form-group">
                 <label>Пароль</label>
-                <input type="password" name="password" minlength="8" required />
+                <input
+                  type="password"
+                  name="password"
+                  minlength="8"
+                  autocomplete="new-password"
+                  required
+                />
               </div>
 
               <div class="form-group">
@@ -681,7 +916,9 @@ export class UsersManagement extends LitElement {
         </button>
       </div>
 
-      ${this.renderFilters()} ${this.renderTable()} ${this.renderModal()}
+      ${this.notice ? html`<div class="notice success">${this.notice}</div>` : ''}
+      ${this.renderFilters()} ${this.renderBulkActions()} ${this.renderTable()}
+      ${this.renderModal()}
     `;
   }
 }
