@@ -127,7 +127,7 @@ pub async fn optional_auth_middleware(
 pub async fn admin_guard_middleware(request: Request, next: Next) -> Result<Response, StatusCode> {
     let claims = request.extensions().get::<JwtClaims>();
     if let Some(claims) = claims {
-        if claims.role == "admin" {
+        if claims.role == "admin" || claims.role == "content_admin" {
             return Ok(next.run(request).await);
         }
     }

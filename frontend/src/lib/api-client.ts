@@ -5,6 +5,7 @@ import type {
   AdminTemplateDetail,
   AdminTemplateSummary,
   AdminTemplateUpdatePayload,
+  AdminTemplateCreatePayload,
   AnticheatSettings,
   BulkUserActionRequest,
   BulkUserActionResult,
@@ -33,6 +34,23 @@ import type {
   SubmitAnswerPayload,
   TemplateFilterParams,
   TemplateRevertPayload,
+  TemplateValidationIssue,
+  TemplateVersionSummary,
+  TopicCreatePayload,
+  TopicSummary,
+  TopicUpdatePayload,
+  LevelCreatePayload,
+  LevelReorderPayload,
+  LevelSummary,
+  LevelUpdatePayload,
+  RuleCreatePayload,
+  RuleSummary,
+  RuleUpdatePayload,
+  RuleCoverage,
+  TemplateDuplicate,
+  EmbeddingConsistencyReport,
+  EmbeddingJobSummary,
+  EmbeddingRebuildPayload,
   SettingsTestResponse,
   SsoSettings,
   SystemMetrics,
@@ -324,6 +342,13 @@ export class ApiClient {
     return this.request<AdminTemplateSummary[]>(url);
   }
 
+  async createAdminTemplate(payload: AdminTemplateCreatePayload) {
+    return this.request<AdminTemplateSummary>(`${ADMIN_BASE}/templates`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   async getAdminTemplate(templateId: string) {
     return this.request<AdminTemplateDetail>(`${ADMIN_BASE}/templates/${templateId}`);
   }
@@ -343,6 +368,150 @@ export class ApiClient {
         body: JSON.stringify(payload),
       },
     );
+  }
+
+  async listTemplateVersions(templateId: string) {
+    return this.request<TemplateVersionSummary[]>(
+      `${ADMIN_BASE}/templates/${templateId}/versions`,
+    );
+  }
+
+  async submitTemplateForModeration(templateId: string) {
+    return this.request<AdminTemplateSummary>(
+      `${ADMIN_BASE}/templates/${templateId}/submit`,
+      {
+        method: 'POST',
+      },
+    );
+  }
+
+  async approveTemplate(templateId: string) {
+    return this.request<AdminTemplateSummary>(
+      `${ADMIN_BASE}/templates/${templateId}/approve`,
+      {
+        method: 'POST',
+      },
+    );
+  }
+
+  async rejectTemplate(templateId: string, payload: TemplateRevertPayload) {
+    return this.request<AdminTemplateSummary>(
+      `${ADMIN_BASE}/templates/${templateId}/reject`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    );
+  }
+
+  async validateTemplates() {
+    return this.request<TemplateValidationIssue[]>(`${ADMIN_BASE}/templates/validate`, {
+      method: 'POST',
+    });
+  }
+
+  async listDuplicates() {
+    return this.request<TemplateDuplicate[]>(`${ADMIN_BASE}/templates/duplicates`);
+  }
+
+  async rebuildEmbeddings(payload: EmbeddingRebuildPayload) {
+    return this.request<EmbeddingJobSummary>(`${ADMIN_BASE}/embeddings/rebuild`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getEmbeddingProgress() {
+    return this.request<EmbeddingJobSummary>(`${ADMIN_BASE}/embeddings/progress`);
+  }
+
+  async getEmbeddingConsistency() {
+    return this.request<EmbeddingConsistencyReport>(
+      `${ADMIN_BASE}/embeddings/consistency`,
+    );
+  }
+
+  async listTopics() {
+    return this.request<TopicSummary[]>(`${ADMIN_BASE}/topics`);
+  }
+
+  async createTopic(payload: TopicCreatePayload) {
+    return this.request<TopicSummary>(`${ADMIN_BASE}/topics`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateTopic(topicId: string, payload: TopicUpdatePayload) {
+    return this.request<TopicSummary>(`${ADMIN_BASE}/topics/${topicId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteTopic(topicId: string) {
+    return this.request(`${ADMIN_BASE}/topics/${topicId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async listLevels(topicId: string) {
+    return this.request<LevelSummary[]>(`${ADMIN_BASE}/topics/${topicId}/levels`);
+  }
+
+  async createLevel(payload: LevelCreatePayload) {
+    return this.request<LevelSummary>(`${ADMIN_BASE}/levels`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateLevel(levelId: string, payload: LevelUpdatePayload) {
+    return this.request<LevelSummary>(`${ADMIN_BASE}/levels/${levelId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteLevel(levelId: string) {
+    return this.request(`${ADMIN_BASE}/levels/${levelId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async reorderLevels(payload: LevelReorderPayload) {
+    return this.request(`${ADMIN_BASE}/levels/reorder`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async listRules() {
+    return this.request<RuleSummary[]>(`${ADMIN_BASE}/rules`);
+  }
+
+  async createRule(payload: RuleCreatePayload) {
+    return this.request<RuleSummary>(`${ADMIN_BASE}/rules`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateRule(ruleId: string, payload: RuleUpdatePayload) {
+    return this.request<RuleSummary>(`${ADMIN_BASE}/rules/${ruleId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteRule(ruleId: string) {
+    return this.request(`${ADMIN_BASE}/rules/${ruleId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getRuleCoverage() {
+    return this.request<RuleCoverage[]>(`${ADMIN_BASE}/rules/coverage`);
   }
 
   async getEmbeddingQueueStatus() {

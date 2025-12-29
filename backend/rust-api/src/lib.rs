@@ -130,6 +130,70 @@ fn admin_routes(
             "/templates/{id}/revert",
             post(handlers::admin::revert_template),
         )
+        .route(
+            "/templates/{id}/versions",
+            get(handlers::admin::list_template_versions),
+        )
+        .route(
+            "/templates/{id}/submit",
+            post(handlers::admin::submit_template_for_moderation),
+        )
+        .route(
+            "/templates/{id}/approve",
+            post(handlers::admin::approve_template),
+        )
+        .route(
+            "/templates/{id}/reject",
+            post(handlers::admin::reject_template),
+        )
+        .route(
+            "/templates/validate",
+            post(handlers::admin::validate_templates),
+        )
+        .route(
+            "/templates/duplicates",
+            get(handlers::admin::list_duplicates),
+        )
+        .route(
+            "/embeddings/rebuild",
+            post(handlers::admin::rebuild_embeddings),
+        )
+        .route(
+            "/embeddings/progress",
+            get(handlers::admin::embedding_progress),
+        )
+        .route(
+            "/embeddings/consistency",
+            get(handlers::admin::embedding_consistency),
+        )
+        .route(
+            "/templates/duplicates",
+            get(handlers::admin::list_duplicates),
+        )
+        .route(
+            "/topics",
+            get(handlers::admin::list_topics).post(handlers::admin::create_topic),
+        )
+        .route(
+            "/topics/{id}",
+            put(handlers::admin::update_topic).delete(handlers::admin::delete_topic),
+        )
+        .route("/topics/{id}/levels", get(handlers::admin::list_levels))
+        .route("/levels", post(handlers::admin::create_level))
+        .route(
+            "/levels/{id}",
+            put(handlers::admin::update_level).delete(handlers::admin::delete_level),
+        )
+        .route("/levels/reorder", post(handlers::admin::reorder_levels))
+        .route(
+            "/rules",
+            get(handlers::admin::list_rules).post(handlers::admin::create_rule),
+        )
+        .route(
+            "/rules/{id}",
+            put(handlers::admin::update_rule).delete(handlers::admin::delete_rule),
+        )
+        .route("/rules/coverage", get(handlers::admin::rule_coverage))
         .route("/queue", get(handlers::admin::queue_status))
         .route("/feature-flags", get(handlers::admin::list_feature_flags))
         .route(

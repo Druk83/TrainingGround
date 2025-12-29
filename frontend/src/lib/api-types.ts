@@ -138,20 +138,13 @@ export interface ExportResponsePayload {
   expires_at: string;
 }
 
-export type AdminTemplateStatus = 'draft' | 'ready' | 'published' | 'deprecated';
-
-export interface LevelSummary {
-  id: string;
-  name: string;
-  order: number;
-  topic_id: string;
-}
-
-export interface TopicSummary {
-  id: string;
-  slug: string;
-  name: string;
-}
+export type AdminTemplateStatus =
+  | 'draft'
+  | 'pending_review'
+  | 'reviewed_once'
+  | 'ready'
+  | 'published'
+  | 'deprecated';
 
 export interface AdminTemplateSummary {
   id: string;
@@ -164,6 +157,99 @@ export interface AdminTemplateSummary {
   pii_flags: string[];
   source_refs: string[];
   updated_at: string;
+}
+
+export interface TopicSummary {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  icon_url?: string | null;
+  sort_order: number;
+  status: 'active' | 'deprecated';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TopicCreatePayload {
+  slug: string;
+  name: string;
+  description?: string;
+  icon_url?: string;
+  status?: 'active' | 'deprecated';
+}
+
+export interface TopicUpdatePayload {
+  name?: string;
+  description?: string;
+  icon_url?: string;
+  status?: 'active' | 'deprecated';
+}
+
+export interface LevelSummary {
+  id: string;
+  name: string;
+  difficulty: 'A1' | 'A2' | 'B1' | 'B2';
+  order: number;
+  status: 'active' | 'deprecated';
+  topic_id: string;
+}
+
+export interface LevelCreatePayload {
+  topic_id: string;
+  name: string;
+  difficulty: 'A1' | 'A2' | 'B1' | 'B2';
+  description?: string;
+  min_pass_percent?: number;
+  sort_order?: number;
+}
+
+export interface LevelUpdatePayload {
+  name?: string;
+  description?: string;
+  difficulty?: 'A1' | 'A2' | 'B1' | 'B2';
+  min_pass_percent?: number;
+  status?: 'active' | 'deprecated';
+}
+
+export interface LevelReorderPayload {
+  ordering: string[];
+}
+
+export interface RuleSummary {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  examples: string[];
+  exceptions: string[];
+  sources: string[];
+  status: 'active' | 'deprecated';
+}
+
+export interface RuleCreatePayload {
+  name: string;
+  category: string;
+  description: string;
+  examples?: string[];
+  exceptions?: string[];
+  sources?: string[];
+  status?: 'active' | 'deprecated';
+}
+
+export interface RuleUpdatePayload {
+  name?: string;
+  category?: string;
+  description?: string;
+  examples?: string[];
+  exceptions?: string[];
+  sources?: string[];
+  status?: 'active' | 'deprecated';
+}
+
+export interface RuleCoverage {
+  rule_id: string;
+  linked_templates: number;
 }
 
 export interface AdminTemplateDetail extends AdminTemplateSummary {
@@ -193,8 +279,60 @@ export interface AdminTemplateUpdatePayload {
   source_refs?: string[];
 }
 
+export interface AdminTemplateCreatePayload {
+  slug: string;
+  level_id: string;
+  rule_ids: string[];
+  content: string;
+  params?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  difficulty?: string;
+  source_refs?: string[];
+}
+
 export interface TemplateRevertPayload {
   reason: string;
+}
+
+export interface TemplateVersionSummary {
+  version: number;
+  created_at: string;
+  created_by?: string;
+  changes: Record<string, unknown>;
+}
+
+export interface TemplateValidationIssue {
+  template_id: string;
+  slug: string;
+  reason: string;
+  severity: string;
+}
+
+export interface TemplateDuplicate {
+  template_a: string;
+  template_b: string;
+  similarity: number;
+  reason: string;
+}
+
+export interface EmbeddingJobSummary {
+  id: string;
+  mode: string;
+  status: string;
+  total: number;
+  processed: number;
+  created_at: string;
+}
+
+export interface EmbeddingRebuildPayload {
+  mode: 'all' | 'changed' | 'new' | 'selected';
+  template_ids?: string[];
+}
+
+export interface EmbeddingConsistencyReport {
+  mongo_templates: number;
+  qdrant_vectors: number;
+  discrepancies: string[];
 }
 
 export interface QueueStatus {
