@@ -10,6 +10,8 @@ export class HintPanel extends LitElement {
     loading: { type: Boolean },
     error: { type: String },
     hotkeysEnabled: { type: Boolean },
+    availableHints: { type: Number },
+    maxHints: { type: Number },
   };
 
   declare hints: HintEntry[];
@@ -17,6 +19,8 @@ export class HintPanel extends LitElement {
   declare loading: boolean;
   declare error?: string;
   declare hotkeysEnabled: boolean;
+  declare availableHints?: number;
+  declare maxHints?: number;
 
   constructor() {
     super();
@@ -49,6 +53,20 @@ export class HintPanel extends LitElement {
       letter-spacing: 0.08em;
       font-size: 0.9rem;
       color: var(--text-muted);
+    }
+
+    .hint-meta {
+      margin-top: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .hint-limit {
+      color: var(--warning, #f97316);
+      font-weight: 600;
     }
 
     button {
@@ -109,9 +127,13 @@ export class HintPanel extends LitElement {
           <h2 id="hints-heading">Подсказки</h2>
           <button
             @click=${this.handleHintRequest}
-            ?disabled=${this.loading}
+            ?disabled=${this.loading || this.isHintLimitReached()}
             aria-busy=${this.loading}
-            title=${this.hotkeysEnabled ? 'Горячая клавиша: H' : nothing}
+            title=${this.isHintLimitReached()
+              ? 'Лимит подсказок достигнут'
+              : this.hotkeysEnabled
+                ? 'Горячая клавиша: H'
+                : nothing}
           >
             ${this.loading ? 'Отправляем...' : 'Запросить подсказку'}
             ${this.hotkeysEnabled && !this.loading
@@ -119,6 +141,7 @@ export class HintPanel extends LitElement {
               : null}
           </button>
         </div>
+        ${this.renderHintMeta()}
         ${this.error ? html`<p role="alert">${this.error}</p>` : null}
         <div aria-live="polite">
           ${this.hints.length === 0
@@ -157,5 +180,34 @@ export class HintPanel extends LitElement {
     this.dispatchEvent(
       new CustomEvent('request-hint', { bubbles: true, composed: true }),
     );
+  }
+
+  private isHintLimitReached() {
+    return typeof this.availableHints === 'number' && this.availableHints <= 0;
+  }
+
+  private renderHintMeta() {
+    const remaining =
+      typeof this.availableHints === 'number' ? this.availableHints : undefined;
+    const max = typeof this.maxHints === 'number' ? this.maxHints : undefined;
+    const limitReached = this.isHintLimitReached();
+    if (remaining === undefined && !limitReached) {
+      return nothing;
+    }
+
+    return html`
+      <div class="hint-meta">
+        ${remaining !== undefined
+          ? html`
+              <p class="hint-meta-text">
+                ${max !== undefined
+                  ? html`Подсказок: ${remaining} из ${max}`
+                  : html`Подсказок осталось: ${remaining}`}
+              </p>
+            `
+          : null}
+        ${limitReached ? html`<p class="hint-limit">Лимит подсказок достигнут</p>` : null}
+      </div>
+    `;
   }
 }

@@ -1,6 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { authService } from '@/lib/auth-service';
+import { isFeatureEnabled } from '@/lib/feature-flags';
 
 @customElement('login-page')
 export class LoginPage extends LitElement {
@@ -49,6 +50,23 @@ export class LoginPage extends LitElement {
       margin-bottom: 24px;
     }
 
+    .offline-warning {
+      background: #1e293b;
+      border: 1px solid #0f172a;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      text-align: center;
+      color: #fee2e2;
+      font-weight: 600;
+    }
+
+    .field-error {
+      color: #fecdd3;
+      font-size: 0.85rem;
+      margin-top: 6px;
+    }
+
     label {
       display: block;
       margin-bottom: 8px;
@@ -87,6 +105,46 @@ export class LoginPage extends LitElement {
       cursor: pointer;
       font-family: inherit;
       height: 44px;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .actions button {
+      flex: 1;
+    }
+
+    .link-button {
+      background: transparent;
+      color: #38bdf8;
+      text-decoration: underline;
+      border: none;
+      padding: 0;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .link-button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .sso-button {
+      width: 100%;
+      margin-top: 8px;
+      background: #111827;
+      border: 1px solid #374151;
+      color: #f8fafc;
+      border-radius: 8px;
+      padding: 10px 0;
+    }
+
+    .sso-button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
 
     button:hover:not(:disabled) {
@@ -129,6 +187,10 @@ export class LoginPage extends LitElement {
   @state() declare private password: string;
   @state() declare private loading: boolean;
   @state() declare private error: string;
+  @state() declare private emailError?: string;
+  @state() declare private passwordError?: string;
+  @state() declare private online: boolean;
+  private ssoEnabled = isFeatureEnabled('sso');
 
   constructor() {
     super();
@@ -136,32 +198,89 @@ export class LoginPage extends LitElement {
     this.password = '';
     this.loading = false;
     this.error = '';
+    this.online = navigator.onLine;
   }
+
+  connectedCallback() {
+    super.connectedCallback();
+    window.addEventListener('online', this.handleOnlineStatus);
+    window.addEventListener('offline', this.handleOfflineStatus);
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    window.removeEventListener('online', this.handleOnlineStatus);
+    window.removeEventListener('offline', this.handleOfflineStatus);
+  }
+
+  private handleOnlineStatus = () => {
+    this.online = true;
+    this.error = '';
+  };
+
+  private handleOfflineStatus = () => {
+    this.online = false;
+  };
 
   private async handleSubmit(e: Event) {
     e.preventDefault();
+    if (!this.online) {
+      this.error = 'Вход доступен только online';
+      return;
+    }
 
-    if (!this.email || !this.password) {
-      this.error = 'Пожалуйста, заполните все поля';
+    this.emailError = undefined;
+    this.passwordError = undefined;
+    this.error = '';
+
+    const trimmedEmail = this.email.trim();
+    if (!trimmedEmail) {
+      this.emailError = 'Введите email';
+      return;
+    }
+
+    if (!this.isValidEmail(trimmedEmail)) {
+      this.emailError = 'Введите корректный email';
+      return;
+    }
+
+    if (this.password.length < 8) {
+      this.passwordError = 'Пароль должен быть минимум 8 символов';
       return;
     }
 
     this.loading = true;
-    this.error = '';
 
     try {
       await authService.login({
-        email: this.email,
+        email: trimmedEmail,
         password: this.password,
         remember_me: false,
       });
-
       authService.redirectToHome();
     } catch (err) {
-      this.error = err instanceof Error ? err.message : 'Неизвестная ошибка';
+      const message = err instanceof Error ? err.message : 'Неизвестная ошибка';
+      if (message.toLowerCase().includes('blocked')) {
+        this.error = message;
+      } else {
+        this.error = 'Неверный email или пароль';
+      }
     } finally {
       this.loading = false;
     }
+  }
+
+  private handleForgotPassword = () => {
+    window.location.href = '/forgot-password';
+  };
+
+  private handleSSOLogin = () => {
+    window.location.href = '/auth/sso';
+  };
+
+  private isValidEmail(value: string) {
+    // simple RFC-like check
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
   }
 
   render() {
@@ -172,45 +291,74 @@ export class LoginPage extends LitElement {
           <p>Платформа обучения программированию</p>
         </div>
 
+        ${!this.online
+          ? html`<div class="offline-warning" role="status">
+              Вход доступен только online
+            </div>`
+          : null}
         ${this.error ? html`<div class="error" role="alert">${this.error}</div>` : ''}
 
         <form @submit=${this.handleSubmit}>
           <div class="form-group">
-            <label for="email">Email</label>
+            <label for="login-email">Email</label>
             <input
-              id="email"
+              id="login-email"
               type="email"
-              placeholder="your@email.com"
               .value=${this.email}
               @input=${(e: Event) => (this.email = (e.target as HTMLInputElement).value)}
               ?disabled=${this.loading}
               autocomplete="email"
-              required
             />
+            ${this.emailError
+              ? html`<p class="field-error" role="alert">${this.emailError}</p>`
+              : null}
           </div>
 
           <div class="form-group">
-            <label for="password">Пароль</label>
+            <label for="login-password">Пароль</label>
             <input
-              id="password"
+              id="login-password"
               type="password"
-              placeholder="••••••••"
               .value=${this.password}
               @input=${(e: Event) =>
                 (this.password = (e.target as HTMLInputElement).value)}
               ?disabled=${this.loading}
               autocomplete="current-password"
-              required
             />
+            ${this.passwordError
+              ? html`<p class="field-error" role="alert">${this.passwordError}</p>`
+              : null}
           </div>
 
-          <button type="submit" ?disabled=${this.loading}>
-            ${this.loading ? 'Вход...' : 'Войти'}
-          </button>
+          <div class="actions">
+            <button type="submit" ?disabled=${this.loading}>
+              ${this.loading ? 'Вход...' : 'Войти'}
+            </button>
+            <button
+              type="button"
+              class="link-button"
+              @click=${this.handleForgotPassword}
+              ?disabled=${this.loading}
+            >
+              Забыли пароль?
+            </button>
+          </div>
         </form>
 
         <nav class="links">
           <p>Нет аккаунта? <a href="/register">Зарегистрироваться</a></p>
+          ${this.ssoEnabled
+            ? html`
+                <button
+                  type="button"
+                  class="sso-button"
+                  @click=${this.handleSSOLogin}
+                  ?disabled=${this.loading}
+                >
+                  Войти через SSO
+                </button>
+              `
+            : null}
         </nav>
       </div>
     `;

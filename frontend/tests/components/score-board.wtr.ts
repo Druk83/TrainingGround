@@ -27,4 +27,46 @@ describe('score-board', () => {
     const liveRegion = element.shadowRoot?.querySelector('[aria-live="polite"]');
     expect(liveRegion?.textContent).to.include('Баллы: 150');
   });
+
+  it('shows delta message for recent scoring changes', async () => {
+    const element = await fixture<ScoreBoard>(html`<score-board></score-board>`);
+    element.data = {
+      totalScore: 200,
+      attempts: 4,
+      correct: 4,
+      accuracy: 100,
+      currentStreak: 4,
+      longestStreak: 4,
+      hintsUsed: 0,
+      hintsRemaining: 2,
+      lastScoreDelta: 15,
+      lastBonusApplied: true,
+    };
+    await element.updateComplete;
+
+    const delta = element.shadowRoot?.querySelector('.delta');
+    expect(delta?.textContent).to.include('+15 баллов');
+    expect(delta?.textContent).to.include('бонус за серию');
+  });
+
+  it('shows hint penalty message when applicable', async () => {
+    const element = await fixture<ScoreBoard>(html`<score-board></score-board>`);
+    element.data = {
+      totalScore: 130,
+      attempts: 2,
+      correct: 1,
+      accuracy: 50,
+      currentStreak: 0,
+      longestStreak: 1,
+      hintsUsed: 1,
+      hintsRemaining: 1,
+      lastScoreDelta: -5,
+      lastHintPenalty: -5,
+    };
+    await element.updateComplete;
+
+    const delta = element.shadowRoot?.querySelector('.delta');
+    expect(delta?.textContent).to.include('Штраф');
+    expect(delta?.textContent).to.include('-5');
+  });
 });

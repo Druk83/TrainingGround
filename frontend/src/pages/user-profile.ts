@@ -1,6 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { authService } from '@/lib/auth-service';
+import { lessonStore, type ScoreState } from '@/lib/session-store';
 import '@/components/app-header';
 
 interface ActiveSession {
@@ -14,6 +15,18 @@ interface ActiveSession {
 
 @customElement('user-profile')
 export class UserProfile extends LitElement {
+  @state()
+  private scoreboard: ScoreState = {
+    totalScore: 0,
+    attempts: 0,
+    correct: 0,
+    accuracy: 0,
+    currentStreak: 0,
+    longestStreak: 0,
+    hintsUsed: 0,
+  };
+  private unsubscribe?: () => void;
+
   static styles = css`
     :host {
       display: block;
@@ -56,6 +69,34 @@ export class UserProfile extends LitElement {
       margin: 0 0 1rem;
       font-size: 1.25rem;
       color: var(--text-main);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+      background: var(--surface-3);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      border: 1px solid #111b2a;
+      text-align: center;
+    }
+
+    .stat-card .label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.35rem;
+    }
+
+    .stat-card .value {
+      font-size: 1.5rem;
+      font-weight: 600;
     }
 
     .info-grid {
@@ -319,7 +360,15 @@ export class UserProfile extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    this.unsubscribe = lessonStore.subscribe((snapshot) => {
+      this.scoreboard = { ...snapshot.scoreboard };
+    });
     this.loadSessions();
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.unsubscribe?.();
   }
 
   private async loadSessions() {
@@ -508,6 +557,24 @@ export class UserProfile extends LitElement {
         <div class="header">
           <h1>Профиль пользователя</h1>
           <p>Управление аккаунтом и безопасностью</p>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="label">Баллы</span>
+            <span class="value">${this.scoreboard.totalScore}</span>
+          </div>
+          <div class="stat-card">
+            <span class="label">Точность</span>
+            <span class="value">${this.scoreboard.accuracy}%</span>
+          </div>
+          <div class="stat-card">
+            <span class="label">Серия</span>
+            <span class="value">${this.scoreboard.currentStreak}</span>
+          </div>
+          <div class="stat-card">
+            <span class="label">Подсказки</span>
+            <span class="value">${this.scoreboard.hintsUsed}</span>
+          </div>
         </div>
 
         ${this.error ? html`<div class="error" role="alert">${this.error}</div>` : ''}

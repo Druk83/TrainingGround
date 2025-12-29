@@ -1,6 +1,7 @@
-﻿import { html, fixture, expect } from '@open-wc/testing';
-import '../components/timer-display';
-import type { TimerDisplay } from '../components/timer-display';
+/// <reference types="mocha" />
+import { html, fixture, expect } from '@open-wc/testing';
+import '../../src/components/timer-display';
+import type { TimerDisplay } from '../../src/components/timer-display';
 
 describe('timer-display', () => {
   it('shows remaining time', async () => {
@@ -10,3 +11,4 @@ describe('timer-display', () => {
     expect(el.shadowRoot?.textContent).to.contain('02:05');
   });
 });
+

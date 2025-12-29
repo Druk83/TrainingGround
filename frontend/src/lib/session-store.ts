@@ -18,10 +18,13 @@ import { lessonCatalog, type LessonDefinition } from './lesson-catalog';
 import { isFeatureEnabled } from './feature-flags';
 import { requestExplanation } from '@/services/explanations';
 import { readFromStorage, writeToStorage, STORAGE_KEYS } from './storage';
+import { applyHintPenalty, calculateAnswerScore, HINT_PENALTY } from './scoring';
 
 export interface LessonCard extends LessonDefinition {
   status: 'locked' | 'available' | 'active' | 'completed';
   progress: number;
+  levelsCompleted: number;
+  percentCorrect: number;
 }
 
 export interface HintEntry {
@@ -57,7 +60,12 @@ export interface ScoreState {
   longestStreak: number;
   hintsUsed: number;
   hintsRemaining?: number;
+  lastScoreDelta?: number;
+  lastBonusApplied?: boolean;
+  lastHintPenalty?: number;
 }
+
+export const MAX_HINTS_PER_SESSION = 2;
 
 export interface UserState {
   id: string;
@@ -117,6 +125,9 @@ const defaultScore: ScoreState = {
   longestStreak: 0,
   hintsUsed: 0,
   hintsRemaining: undefined,
+  lastScoreDelta: 0,
+  lastBonusApplied: false,
+  lastHintPenalty: undefined,
 };
 
 const defaultTimer: TimerState = {
@@ -134,6 +145,7 @@ export class LessonStore {
   private currentLesson?: LessonDefinition;
   private analyticsBuffer: number[] = [];
   private lastKeypressAt = 0;
+  private autoSubmittedOnTimeout = false;
 
   constructor() {
     const storedUser = readFromStorage<UserState>(STORAGE_KEYS.user, {
@@ -265,6 +277,20 @@ export class LessonStore {
       return;
     }
 
+    if (this.state.scoreboard.hintsUsed >= MAX_HINTS_PER_SESSION) {
+      this.patch({
+        hints: {
+          ...this.state.hints,
+          isLoading: false,
+          error: 'Лимит подсказок на уровне исчерпан',
+        },
+      });
+      this.pushNotification('warning', 'Лимит подсказок достигнут');
+      return;
+    }
+
+    const previousScoreboard = { ...this.state.scoreboard };
+    this.applyHintCostPreview();
     this.patch({ hints: { ...this.state.hints, isLoading: true, error: undefined } });
 
     try {
@@ -282,17 +308,50 @@ export class LessonStore {
           'warning',
           'Подсказка добавлена в очередь для синхронизации',
         );
-        await this.refreshQueueSize();
-      } else {
         this.patch({
           hints: {
             ...this.state.hints,
             isLoading: false,
-            error: (error as Error).message,
+            error: undefined,
           },
         });
+        await this.refreshQueueSize();
+        return;
       }
+
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'Неизвестная ошибка при запросе подсказки';
+      this.patch({
+        hints: {
+          ...this.state.hints,
+          isLoading: false,
+          error: errorMessage,
+        },
+        scoreboard: previousScoreboard,
+      });
     }
+  }
+
+  private applyHintCostPreview() {
+    const hintsUsed = this.state.scoreboard.hintsUsed + 1;
+    const remaining =
+      typeof this.state.scoreboard.hintsRemaining === 'number'
+        ? Math.max(0, this.state.scoreboard.hintsRemaining - 1)
+        : Math.max(0, MAX_HINTS_PER_SESSION - hintsUsed);
+
+    const scoreboard = {
+      ...this.state.scoreboard,
+      hintsUsed,
+      hintsRemaining: remaining,
+      totalScore: applyHintPenalty(this.state.scoreboard.totalScore),
+      lastScoreDelta: -HINT_PENALTY,
+      lastBonusApplied: false,
+      lastHintPenalty: HINT_PENALTY,
+    };
+
+    this.patch({ scoreboard });
   }
 
   async flushOfflineQueue() {
@@ -303,10 +362,11 @@ export class LessonStore {
     const result = await this.offlineQueue.flush({
       answer: async (operation) => {
         try {
-          await this.api.submitAnswer(
+          const response = await this.api.submitAnswer(
             operation.sessionId,
             operation.payload as { answer: string },
           );
+          this.handleAnswerResult(response);
           return { ok: true, status: 200 };
         } catch (error) {
           return {
@@ -318,7 +378,12 @@ export class LessonStore {
       },
       hint: async (operation) => {
         try {
-          await this.api.requestHint(operation.sessionId, operation.payload);
+          const response = await this.api.requestHint(
+            operation.sessionId,
+            operation.payload,
+          );
+          this.handleHintResponse(response);
+          await this.tryLoadExplanation(response.hint_text);
           return { ok: true, status: 200 };
         } catch (_error) {
           return { ok: false, status: 500 };
@@ -419,26 +484,32 @@ export class LessonStore {
       },
       lessons: this.computeLessons(this.state.scoreboard, lesson.id),
     });
+    this.autoSubmittedOnTimeout = false;
   }
 
   private handleAnswerResult(result: SubmitAnswerResponse) {
-    const attempts = this.state.scoreboard.attempts + 1;
-    const correct = result.correct
-      ? this.state.scoreboard.correct + 1
-      : this.state.scoreboard.correct;
+    const prevScoreboard = this.state.scoreboard;
+    const scoring = calculateAnswerScore({
+      correct: result.correct,
+      currentStreak: prevScoreboard.currentStreak,
+    });
+    const attempts = prevScoreboard.attempts + 1;
+    const correct = result.correct ? prevScoreboard.correct + 1 : prevScoreboard.correct;
     const accuracy = attempts === 0 ? 0 : Math.round((correct / attempts) * 100);
-    const currentStreak = result.correct ? this.state.scoreboard.currentStreak + 1 : 0;
-    const longestStreak = Math.max(this.state.scoreboard.longestStreak, currentStreak);
+    const longestStreak = Math.max(prevScoreboard.longestStreak, scoring.newStreak);
+    const delta = result.total_score - prevScoreboard.totalScore;
 
-    const totalScore = result.total_score;
     const scoreboard = {
-      ...this.state.scoreboard,
+      ...prevScoreboard,
       attempts,
       correct,
       accuracy,
-      currentStreak,
+      currentStreak: scoring.newStreak,
       longestStreak,
-      totalScore,
+      totalScore: result.total_score,
+      lastScoreDelta: delta,
+      lastBonusApplied: scoring.bonusApplied,
+      lastHintPenalty: undefined,
     };
 
     this.patch({
@@ -525,6 +596,10 @@ export class LessonStore {
         },
       });
     } else {
+      if (!this.autoSubmittedOnTimeout) {
+        this.autoSubmittedOnTimeout = true;
+        void this.submitAnswer('');
+      }
       this.patch({
         timer: {
           ...this.state.timer,
@@ -615,11 +690,24 @@ export class LessonStore {
       if (activeLessonId === lesson.id) {
         status = 'active';
       }
-      const progress = score.accuracy;
+      const percentCorrect = score.accuracy;
+      const levelsCompleted = Math.min(
+        lesson.levels,
+        Math.round((percentCorrect / 100) * lesson.levels),
+      );
+      const progress =
+        lesson.levels > 0
+          ? Math.min(100, Math.round((levelsCompleted / lesson.levels) * 100))
+          : 0;
+      const statusFinal = (
+        levelsCompleted >= lesson.levels && status !== 'active' ? 'completed' : status
+      ) as LessonCard['status'];
       return {
         ...lesson,
-        status,
-        progress: Math.min(100, progress),
+        status: statusFinal,
+        progress,
+        levelsCompleted,
+        percentCorrect,
       };
     });
   }

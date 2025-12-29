@@ -2,6 +2,8 @@
 import { customElement } from 'lit/decorators.js';
 import type { TimerState } from '@/lib/session-store';
 
+const LOW_TIME_THRESHOLD = 10;
+
 @customElement('timer-display')
 export class TimerDisplay extends LitElement {
   static properties = {
@@ -36,6 +38,7 @@ export class TimerDisplay extends LitElement {
     .time {
       font-size: clamp(2rem, 6vw, 3rem);
       font-weight: 600;
+      color: var(--text-main);
     }
 
     .bar {
@@ -51,18 +54,31 @@ export class TimerDisplay extends LitElement {
       height: 100%;
       background: var(--primary);
     }
+
+    .time.urgent {
+      color: var(--error);
+    }
+
+    .bar.urgent div {
+      background: var(--error);
+    }
   `;
 
   render() {
     const percent = this.data.totalSeconds
-      ? (this.data.remainingSeconds / this.data.totalSeconds) * 100
+      ? Math.max(
+          0,
+          Math.min((this.data.remainingSeconds / this.data.totalSeconds) * 100, 100),
+        )
       : 0;
+    const isUrgent =
+      this.data.status === 'running' && this.data.remainingSeconds <= LOW_TIME_THRESHOLD;
     return html`
-      <div class="time" aria-live="assertive">
+      <div class=${`time${isUrgent ? ' urgent' : ''}`} aria-live="assertive">
         ${this.formatTime(this.data.remainingSeconds)}
       </div>
       <div
-        class="bar"
+        class=${`bar${isUrgent ? ' urgent' : ''}`}
         role="progressbar"
         aria-label="Оставшееся время"
         aria-valuemin="0"

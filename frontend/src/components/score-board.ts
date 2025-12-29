@@ -47,6 +47,12 @@ export class ScoreBoard extends LitElement {
       gap: 0.75rem;
     }
 
+    .delta {
+      margin-top: 0.75rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
     .card {
       background: var(--surface-3);
       padding: 0.75rem;
@@ -110,6 +116,7 @@ export class ScoreBoard extends LitElement {
           )}
         </div>
       </section>
+      ${this.renderDeltaBanner()}
     `;
   }
 
@@ -138,5 +145,27 @@ export class ScoreBoard extends LitElement {
         : 'Серия обнулена',
     );
     return parts.join('. ');
+  }
+
+  private renderDeltaBanner() {
+    const message = this.composeDeltaMessage(this.data);
+    if (!message) {
+      return null;
+    }
+    return html`<p class="delta" aria-live="polite">${message}</p>`;
+  }
+
+  private composeDeltaMessage(data: ScoreState): string | null {
+    if (typeof data.lastHintPenalty === 'number' && data.lastHintPenalty < 0) {
+      return `Штраф за подсказку ${data.lastHintPenalty}`;
+    }
+    if (typeof data.lastScoreDelta === 'number' && data.lastScoreDelta > 0) {
+      const bonus = data.lastBonusApplied ? ' (бонус за серию)' : '';
+      return `+${data.lastScoreDelta} баллов${bonus}`;
+    }
+    if (typeof data.lastScoreDelta === 'number' && data.lastScoreDelta === 0) {
+      return 'Последний ответ не принёс баллов';
+    }
+    return null;
   }
 }

@@ -7,10 +7,12 @@ import {
   type ScoreState,
   type TimerState,
   type ConflictResolution,
+  MAX_HINTS_PER_SESSION,
 } from '@/lib/session-store';
 import { isFeatureEnabled } from '@/lib/feature-flags';
 import '@/components/lesson-catalog';
 import '@/components/lesson-player';
+import '@/components/lesson-results';
 import '@/components/hint-panel';
 import '@/components/connection-indicator';
 import '@/components/conflict-resolver';
@@ -441,6 +443,14 @@ export class AppShell extends LitElement {
           @answer-submit=${this.forwardAnswer}
           @answer-typing=${this.handleTyping}
         ></lesson-player>
+        <lesson-results
+          .scoreboard=${this.snapshot.scoreboard}
+          .lessonTitle=${this.snapshot.activeSession?.title}
+          .visible=${this.shouldShowResults()}
+          @retry-lesson=${this.handleRetryLesson}
+          @return-to-catalog=${this.handleReturnToCatalog}
+          @next-level=${this.handleNextLevel}
+        ></lesson-results>
       </section>
     `;
   }
@@ -448,6 +458,7 @@ export class AppShell extends LitElement {
   private renderInsightsSection() {
     const hidden = this.isStackedLayout && this.activePanel !== 'insights';
     const ariaLabel = this.isStackedLayout ? 'tab-insights' : 'insights-title';
+    const availableHints = this.calculateHintAvailability();
     return html`
       <aside
         class="insights"
@@ -463,11 +474,23 @@ export class AppShell extends LitElement {
           .loading=${this.snapshot.hints.isLoading}
           .error=${this.snapshot.hints.error}
           .hotkeysEnabled=${this.hotkeysEnabled}
+          .availableHints=${availableHints}
+          .maxHints=${MAX_HINTS_PER_SESSION}
           @request-hint=${this.forwardHint}
         ></hint-panel>
         ${this.renderConflictResolver()}
       </aside>
     `;
+  }
+
+  private calculateHintAvailability() {
+    const hintsUsed = this.snapshot.scoreboard.hintsUsed;
+    const serverRemaining = this.snapshot.scoreboard.hintsRemaining;
+    const fallback = Math.max(0, MAX_HINTS_PER_SESSION - hintsUsed);
+    if (typeof serverRemaining === 'number') {
+      return Math.max(0, Math.min(serverRemaining, MAX_HINTS_PER_SESSION));
+    }
+    return fallback;
   }
 
   private renderConflictResolver() {
@@ -817,6 +840,40 @@ export class AppShell extends LitElement {
 
   private handleSync = () => {
     lessonStore.flushOfflineQueue();
+  };
+
+  private shouldShowResults() {
+    return (
+      this.snapshot.timer.status === 'expired' &&
+      this.snapshot.scoreboard.attempts > 0 &&
+      Boolean(this.snapshot.activeSession)
+    );
+  }
+
+  private handleRetryLesson = () => {
+    const lessonId = this.snapshot.activeSession?.taskId ?? this.snapshot.lessons[0]?.id;
+    if (lessonId) {
+      lessonStore.startSession(lessonId);
+      this.activePanel = 'player';
+    }
+  };
+
+  private handleReturnToCatalog = () => {
+    this.activePanel = 'sidebar';
+  };
+
+  private handleNextLevel = () => {
+    const currentId = this.snapshot.activeSession?.taskId;
+    const lessons = this.snapshot.lessons;
+    const currentIndex = lessons.findIndex((lesson) => lesson.id === currentId);
+    const nextLesson = lessons
+      .slice(currentIndex + 1)
+      .find((lesson) => lesson.status !== 'locked');
+    const lessonToStart = nextLesson ?? lessons[0];
+    if (lessonToStart) {
+      lessonStore.startSession(lessonToStart.id);
+      this.activePanel = 'player';
+    }
   };
 
   private handleSwUpdate = (event: CustomEvent<() => void>) => {

@@ -16,6 +16,9 @@ const baseData: ScoreState = {
   longestStreak: 5,
   hintsUsed: 2,
   hintsRemaining: 1,
+  lastScoreDelta: 0,
+  lastBonusApplied: false,
+  lastHintPenalty: undefined,
 };
 
 const meta: Meta<ScoreBoardArgs> = {
@@ -48,6 +51,20 @@ export const PerfectRun: Story = {
       longestStreak: 10,
       hintsUsed: 0,
       hintsRemaining: 2,
+      lastScoreDelta: 15,
+      lastBonusApplied: true,
+      lastHintPenalty: undefined,
+    },
+  },
+  render: Template,
+};
+
+export const HintPenalty: Story = {
+  args: {
+    data: {
+      ...baseData,
+      lastScoreDelta: -5,
+      lastHintPenalty: -5,
     },
   },
   render: Template,

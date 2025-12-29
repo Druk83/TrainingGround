@@ -1,4 +1,4 @@
-type FlagKey = 'offlineQueue' | 'analytics' | 'workbox' | 'hotkeys';
+type FlagKey = 'offlineQueue' | 'analytics' | 'workbox' | 'hotkeys' | 'sso';
 
 type FlagMap = Record<FlagKey, boolean>;
 
@@ -7,6 +7,7 @@ const defaultFlags: FlagMap = {
   analytics: true,
   workbox: true,
   hotkeys: false,
+  sso: false,
 };
 
 const globalFlags = (
@@ -36,6 +37,17 @@ const explicitHotkeys = (() => {
   return value.toString().toLowerCase() === 'true';
 })();
 
+const explicitSso = (() => {
+  const value = import.meta.env.VITE_FEATURE_SSO;
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  return value.toString().toLowerCase() === 'true';
+})();
+
 const flags: FlagMap = {
   ...defaultFlags,
   ...(envFlags ?? {}),
@@ -44,6 +56,9 @@ const flags: FlagMap = {
 
 if (typeof explicitHotkeys === 'boolean') {
   flags.hotkeys = explicitHotkeys;
+}
+if (typeof explicitSso === 'boolean') {
+  flags.sso = explicitSso;
 }
 
 export function isFeatureEnabled(key: FlagKey) {

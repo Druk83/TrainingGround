@@ -77,6 +77,39 @@ export class LessonCatalog extends LitElement {
       margin: 0.2rem 0;
     }
 
+    .meta {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.4rem;
+    }
+
+    .meta span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.2rem;
+    }
+
+    .progress-label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .button-text {
+      display: block;
+      margin-top: 0.35rem;
+      font-weight: 600;
+    }
+
+    .percent {
+      font-size: 0.85rem;
+      color: var(--primary);
+      font-weight: 600;
+    }
+
     progress {
       width: 100%;
       appearance: none;
@@ -122,7 +155,10 @@ export class LessonCatalog extends LitElement {
           aria-pressed=${active}
           @click=${() => this.handleSelect(lesson.id)}
         >
-          <span class="label">${lesson.difficulty} • ${lesson.durationMinutes} мин</span>
+          <span class="label">
+            ${lesson.difficulty} • ${lesson.durationMinutes} мин • ${lesson.levels}
+            уровней
+          </span>
           <div class="title">${lesson.title}</div>
           <p>${lesson.summary}</p>
           <progress
@@ -130,7 +166,12 @@ export class LessonCatalog extends LitElement {
             value=${lesson.progress}
             aria-label="Прогресс по уроку «${lesson.title}»"
           ></progress>
-          <span>${this.renderLessonStatus(lesson)}</span>
+          <div class="meta">
+            <span>${lesson.levelsCompleted} / ${lesson.levels} уровней</span>
+            <span class="percent">${lesson.percentCorrect}% правильных</span>
+          </div>
+          <span class="progress-label">${this.renderLessonStatus(lesson)}</span>
+          <span class="button-text">${this.renderButtonLabel(lesson)}</span>
         </button>
       </li>
     `;
@@ -147,6 +188,19 @@ export class LessonCatalog extends LitElement {
       default:
         return 'Готов к старту';
     }
+  }
+
+  private renderButtonLabel(lesson: LessonCard) {
+    if (lesson.status === 'locked') {
+      return 'Недоступно';
+    }
+    if (lesson.status === 'active') {
+      return 'Продолжить';
+    }
+    if (lesson.status === 'completed') {
+      return 'Пройти заново';
+    }
+    return 'Начать';
   }
 
   private handleSelect(lessonId: string) {

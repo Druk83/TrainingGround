@@ -2,7 +2,7 @@
 import { esbuildPlugin } from "@web/dev-server-esbuild";
 
 export default {
-  files: ["src/__tests__/**/*.wtr.ts", "tests/components/**/*.wtr.ts"],
+  files: ["tests/components/**/*.wtr.ts"],
   nodeResolve: true,
   concurrentBrowsers: 1,
   browsers: [

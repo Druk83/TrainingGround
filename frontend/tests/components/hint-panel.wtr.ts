@@ -42,4 +42,20 @@ describe('hint-panel', () => {
     element.shadowRoot?.querySelector('button')?.click();
     await eventPromise;
   });
+
+  it('disables request button when hint limit is reached', async () => {
+    const element = await fixture<HintPanel>(html`
+      <hint-panel
+        .availableHints=${0}
+        .maxHints=${2}
+        .hotkeysEnabled=${false}
+      ></hint-panel>
+    `);
+    await element.updateComplete;
+
+    const button = element.shadowRoot?.querySelector('button');
+    expect(button?.hasAttribute('disabled')).to.be.true;
+    const limitMessage = element.shadowRoot?.querySelector('.hint-limit');
+    expect(limitMessage?.textContent).to.include('Лимит подсказок');
+  });
 });

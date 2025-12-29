@@ -9,6 +9,8 @@ type HintPanelArgs = {
   loading: boolean;
   error?: string;
   hotkeysEnabled: boolean;
+  availableHints?: number;
+  maxHints?: number;
 };
 
 const sampleHints: HintEntry[] = [
@@ -47,6 +49,8 @@ const meta: Meta<HintPanelArgs> = {
     explanations: sampleExplanations,
     loading: false,
     hotkeysEnabled: true,
+    availableHints: 1,
+    maxHints: 2,
   },
 };
 
@@ -59,6 +63,8 @@ const Template = ({
   loading,
   error,
   hotkeysEnabled,
+  availableHints,
+  maxHints,
 }: HintPanelArgs) =>
   html`<hint-panel
     .hints=${hints}
@@ -66,6 +72,8 @@ const Template = ({
     .loading=${loading}
     .error=${error}
     .hotkeysEnabled=${hotkeysEnabled}
+    .availableHints=${availableHints}
+    .maxHints=${maxHints}
   ></hint-panel>`;
 
 export const Ready: Story = {
@@ -88,6 +96,19 @@ export const ErrorState: Story = {
     explanations: [],
     loading: false,
     error: 'Лимит подсказок исчерпан',
+    availableHints: 0,
+    maxHints: 2,
+  },
+  render: Template,
+};
+
+export const LimitReached: Story = {
+  args: {
+    hints: [],
+    explanations: [],
+    loading: false,
+    availableHints: 0,
+    maxHints: 2,
   },
   render: Template,
 };
