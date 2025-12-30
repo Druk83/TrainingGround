@@ -17,11 +17,22 @@ import type {
   CreateUserRequest,
   ExportRequestPayload,
   ExportResponsePayload,
+  ExportStatusPayload,
   EmailSettings,
   FeatureFlagRecord,
   FeatureFlagUpdatePayload,
   GroupResponse,
   GroupStatsResponse,
+  NotificationHistoryEntry,
+  NotificationTemplate,
+  CreateNotificationTemplatePayload,
+  SendNotificationPayload,
+  SendNotificationResponse,
+  TeacherStudentDetail,
+  TeacherStudentSummary,
+  TopicAnalyticsEntry,
+  ActivityEntry,
+  RecommendationEntry,
   IncidentWithUser,
   ListIncidentsQuery,
   ListGroupsQuery,
@@ -105,6 +116,7 @@ const ADMIN_BASE = stripTrailingSlash(
         import.meta.env.VITE_ADMIN_URL ??
         `${BACKEND_ORIGIN}/admin`),
 );
+const TEACHER_BASE = stripTrailingSlash(`${API_BASE}/teacher`);
 
 type MongoObjectId = {
   $oid?: string;
@@ -312,6 +324,10 @@ export class ApiClient {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  }
+
+  async getExportStatus(exportId: string) {
+    return this.request<ExportStatusPayload>(`${STATS_BASE}/exports/${exportId}`);
   }
 
   async listAdminTemplates(filters: TemplateFilterParams = {}) {
@@ -713,6 +729,71 @@ export class ApiClient {
       throw new Error(detail?.message ?? `Request failed with ${response.status}`);
     }
     return response.blob();
+  }
+
+  async listTeacherGroups() {
+    return this.request<GroupResponse[]>(`${TEACHER_BASE}/groups`);
+  }
+
+  async listTeacherGroupStudents(groupId: string) {
+    return this.request<TeacherStudentSummary[]>(
+      `${TEACHER_BASE}/groups/${groupId}/students`,
+    );
+  }
+
+  async getTeacherStudentDetail(groupId: string, studentId: string) {
+    return this.request<TeacherStudentDetail>(
+      `${TEACHER_BASE}/groups/${groupId}/students/${studentId}`,
+    );
+  }
+
+  private teacherAnalyticsUrl(path: string, groupId: string) {
+    const params = new URLSearchParams({ groupId });
+    return `${TEACHER_BASE}${path}?${params.toString()}`;
+  }
+
+  async getGroupTopicAnalytics(groupId: string) {
+    return this.request<TopicAnalyticsEntry[]>(
+      this.teacherAnalyticsUrl('/analytics/topics', groupId),
+    );
+  }
+
+  async getGroupActivity(groupId: string) {
+    return this.request<ActivityEntry[]>(
+      this.teacherAnalyticsUrl('/analytics/activity', groupId),
+    );
+  }
+
+  async getGroupRecommendations(groupId: string) {
+    return this.request<RecommendationEntry[]>(
+      this.teacherAnalyticsUrl('/analytics/recommendations', groupId),
+    );
+  }
+
+  async listTeacherNotificationTemplates() {
+    return this.request<NotificationTemplate[]>(
+      `${TEACHER_BASE}/notifications/templates`,
+    );
+  }
+
+  async createTeacherNotificationTemplate(payload: CreateNotificationTemplatePayload) {
+    return this.request<NotificationTemplate>(`${TEACHER_BASE}/notifications/templates`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async sendTeacherNotification(payload: SendNotificationPayload) {
+    return this.request<SendNotificationResponse>(`${TEACHER_BASE}/notifications/send`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async listTeacherNotificationHistory() {
+    return this.request<NotificationHistoryEntry[]>(
+      `${TEACHER_BASE}/notifications/history`,
+    );
   }
 
   async listIncidents(query?: ListIncidentsQuery) {

@@ -103,6 +103,17 @@ export interface MaterializedStat {
   calculated_at: string;
 }
 
+export interface ProgressSummary {
+  id: string;
+  user_id: string;
+  level_id: string;
+  attempts_total: number;
+  correct_count: number;
+  percentage: number;
+  score: number;
+  updated_at: string;
+}
+
 export interface LeaderboardEntry {
   user_id: string;
   score: number;
@@ -129,13 +140,23 @@ export interface ExportRequestPayload {
     from: string;
     to: string;
   };
-  format: 'csv' | 'pdf';
+  format: 'csv' | 'pdf' | 'xlsx';
 }
 
 export interface ExportResponsePayload {
   export_id: string;
   status: string;
   expires_at: string;
+}
+
+export interface ExportStatusPayload {
+  export_id: string;
+  status: 'pending' | 'processing' | 'ready' | 'failed';
+  format: 'csv' | 'pdf' | 'xlsx';
+  expires_at: string;
+  completed_at?: string | null;
+  download_url?: string | null;
+  error?: string | null;
 }
 
 export type AdminTemplateStatus =
@@ -436,6 +457,79 @@ export interface GroupResponse {
   student_count: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface TopicAnalyticsEntry {
+  topic_id: string;
+  topic_name?: string;
+  avg_percentage?: number;
+  total_attempts?: number;
+  total_score?: number;
+}
+
+export interface ActivityEntry {
+  date: string;
+  avg_percentage?: number;
+  total_attempts?: number;
+  total_score?: number;
+}
+
+export interface RecommendationEntry {
+  topic_id: string;
+  topic_name?: string;
+  avg_percentage?: number;
+}
+
+export interface NotificationTemplate {
+  id: string;
+  name: string;
+  subject: string;
+  body: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateNotificationTemplatePayload {
+  name: string;
+  subject: string;
+  body: string;
+}
+
+export interface SendNotificationPayload {
+  group_id: string;
+  template_id: string;
+  student_ids?: string[];
+}
+
+export interface SendNotificationResponse {
+  sent: number;
+  email_disabled: boolean;
+}
+
+export interface NotificationHistoryEntry {
+  id: string;
+  template_id: string;
+  template_name?: string | null;
+  subject: string;
+  sent_at: string;
+  recipientsCount: number;
+  status: string;
+}
+
+export interface TeacherStudentSummary {
+  id: string;
+  name: string;
+  email: string;
+  accuracy: number | null;
+  total_attempts: number | null;
+  total_score: number | null;
+  last_progress_at: string | null;
+  last_login_at: string | null;
+}
+
+export interface TeacherStudentDetail {
+  summary: TeacherStudentSummary;
+  progress: ProgressSummary[];
 }
 
 export interface CreateGroupRequest {

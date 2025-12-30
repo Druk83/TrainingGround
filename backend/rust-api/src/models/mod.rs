@@ -52,6 +52,7 @@ pub mod backup;
 pub mod content;
 pub mod group;
 pub mod hint;
+pub mod notification;
 pub mod refresh_token;
 pub mod reporting;
 pub mod system_metrics;

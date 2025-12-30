@@ -144,6 +144,54 @@ pub(crate) async fn request_group_export(
     }))
 }
 
+pub(crate) async fn get_export_status(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(export_id): Path<String>,
+) -> Result<Json<ExportStatusResponse>, ApiError> {
+    let export_obj = parse_object_id(&export_id, "export_id")?;
+    let service = ReportingService::new(state.mongo.clone(), state.redis.clone());
+    let export = service
+        .get_export_by_id(&export_obj)
+        .await?
+        .ok_or_else(|| ApiError::not_found("Export not found"))?;
+
+    if claims.role != "admin" {
+        let teacher_obj = parse_object_id(&claims.sub, "teacher_id")?;
+        if export.teacher_id != teacher_obj {
+            return Err(ApiError::forbidden("Export not found"));
+        }
+    }
+
+    let mut download_url = None;
+    if export.status == ExportStatus::Ready {
+        if let Some(key) = &export.storage_key {
+            if let Some(storage) = state.object_storage.as_ref() {
+                download_url = Some(
+                    storage
+                        .generate_presigned_download_url(
+                            key,
+                            state.config.reporting.signed_url_ttl(),
+                        )
+                        .map_err(|err| {
+                            ApiError::internal(format!("Failed to sign download URL: {}", err))
+                        })?,
+                );
+            }
+        }
+    }
+
+    Ok(Json(ExportStatusResponse {
+        export_id: export.id.to_hex(),
+        status: export.status,
+        format: export.format,
+        expires_at: export.expires_at,
+        completed_at: export.completed_at,
+        download_url,
+        error: export.error,
+    }))
+}
+
 #[derive(Debug, Serialize)]
 pub(crate) struct GroupStatsResponse {
     group_id: String,
@@ -170,6 +218,17 @@ pub(crate) struct ExportResponse {
     expires_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Serialize)]
+pub(crate) struct ExportStatusResponse {
+    export_id: String,
+    status: ExportStatus,
+    format: ExportFormat,
+    expires_at: DateTime<Utc>,
+    completed_at: Option<DateTime<Utc>>,
+    download_url: Option<String>,
+    error: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct ExportRequest {
     #[serde(default)]
@@ -189,6 +248,7 @@ pub(crate) struct TimeRangeRequest {
 enum ExportFormatRequest {
     Csv,
     Pdf,
+    Xlsx,
 }
 
 impl From<ExportFormatRequest> for ExportFormat {
@@ -196,6 +256,7 @@ impl From<ExportFormatRequest> for ExportFormat {
         match value {
             ExportFormatRequest::Csv => ExportFormat::Csv,
             ExportFormatRequest::Pdf => ExportFormat::Pdf,
+            ExportFormatRequest::Xlsx => ExportFormat::Xlsx,
         }
     }
 }

@@ -122,6 +122,14 @@ lazy_static! {
         &["format"]
     )
     .unwrap();
+
+    pub static ref EXPORT_DURATION_SECONDS: HistogramVec = register_histogram_vec!(
+        "export_duration_seconds",
+        "Export generation duration in seconds",
+        &["format"],
+        vec![0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 20.0]
+    )
+    .unwrap();
 }
 
 /// Renders all metrics in Prometheus text format

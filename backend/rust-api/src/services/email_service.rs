@@ -65,6 +65,41 @@ impl EmailService {
         Ok(())
     }
 
+    pub async fn send_notification_email(
+        &self,
+        recipient_email: &str,
+        recipient_name: &str,
+        subject: &str,
+        body: &str,
+    ) -> Result<()> {
+        let settings = self
+            .load_email_settings()
+            .await?
+            .ok_or_else(|| anyhow!("Email settings are not configured"))?;
+
+        let from_address: Mailbox = format!("{} <{}>", settings.from_name, settings.from_email)
+            .parse()
+            .context("Invalid from email address")?;
+        let to_address: Mailbox = format!("{} <{}>", recipient_name, recipient_email)
+            .parse()
+            .context("Invalid recipient email address")?;
+
+        let email = Message::builder()
+            .from(from_address)
+            .to(to_address)
+            .subject(subject)
+            .body(body.to_string())
+            .context("Failed to build notification email")?;
+
+        let mailer = self.build_mailer(&settings)?;
+        mailer
+            .send(email)
+            .await
+            .context("Failed to send notification email")?;
+
+        Ok(())
+    }
+
     async fn load_email_settings(&self) -> Result<Option<EmailSettings>> {
         let settings_service = SystemSettingsService::new(self.mongo.clone());
         settings_service.get_email_settings().await

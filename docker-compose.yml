@@ -148,6 +148,7 @@ services:
       VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
       # В production использовать реальное хранилище (Consul, etcd, PostgreSQL)
       VAULT_LOCAL_CONFIG: '{"backend": {"file": {"path": "/vault/file"}}, "default_lease_ttl": "168h", "max_lease_ttl": "720h", "ui": true}'
+      VAULT_ADDR: http://127.0.0.1:8200
     cap_add:
       - IPC_LOCK
     volumes:

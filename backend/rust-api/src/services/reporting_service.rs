@@ -4,7 +4,7 @@ use anyhow::{anyhow, Context, Result};
 use chrono::{Duration as ChronoDuration, Utc};
 use futures::TryStreamExt;
 use mongodb::{
-    bson::{doc, oid::ObjectId, to_bson, Bson, Document},
+    bson::{doc, from_document, oid::ObjectId, to_bson, Bson, Document},
     Collection, Database,
 };
 use redis::aio::ConnectionManager;
@@ -21,10 +21,17 @@ use crate::{
         ProgressSummary,
     },
 };
+use serde::Deserialize;
 
 pub struct ReportingService {
     mongo: Database,
     redis: ConnectionManager,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExpiredExport {
+    pub id: ObjectId,
+    pub storage_key: Option<String>,
 }
 
 impl ReportingService {
@@ -352,4 +359,241 @@ impl ReportingService {
             .context("Failed to update expired exports")?;
         Ok(result.modified_count)
     }
+
+    pub async fn mark_expired_exports(&self) -> Result<Vec<ExpiredExport>> {
+        let collection = self.mongo.collection::<ReportExport>("report_exports");
+        let now = chrono_to_bson(Utc::now());
+        let active_statuses = vec![
+            to_bson(&ExportStatus::Pending)?,
+            to_bson(&ExportStatus::Processing)?,
+            to_bson(&ExportStatus::Ready)?,
+        ];
+        let filter = doc! {
+            "expiresAt": { "$lt": now },
+            "status": { "$in": active_statuses },
+        };
+
+        let mut cursor = collection
+            .find(filter.clone())
+            .await
+            .context("Failed to find expired exports")?;
+
+        let mut expired = Vec::new();
+        while let Some(export) = cursor
+            .try_next()
+            .await
+            .context("Expired exports cursor failure")?
+        {
+            expired.push(ExpiredExport {
+                id: export.id,
+                storage_key: export.storage_key,
+            });
+        }
+
+        if expired.is_empty() {
+            return Ok(expired);
+        }
+
+        let ids = expired.iter().map(|entry| entry.id).collect::<Vec<_>>();
+        collection
+            .update_many(
+                doc! { "_id": { "$in": &ids } },
+                doc! {
+                    "$set": {
+                        "status": to_bson(&ExportStatus::Failed)?,
+                        "error": "Expired by retention policy",
+                        "completedAt": now
+                    }
+                },
+            )
+            .await
+            .context("Failed to mark expired exports")?;
+
+        Ok(expired)
+    }
+
+    pub async fn aggregate_topic_stats(
+        &self,
+        student_ids: &[String],
+    ) -> Result<Vec<TopicAnalyticsRow>> {
+        if student_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let collection = self.mongo.collection::<Document>("progress_summary");
+        let pipeline = vec![
+            doc! {
+                "$match": {
+                    "user_id": { "$in": student_ids },
+                }
+            },
+            doc! {
+                "$lookup": {
+                    "from": "levels",
+                    "localField": "level_id",
+                    "foreignField": "_id",
+                    "as": "level"
+                }
+            },
+            doc! {
+                "$unwind": "$level"
+            },
+            doc! {
+                "$group": {
+                    "_id": "$level.topic_id",
+                    "topic_name": { "$first": "$level.topic" },
+                    "avg_percentage": { "$avg": "$percentage" },
+                    "total_attempts": { "$sum": "$attempts_total" },
+                    "total_score": { "$sum": "$score" }
+                }
+            },
+            doc! {
+                "$lookup": {
+                    "from": "topics",
+                    "localField": "_id",
+                    "foreignField": "_id",
+                    "as": "topic"
+                }
+            },
+            doc! {
+                "$unwind": {
+                    "path": "$topic",
+                    "preserveNullAndEmptyArrays": true
+                }
+            },
+            doc! {
+                "$addFields": {
+                    "topic_name": { "$ifNull": [ "$topic.name", "$topic_name" ] }
+                }
+            },
+            doc! {
+                "$project": {
+                    "topic_id": "$_id",
+                    "topic_name": 1,
+                    "avg_percentage": 1,
+                    "total_attempts": 1,
+                    "total_score": 1
+                }
+            },
+            doc! {
+                "$sort": { "avg_percentage": 1 }
+            },
+        ];
+
+        let mut cursor = collection
+            .aggregate(pipeline)
+            .await
+            .context("Failed to aggregate topic stats")?;
+
+        let mut results = Vec::new();
+        while let Some(doc) = cursor
+            .try_next()
+            .await
+            .map_err(|e| anyhow!("Topic analytics cursor failure: {}", e))?
+        {
+            let row: TopicAnalyticsRow =
+                from_document(doc).context("Failed to parse topic analytics row")?;
+            results.push(row);
+        }
+
+        Ok(results)
+    }
+
+    pub async fn aggregate_activity(&self, student_ids: &[String]) -> Result<Vec<ActivityRow>> {
+        if student_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let collection = self.mongo.collection::<Document>("progress_summary");
+        let pipeline = vec![
+            doc! {
+                "$match": {
+                    "user_id": { "$in": student_ids },
+                    "updated_at": { "$exists": true }
+                }
+            },
+            doc! {
+                "$project": {
+                    "date": {
+                        "$dateToString": {
+                            "format": "%Y-%m-%d",
+                            "date": "$updated_at"
+                        }
+                    },
+                    "percentage": "$percentage",
+                    "attempts_total": "$attempts_total",
+                    "score": "$score"
+                }
+            },
+            doc! {
+                "$group": {
+                    "_id": "$date",
+                    "avg_percentage": { "$avg": "$percentage" },
+                    "total_attempts": { "$sum": "$attempts_total" },
+                    "total_score": { "$sum": "$score" }
+                }
+            },
+            doc! { "$sort": { "_id": 1 } },
+            doc! {
+                "$project": {
+                    "date": "$_id",
+                    "avg_percentage": 1,
+                    "total_attempts": 1,
+                    "total_score": 1
+                }
+            },
+        ];
+
+        let mut cursor = collection
+            .aggregate(pipeline)
+            .await
+            .context("Failed to aggregate activity")?;
+
+        let mut results = Vec::new();
+        while let Some(doc) = cursor
+            .try_next()
+            .await
+            .map_err(|e| anyhow!("Activity cursor failure: {}", e))?
+        {
+            let row: ActivityRow = from_document(doc).context("Failed to parse activity row")?;
+            results.push(row);
+        }
+
+        Ok(results)
+    }
+
+    pub async fn aggregate_recommendations(
+        &self,
+        student_ids: &[String],
+    ) -> Result<Vec<TopicAnalyticsRow>> {
+        let mut rows = self.aggregate_topic_stats(student_ids).await?;
+        rows.sort_by(|a, b| {
+            a.avg_percentage
+                .partial_cmp(&b.avg_percentage)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        Ok(rows
+            .into_iter()
+            .filter(|row| row.avg_percentage.unwrap_or(1.0) < 0.75)
+            .take(3)
+            .collect())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TopicAnalyticsRow {
+    #[serde(rename = "topic_id")]
+    pub topic_id: ObjectId,
+    pub topic_name: Option<String>,
+    pub avg_percentage: Option<f64>,
+    pub total_attempts: Option<i64>,
+    pub total_score: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ActivityRow {
+    #[serde(rename = "date")]
+    pub date: String,
+    pub avg_percentage: Option<f64>,
+    pub total_attempts: Option<i64>,
+    pub total_score: Option<i64>,
 }

@@ -76,6 +76,15 @@ pub fn create_router(app_state: std::sync::Arc<services::AppState>) -> Router {
                 )),
         )
         .nest(
+            "/api/v1/teacher",
+            teacher_routes()
+                .layer(middleware::from_fn(middlewares::csrf::csrf_middleware))
+                .layer(middleware::from_fn_with_state(
+                    app_state.clone(),
+                    middlewares::auth::auth_middleware,
+                )),
+        )
+        .nest(
             "/admin",
             admin_routes(app_state.clone())
                 .layer(middleware::from_fn(middlewares::csrf::csrf_middleware))
@@ -110,6 +119,45 @@ fn reporting_routes() -> Router<std::sync::Arc<services::AppState>> {
         .route(
             "/groups/{id}/export",
             post(handlers::reporting::request_group_export),
+        )
+        .route("/exports/{id}", get(handlers::reporting::get_export_status))
+}
+
+fn teacher_routes() -> Router<std::sync::Arc<services::AppState>> {
+    Router::new()
+        .route("/groups", get(handlers::teacher::list_teacher_groups))
+        .route(
+            "/groups/{group_id}/students",
+            get(handlers::teacher::list_group_students),
+        )
+        .route(
+            "/groups/{group_id}/students/{student_id}",
+            get(handlers::teacher::get_student_detail),
+        )
+        .route(
+            "/analytics/topics",
+            get(handlers::teacher::list_group_topic_analytics),
+        )
+        .route(
+            "/analytics/activity",
+            get(handlers::teacher::get_group_activity),
+        )
+        .route(
+            "/analytics/recommendations",
+            get(handlers::teacher::get_recommendations),
+        )
+        .route(
+            "/notifications/templates",
+            get(handlers::teacher::list_notification_templates)
+                .post(handlers::teacher::create_notification_template),
+        )
+        .route(
+            "/notifications/send",
+            post(handlers::teacher::send_group_notification),
+        )
+        .route(
+            "/notifications/history",
+            get(handlers::teacher::list_notification_history),
         )
 }
 

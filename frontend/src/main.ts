@@ -43,6 +43,10 @@ const isRegister = pathname.startsWith('/register');
 const isForbidden = pathname.startsWith('/forbidden') || pathname.startsWith('/403');
 const isProfile = pathname.startsWith('/profile');
 const isTeacherDashboard = pathname.startsWith('/teacher-dashboard');
+const isTeacherStudentsList = pathname === '/teacher/students';
+const isTeacherStudentDetail =
+  pathname.startsWith('/teacher/students/') && pathname.split('/').length >= 4;
+const isTeacherNotifications = pathname.startsWith('/teacher/notifications');
 const isUsersManagement = pathname.startsWith('/admin/users');
 const isGroupsManagement = pathname.startsWith('/admin/groups');
 const isSystemSettings = pathname.startsWith('/admin/settings');
@@ -67,7 +71,8 @@ const isAdminConsole = pathname.startsWith('/admin-console') || pathname === '/a
     !isAnticheat &&
     !isAuditLogs &&
     !isSystemSettings &&
-    !isTeacherDashboard;
+    !isTeacherDashboard &&
+    !isTeacherNotifications;
 
   if (appShell) {
     if (isStudentHome) {
@@ -146,6 +151,36 @@ const isAdminConsole = pathname.startsWith('/admin-console') || pathname === '/a
 
     import('./pages/admin-console').then(() => {
       document.body.appendChild(document.createElement('admin-console'));
+    });
+  } else if (isTeacherStudentDetail) {
+    if (!requireAuth()) return;
+    if (!requireRole(['teacher', 'admin'])) return;
+
+    import('./pages/teacher-student-detail').then(() => {
+      const wrapper = document.createElement('div');
+      wrapper.style.minHeight = '100vh';
+      document.body.appendChild(wrapper);
+      wrapper.appendChild(document.createElement('teacher-student-detail'));
+    });
+  } else if (isTeacherStudentsList) {
+    if (!requireAuth()) return;
+    if (!requireRole(['teacher', 'admin'])) return;
+
+    import('./pages/teacher-students').then(() => {
+      const wrapper = document.createElement('div');
+      wrapper.style.minHeight = '100vh';
+      document.body.appendChild(wrapper);
+      wrapper.appendChild(document.createElement('teacher-students'));
+    });
+  } else if (isTeacherNotifications) {
+    if (!requireAuth()) return;
+    if (!requireRole(['teacher', 'admin'])) return;
+
+    import('./pages/teacher-notifications').then(() => {
+      const wrapper = document.createElement('div');
+      wrapper.style.minHeight = '100vh';
+      document.body.appendChild(wrapper);
+      wrapper.appendChild(document.createElement('teacher-notifications'));
     });
   } else if (isTeacherDashboard) {
     if (!requireAuth()) return;

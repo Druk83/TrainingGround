@@ -158,3 +158,4 @@ pub mod auth;
 pub mod reporting;
 pub mod sessions;
 pub mod sse;
+pub mod teacher;

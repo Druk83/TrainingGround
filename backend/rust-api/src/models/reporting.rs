@@ -136,7 +136,7 @@ impl NewReportExport {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ExportStatus {
     Pending,
@@ -151,11 +151,32 @@ impl ExportStatus {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ExportFormat {
     Csv,
     Pdf,
+    Xlsx,
+}
+
+impl ExportFormat {
+    pub fn as_label(&self) -> &'static str {
+        match self {
+            ExportFormat::Csv => "CSV",
+            ExportFormat::Pdf => "PDF",
+            ExportFormat::Xlsx => "XLSX",
+        }
+    }
+
+    pub fn as_mime(&self) -> &'static str {
+        match self {
+            ExportFormat::Csv => "text/csv",
+            ExportFormat::Pdf => "application/pdf",
+            ExportFormat::Xlsx => {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

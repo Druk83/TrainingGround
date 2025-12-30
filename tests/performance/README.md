@@ -155,3 +155,23 @@ k6 run tests\performance\sse.js
 ### Повторный запуск без очистки
 
 По умолчанию скрипт удаляет старые результаты (переменная `CLEAN=1`). Чтобы сохранить артефакты, перед запуском установите `set CLEAN=0`.
+
+## Проверка SLA для экспортов
+
+Экспорт воркер записывает гистограмму `export_duration_seconds{format="csv"}` (Prometheus). Чтобы убедиться, что отчёты генерируются быстрее 10 секунд:
+
+1. Сгенерируйте хотя бы один отчёт каждого формата (например, через `/teacher-dashboard` → «Экспорт»).
+2. Убедитесь, что endpoint метрик доступен (`curl http://localhost:8081/metrics | grep export_duration_seconds`).
+3. Запустите скрипт:
+   ```bash
+   python tests/performance/check_export_sla.py
+   ```
+   При необходимости можно переопределить параметры:
+   ```bash
+   EXPORT_METRICS_URL=http://localhost:8081/metrics \
+   EXPORT_METRICS_AUTH=metrics:changeme \
+   EXPORT_SLA_SECONDS=10 \
+   python tests/performance/check_export_sla.py
+   ```
+   Где `EXPORT_METRICS_AUTH` — строка `username:password` для basic‑auth на `/metrics` (по умолчанию `METRICS_AUTH` в backend).
+4. Скрипт сравнит общее число export‑сэмплов с содержимым корзины `le="10"` и сообщит о нарушениях. Если хотя бы один отчёт превысил 10 секунд, выходной код будет 2, а в логах (`rust-api`) появится предупреждение `export generation exceeded SLA`.

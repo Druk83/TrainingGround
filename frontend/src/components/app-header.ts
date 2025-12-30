@@ -422,6 +422,16 @@ export class AppHeader extends LitElement {
         href: '/teacher-dashboard',
         active: currentPath.startsWith('/teacher-dashboard'),
       });
+      items.push({
+        label: 'Ученики',
+        href: '/teacher/students',
+        active: currentPath.startsWith('/teacher/students'),
+      });
+      items.push({
+        label: 'Уведомления',
+        href: '/teacher/notifications',
+        active: currentPath.startsWith('/teacher/notifications'),
+      });
     } else if (role === 'content_admin') {
       // Content admin navigation
       items.push({

@@ -136,6 +136,72 @@ impl ObjectStorageClient {
         Ok(())
     }
 
+    pub async fn delete_object(&self, key: &str) -> Result<()> {
+        let object_key = self.full_key(key);
+        let canonical_uri = self.canonical_uri(&object_key);
+
+        let payload_hash = hex::encode(Sha256::digest([]));
+        let now = Utc::now();
+        let amz_date = now.format("%Y%m%dT%H%M%SZ").to_string();
+        let date_stamp = now.format("%Y%m%d").to_string();
+        let scope = format!("{}/{}/s3/aws4_request", date_stamp, self.region);
+
+        let host = self
+            .endpoint
+            .host_str()
+            .ok_or_else(|| anyhow!("Object storage endpoint missing host"))?
+            .to_lowercase();
+
+        let canonical_headers = format!(
+            "host:{}\nx-amz-content-sha256:{}\nx-amz-date:{}\n",
+            host, payload_hash, amz_date
+        );
+        let signed_headers = "host;x-amz-content-sha256;x-amz-date";
+
+        let canonical_request = format!(
+            "DELETE\n{}\n\n{}\n{}\n{}",
+            canonical_uri, canonical_headers, signed_headers, payload_hash
+        );
+
+        let hashed_canonical_request = hex::encode(Sha256::digest(canonical_request.as_bytes()));
+        let string_to_sign = format!(
+            "AWS4-HMAC-SHA256\n{}\n{}\n{}",
+            amz_date, scope, hashed_canonical_request
+        );
+
+        let signing_key = derive_signing_key(&self.secret_key, &date_stamp, &self.region, "s3");
+        let signature = hex::encode(hmac_sign(&signing_key, string_to_sign.as_bytes()));
+
+        let authorization = format!(
+            "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}",
+            self.access_key, scope, signed_headers, signature
+        );
+
+        let mut delete_url = self.endpoint.clone();
+        delete_url.set_path(&format!(
+            "{}/{}",
+            self.bucket,
+            object_key
+                .split('/')
+                .map(|segment| utf8_percent_encode(segment, AWS_URI_ENCODE_SET).to_string())
+                .collect::<Vec<_>>()
+                .join("/")
+        ));
+
+        Client::new()
+            .delete(delete_url)
+            .header("Authorization", authorization)
+            .header("x-amz-date", amz_date)
+            .header("x-amz-content-sha256", payload_hash)
+            .send()
+            .await
+            .with_context(|| format!("Failed to delete object {}", object_key))?
+            .error_for_status()
+            .context("Object storage delete returned error status")?;
+
+        Ok(())
+    }
+
     pub fn build_export_key(&self, group_id: &str, export_id: &str, extension: &str) -> String {
         let timestamp = Utc::now().format("%Y%m%dT%H%M%S");
         let ext = extension.trim_start_matches('.');
