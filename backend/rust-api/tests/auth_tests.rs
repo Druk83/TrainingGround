@@ -110,6 +110,38 @@ fn extract_refresh_token_cookie(cookies: &[String]) -> Option<String> {
     None
 }
 
+async fn fetch_csrf_token(app: &axum::Router) -> (String, String) {
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/v1/auth/csrf-token")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let csrf_cookie = response
+        .headers()
+        .get_all("set-cookie")
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .find(|c| c.starts_with("csrf_token="))
+        .and_then(|header| header.split(';').next())
+        .and_then(|pair| pair.split('=').nth(1))
+        .unwrap_or("")
+        .to_string();
+
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_str = String::from_utf8(body.to_vec()).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
+    let csrf_token = json["csrf_token"].as_str().unwrap().to_string();
+
+    (csrf_token, csrf_cookie)
+}
+
 #[tokio::test]
 async fn test_register_success() {
     let app = common::create_test_app().await;
@@ -323,10 +355,18 @@ async fn test_logout() {
     let password = "SecurePassword123!";
 
     // Register and login
-    let (_, body, _) = register_user(&app, &email, password, "Logout Test").await;
+    let (_, body, cookies) = register_user(&app, &email, password, "Logout Test").await;
     let access_token = extract_access_token(&body).expect("access_token not found");
+    let refresh_cookie = cookies
+        .iter()
+        .find(|c| c.starts_with("refresh_token="))
+        .and_then(|c| c.split(';').next())
+        .map(|v| v.to_string())
+        .expect("refresh_token cookie missing");
 
     // Logout
+    let (csrf_token, csrf_cookie) = fetch_csrf_token(&app).await;
+    let cookie_header = format!("csrf_token={}; {}", csrf_cookie, refresh_cookie);
     let response = app
         .clone()
         .oneshot(
@@ -334,6 +374,8 @@ async fn test_logout() {
                 .method("POST")
                 .uri("/api/v1/auth/logout")
                 .header(header::AUTHORIZATION, format!("Bearer {}", access_token))
+                .header("x-csrf-token", &csrf_token)
+                .header(header::COOKIE, cookie_header)
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -348,7 +390,7 @@ async fn test_logout() {
         .filter_map(|v| v.to_str().ok().map(|s| s.to_string()))
         .collect();
 
-    assert_eq!(status, StatusCode::OK);
+    assert_eq!(status, StatusCode::NO_CONTENT);
 
     // Verify refresh_token cookie is cleared (max-age=0)
     let cookie_cleared = cookies

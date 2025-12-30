@@ -279,10 +279,14 @@ select:disabled {
   position: absolute;
   top: -40px;
   left: 0;
-  background: var(--primary);
-  color: white;
-  padding: var(--spacing-sm) var(--spacing-md);
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--spacing-md);
+  background: #0b1120;
+  color: #f8fafc;
   text-decoration: none;
+  border: 2px solid var(--focus-ring);
   border-radius: var(--radius-md);
   z-index: 9999;
   transition: top 0.2s ease;
@@ -290,6 +294,8 @@ select:disabled {
 
 .skip-link:focus {
   top: var(--spacing-sm);
+  background: #f8fafc;
+  color: #0b1120;
   outline: var(--focus-ring-width) solid var(--focus-ring);
   outline-offset: var(--focus-ring-offset);
 }

@@ -9,10 +9,11 @@ use uuid::Uuid;
 mod common;
 
 /// Helper: создать admin пользователя и получить токен
-async fn create_admin_with_token(app: &axum::Router) -> (String, String) {
-    // Регистрируем пользователя
+async fn create_admin_with_token(app: &axum::Router) -> (String, String, String) {
+    // Регистрируем пользователя с уникальным email, чтобы тесты не конфликтовали
+    let email = format!("admin-{}@test.com", Uuid::new_v4());
     let register_body = json!({
-        "email": "admin@test.com",
+        "email": email.clone(),
         "password": "Admin123!@#",
         "name": "Admin User",
     });
@@ -35,7 +36,6 @@ async fn create_admin_with_token(app: &axum::Router) -> (String, String) {
     let response_json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
     let user_id = response_json["user"]["id"].as_str().unwrap().to_string();
 
-    // Обновляем роль пользователя на admin через MongoDB
     let config = trainingground_api::config::Config::load().unwrap();
     let mongo_client = mongodb::Client::with_uri_str(&config.mongo_uri)
         .await
@@ -53,7 +53,7 @@ async fn create_admin_with_token(app: &axum::Router) -> (String, String) {
 
     // Логинимся заново чтобы получить токен с ролью admin
     let login_body = json!({
-        "email": "admin@test.com",
+        "email": email,
         "password": "Admin123!@#",
     });
 
@@ -75,7 +75,7 @@ async fn create_admin_with_token(app: &axum::Router) -> (String, String) {
     let response_json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
     let access_token = response_json["access_token"].as_str().unwrap().to_string();
 
-    (user_id, access_token)
+    (user_id, access_token, email)
 }
 
 async fn create_student_token(app: &axum::Router) -> String {
@@ -171,8 +171,9 @@ async fn admin_create_user(
     admin_token: &str,
     csrf_token: &str,
     csrf_cookie: &str,
+    email_override: Option<String>,
 ) -> TestUser {
-    let email = format!("bulk-user-{}@test.com", Uuid::new_v4());
+    let email = email_override.unwrap_or_else(|| format!("bulk-user-{}@test.com", Uuid::new_v4()));
     let create_user_body = json!({
         "email": email,
         "password": "Bulk123!@#",
@@ -241,7 +242,7 @@ async fn admin_create_group(
 #[tokio::test]
 async fn test_create_user_as_admin() {
     let app = common::create_test_app().await;
-    let (_admin_id, admin_token) = create_admin_with_token(&app).await;
+    let (_admin_id, admin_token, _) = create_admin_with_token(&app).await;
     let (csrf_token, csrf_cookie) = get_csrf_token(&app).await;
 
     let create_user_body = json!({
@@ -340,11 +341,11 @@ async fn test_create_user_without_admin_role_forbidden() {
 #[tokio::test]
 async fn test_bulk_assign_groups() {
     let app = common::create_test_app().await;
-    let (_admin_id, admin_token) = create_admin_with_token(&app).await;
+    let (_admin_id, admin_token, _) = create_admin_with_token(&app).await;
     let (csrf_token, csrf_cookie) = get_csrf_token(&app).await;
 
-    let user1 = admin_create_user(&app, &admin_token, &csrf_token, &csrf_cookie).await;
-    let user2 = admin_create_user(&app, &admin_token, &csrf_token, &csrf_cookie).await;
+    let user1 = admin_create_user(&app, &admin_token, &csrf_token, &csrf_cookie, None).await;
+    let user2 = admin_create_user(&app, &admin_token, &csrf_token, &csrf_cookie, None).await;
     let group_id = admin_create_group(&app, &admin_token, &csrf_token, &csrf_cookie).await;
 
     let bulk_body = json!({
@@ -404,10 +405,10 @@ async fn test_bulk_assign_groups() {
 async fn test_reset_password_endpoint_returns_temp_password_when_email_disabled() {
     std::env::set_var("EMAIL_SEND_DISABLED", "1");
     let app = common::create_test_app().await;
-    let (_admin_id, admin_token) = create_admin_with_token(&app).await;
+    let (_admin_id, admin_token, _) = create_admin_with_token(&app).await;
     let (csrf_token, csrf_cookie) = get_csrf_token(&app).await;
 
-    let created_user = admin_create_user(&app, &admin_token, &csrf_token, &csrf_cookie).await;
+    let created_user = admin_create_user(&app, &admin_token, &csrf_token, &csrf_cookie, None).await;
 
     let response = app
         .clone()
@@ -457,11 +458,11 @@ async fn test_reset_password_endpoint_returns_temp_password_when_email_disabled(
 #[tokio::test]
 async fn test_bulk_block_users() {
     let app = common::create_test_app().await;
-    let (_admin_id, admin_token) = create_admin_with_token(&app).await;
+    let (_admin_id, admin_token, _) = create_admin_with_token(&app).await;
     let (csrf_token, csrf_cookie) = get_csrf_token(&app).await;
 
-    let user1 = admin_create_user(&app, &admin_token, &csrf_token, &csrf_cookie).await;
-    let user2 = admin_create_user(&app, &admin_token, &csrf_token, &csrf_cookie).await;
+    let user1 = admin_create_user(&app, &admin_token, &csrf_token, &csrf_cookie, None).await;
+    let user2 = admin_create_user(&app, &admin_token, &csrf_token, &csrf_cookie, None).await;
 
     let bulk_body = json!({
         "user_ids": [user1.id.clone(), user2.id.clone()],
@@ -521,7 +522,7 @@ async fn test_bulk_block_users() {
 #[tokio::test]
 async fn test_list_users() {
     let app = common::create_test_app().await;
-    let (_admin_id, admin_token) = create_admin_with_token(&app).await;
+    let (_admin_id, admin_token, _) = create_admin_with_token(&app).await;
 
     let response = app
         .clone()
@@ -556,7 +557,7 @@ async fn test_list_users() {
 #[tokio::test]
 async fn test_get_user_by_id() {
     let app = common::create_test_app().await;
-    let (admin_id, admin_token) = create_admin_with_token(&app).await;
+    let (admin_id, admin_token, admin_email) = create_admin_with_token(&app).await;
 
     let response = app
         .clone()
@@ -578,14 +579,14 @@ async fn test_get_user_by_id() {
     let response_json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
 
     assert_eq!(response_json["id"], admin_id);
-    assert_eq!(response_json["email"], "admin@test.com");
+    assert_eq!(response_json["email"], admin_email);
     assert_eq!(response_json["role"], "admin");
 }
 
 #[tokio::test]
 async fn test_update_user() {
     let app = common::create_test_app().await;
-    let (_admin_id, admin_token) = create_admin_with_token(&app).await;
+    let (_admin_id, admin_token, _) = create_admin_with_token(&app).await;
     let (csrf_token, csrf_cookie) = get_csrf_token(&app).await;
 
     // Создаем пользователя
@@ -653,7 +654,7 @@ async fn test_update_user() {
 #[tokio::test]
 async fn test_block_and_unblock_user() {
     let app = common::create_test_app().await;
-    let (_admin_id, admin_token) = create_admin_with_token(&app).await;
+    let (_admin_id, admin_token, _) = create_admin_with_token(&app).await;
     let (csrf_token, csrf_cookie) = get_csrf_token(&app).await;
 
     // Создаем пользователя
@@ -749,7 +750,7 @@ async fn test_block_and_unblock_user() {
 #[tokio::test]
 async fn test_delete_user() {
     let app = common::create_test_app().await;
-    let (_admin_id, admin_token) = create_admin_with_token(&app).await;
+    let (_admin_id, admin_token, _) = create_admin_with_token(&app).await;
     let (csrf_token, csrf_cookie) = get_csrf_token(&app).await;
 
     // Создаем пользователя
@@ -820,7 +821,7 @@ async fn test_delete_user() {
 #[tokio::test]
 async fn test_create_user_with_invalid_email() {
     let app = common::create_test_app().await;
-    let (_admin_id, admin_token) = create_admin_with_token(&app).await;
+    let (_admin_id, admin_token, _) = create_admin_with_token(&app).await;
     let (csrf_token, csrf_cookie) = get_csrf_token(&app).await;
 
     let create_user_body = json!({
@@ -852,7 +853,7 @@ async fn test_create_user_with_invalid_email() {
 #[tokio::test]
 async fn test_create_user_with_short_password() {
     let app = common::create_test_app().await;
-    let (_admin_id, admin_token) = create_admin_with_token(&app).await;
+    let (_admin_id, admin_token, _) = create_admin_with_token(&app).await;
     let (csrf_token, csrf_cookie) = get_csrf_token(&app).await;
 
     let create_user_body = json!({
@@ -905,13 +906,15 @@ async fn test_student_forbidden_from_admin_routes() {
 #[tokio::test]
 async fn test_list_users_with_pagination() {
     let app = common::create_test_app().await;
-    let (_admin_id, admin_token) = create_admin_with_token(&app).await;
+    let (_admin_id, admin_token, _) = create_admin_with_token(&app).await;
     let (csrf_token, csrf_cookie) = get_csrf_token(&app).await;
 
     let mut created = Vec::new();
-    for _ in 0..3 {
+    let email_base = format!("bulk-page-{}", Uuid::new_v4());
+    for idx in 0..3 {
+        let email = format!("{email_base}-{idx}@test.com");
         created.push(
-            admin_create_user(&app, &admin_token, &csrf_token, &csrf_cookie)
+            admin_create_user(&app, &admin_token, &csrf_token, &csrf_cookie, Some(email))
                 .await
                 .id,
         );
@@ -922,7 +925,10 @@ async fn test_list_users_with_pagination() {
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri("/admin/users?limit=2&offset=1")
+                .uri(format!(
+                    "/admin/users?search={}&limit=2&offset=1",
+                    email_base
+                ))
                 .header("authorization", format!("Bearer {}", admin_token))
                 .body(Body::empty())
                 .unwrap(),
@@ -938,7 +944,7 @@ async fn test_list_users_with_pagination() {
         .iter()
         .map(|u| u["id"].as_str().unwrap().to_string())
         .collect();
-    assert!(created.iter().any(|id| returned_ids.contains(id)));
+    assert!(returned_ids.iter().all(|id| created.contains(id)));
 }
 
 async fn seed_bulk_users(admin_id: &str, count: usize) {
@@ -987,7 +993,7 @@ async fn seed_bulk_users(admin_id: &str, count: usize) {
 #[tokio::test]
 async fn test_list_users_handles_large_dataset() {
     let app = common::create_test_app().await;
-    let (admin_id, admin_token) = create_admin_with_token(&app).await;
+    let (admin_id, admin_token, _) = create_admin_with_token(&app).await;
     seed_bulk_users(&admin_id, 1000).await;
 
     let response = app

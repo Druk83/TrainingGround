@@ -360,13 +360,13 @@ export class RulesManagement extends LitElement {
       this.previewHtml = '';
       return;
     }
-    const parsed = marked.parse(value);
+    const parsed: string | Promise<string> = marked.parse(value);
     if (typeof parsed === 'string') {
       this.previewHtml = DOMPurify.sanitize(parsed);
       return;
     }
     this.previewHtml = '';
-    parsed.then((result) => {
+    parsed.then((result: string) => {
       this.previewHtml = DOMPurify.sanitize(result);
     });
   }

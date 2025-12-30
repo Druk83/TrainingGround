@@ -6,7 +6,7 @@ use crate::models::user::{
 use anyhow::{anyhow, Context, Result};
 use bcrypt::{hash, DEFAULT_COST};
 use chrono::{Duration, Utc};
-use mongodb::bson::{doc, oid::ObjectId, Regex};
+use mongodb::bson::{doc, oid::ObjectId, DateTime as BsonDateTime, Regex};
 use mongodb::Database;
 use redis::aio::ConnectionManager;
 
@@ -158,7 +158,7 @@ impl UserManagementService {
         // Построение update document
         let mut update_doc = doc! {
             "$set": {
-                "updatedAt": Utc::now().to_rfc3339(),
+                "updatedAt": BsonDateTime::from_millis(Utc::now().timestamp_millis()),
             }
         };
 
@@ -259,14 +259,15 @@ impl UserManagementService {
             "$set": {
                 "is_blocked": true,
                 "blockReason": &req.reason,
-                "updatedAt": Utc::now().to_rfc3339(),
+                "updatedAt": BsonDateTime::from_millis(Utc::now().timestamp_millis()),
             }
         };
 
         if let Some(until) = blocked_until {
-            update_doc
-                .get_document_mut("$set")?
-                .insert("blockedUntil", until.to_rfc3339());
+            update_doc.get_document_mut("$set")?.insert(
+                "blockedUntil",
+                BsonDateTime::from_millis(until.timestamp_millis()),
+            );
         } else {
             update_doc
                 .get_document_mut("$set")?
@@ -315,7 +316,7 @@ impl UserManagementService {
         let update_doc = doc! {
             "$set": {
                 "is_blocked": false,
-                "updatedAt": Utc::now().to_rfc3339(),
+                "updatedAt": BsonDateTime::from_millis(Utc::now().timestamp_millis()),
             },
             "$unset": {
                 "blockedUntil": "",
@@ -356,7 +357,7 @@ impl UserManagementService {
         let update_doc = doc! {
             "$set": {
                 "password_hash": password_hash,
-                "updatedAt": Utc::now().to_rfc3339(),
+                "updatedAt": BsonDateTime::from_millis(Utc::now().timestamp_millis()),
             }
         };
 
@@ -422,7 +423,7 @@ impl UserManagementService {
         let update_doc = doc! {
             "$set": {
                 "group_ids": group_ids,
-                "updatedAt": Utc::now().to_rfc3339(),
+                "updatedAt": BsonDateTime::from_millis(Utc::now().timestamp_millis()),
             }
         };
 

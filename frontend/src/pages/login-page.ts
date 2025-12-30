@@ -1,10 +1,13 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, css, html, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { authService } from '@/lib/auth-service';
 import { isFeatureEnabled } from '@/lib/feature-flags';
 
 @customElement('login-page')
 export class LoginPage extends LitElement {
+  protected createRenderRoot() {
+    return this;
+  }
   static styles = css`
     :host {
       display: flex;
@@ -122,9 +125,13 @@ export class LoginPage extends LitElement {
       color: #38bdf8;
       text-decoration: underline;
       border: none;
-      padding: 0;
+      padding: 6px 12px;
       font: inherit;
       cursor: pointer;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .link-button:disabled {
@@ -175,6 +182,11 @@ export class LoginPage extends LitElement {
     .links a {
       color: #3b82f6;
       text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 6px 12px;
+      border-radius: var(--radius-md);
     }
 
     .links a:hover {
@@ -203,6 +215,9 @@ export class LoginPage extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    if (!document.title || document.title.trim().length === 0) {
+      document.title = 'TrainingGround — Login';
+    }
     window.addEventListener('online', this.handleOnlineStatus);
     window.addEventListener('offline', this.handleOfflineStatus);
   }
@@ -284,6 +299,9 @@ export class LoginPage extends LitElement {
   }
 
   render() {
+    const emailErrorId = 'login-email-error';
+    const passwordErrorId = 'login-password-error';
+
     return html`
       <div class="login-container">
         <div class="logo">
@@ -296,21 +314,36 @@ export class LoginPage extends LitElement {
               Вход доступен только online
             </div>`
           : null}
-        ${this.error ? html`<div class="error" role="alert">${this.error}</div>` : ''}
+        ${this.error
+          ? html`<div class="error" role="alert" aria-live="assertive">
+              ${this.error}
+            </div>`
+          : ''}
 
         <form @submit=${this.handleSubmit}>
           <div class="form-group">
             <label for="login-email">Email</label>
             <input
               id="login-email"
+              name="email"
               type="email"
               .value=${this.email}
               @input=${(e: Event) => (this.email = (e.target as HTMLInputElement).value)}
               ?disabled=${this.loading}
               autocomplete="email"
+              aria-label="Email"
+              aria-invalid=${this.emailError ? 'true' : 'false'}
+              aria-describedby=${this.emailError ? emailErrorId : nothing}
             />
             ${this.emailError
-              ? html`<p class="field-error" role="alert">${this.emailError}</p>`
+              ? html`<p
+                  id=${emailErrorId}
+                  class="field-error"
+                  role="alert"
+                  aria-live="assertive"
+                >
+                  ${this.emailError}
+                </p>`
               : null}
           </div>
 
@@ -318,15 +351,26 @@ export class LoginPage extends LitElement {
             <label for="login-password">Пароль</label>
             <input
               id="login-password"
+              name="password"
               type="password"
               .value=${this.password}
               @input=${(e: Event) =>
                 (this.password = (e.target as HTMLInputElement).value)}
               ?disabled=${this.loading}
               autocomplete="current-password"
+              aria-label="Password"
+              aria-invalid=${this.passwordError ? 'true' : 'false'}
+              aria-describedby=${this.passwordError ? passwordErrorId : nothing}
             />
             ${this.passwordError
-              ? html`<p class="field-error" role="alert">${this.passwordError}</p>`
+              ? html`<p
+                  id=${passwordErrorId}
+                  class="field-error"
+                  role="alert"
+                  aria-live="assertive"
+                >
+                  ${this.passwordError}
+                </p>`
               : null}
           </div>
 

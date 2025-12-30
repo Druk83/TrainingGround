@@ -3,6 +3,15 @@ import { authService } from './lib/auth-service';
 import './styles/breakpoints.css';
 import './styles/global.css';
 
+const DEFAULT_TITLE = 'TrainingGround';
+if (!document.title || document.title.trim().length === 0) {
+  document.title = DEFAULT_TITLE;
+}
+
+if (!document.documentElement.getAttribute('lang')) {
+  document.documentElement.setAttribute('lang', 'ru');
+}
+
 // Auth helpers
 function requireAuth(redirectTo = '/login'): boolean {
   if (!authService.isAuthenticated()) {
@@ -69,11 +78,7 @@ const isAdminConsole = pathname.startsWith('/admin-console') || pathname === '/a
   }
 
   if (skipLink) {
-    if (isStudentHome) {
-      skipLink.style.display = '';
-    } else {
-      skipLink.style.display = 'none';
-    }
+    skipLink.style.display = '';
   }
 
   // Public pages (no auth required)

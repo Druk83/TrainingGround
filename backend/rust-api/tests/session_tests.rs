@@ -26,7 +26,7 @@ async fn test_create_session_uses_task_from_db() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/v1/sessions/")
+                .uri("/api/v1/sessions")
                 .header("content-type", "application/json")
                 .header("authorization", format!("Bearer {}", token))
                 .header("x-csrf-token", &csrf_token)
@@ -74,7 +74,7 @@ async fn test_create_session_unknown_task_returns_404() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/v1/sessions/")
+                .uri("/api/v1/sessions")
                 .header("content-type", "application/json")
                 .header("authorization", format!("Bearer {}", token))
                 .header("x-csrf-token", &csrf_token)

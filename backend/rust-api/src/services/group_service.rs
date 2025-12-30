@@ -4,7 +4,7 @@ use crate::models::group::{
 use crate::models::user::{User, UserRole};
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
-use mongodb::bson::{doc, oid::ObjectId, Regex};
+use mongodb::bson::{doc, oid::ObjectId, DateTime as BsonDateTime, Regex};
 use mongodb::Database;
 
 pub struct GroupService {
@@ -190,7 +190,7 @@ impl GroupService {
         // Построение update document
         let mut update_doc = doc! {
             "$set": {
-                "updatedAt": Utc::now().to_rfc3339(),
+                "updatedAt": BsonDateTime::from_millis(Utc::now().timestamp_millis()),
             }
         };
 

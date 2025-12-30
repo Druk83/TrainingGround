@@ -13,6 +13,16 @@ pub async fn create_test_app() -> Router {
     // Load test environment from .env.test
     dotenvy::from_filename(".env.test").ok();
 
+    // Disable rate limiting for integration tests by default (can be overridden by tests)
+    if std::env::var("RATE_LIMIT_DISABLED").is_err() {
+        std::env::set_var("RATE_LIMIT_DISABLED", "1");
+    }
+    if std::env::var("ADMIN_RATE_LIMIT_DISABLED").is_err() {
+        std::env::set_var("ADMIN_RATE_LIMIT_DISABLED", "1");
+    }
+    // Ensure cookies issued during tests use Secure flag for cookie assertions
+    std::env::set_var("COOKIE_SECURE", "true");
+
     // Load test configuration
     let config = Config::load().expect("Failed to load test configuration");
 

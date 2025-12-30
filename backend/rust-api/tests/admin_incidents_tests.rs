@@ -100,6 +100,7 @@ async fn test_update_incident_status() {
                 .method("PUT")
                 .uri(format!("/admin/incidents/{}", incident_id))
                 .header("authorization", format!("Bearer {}", admin_token))
+                .header("content-type", "application/json")
                 .header("x-csrf-token", &csrf_token_update)
                 .header("cookie", format!("csrf_token={}", csrf_cookie_update))
                 .body(Body::from(payload.to_string()))

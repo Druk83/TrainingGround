@@ -18,8 +18,8 @@ impl TemplateStatus {
     pub fn as_str(&self) -> &'static str {
         match self {
             TemplateStatus::Draft => "draft",
-            TemplateStatus::PendingReview => "pending_review",
-            TemplateStatus::ReviewedOnce => "reviewed_once",
+            TemplateStatus::PendingReview => "pendingreview",
+            TemplateStatus::ReviewedOnce => "reviewedonce",
             TemplateStatus::Ready => "ready",
             TemplateStatus::Published => "published",
             TemplateStatus::Deprecated => "deprecated",
@@ -43,10 +43,11 @@ impl FromStr for TemplateStatus {
     type Err = String;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value.to_lowercase().as_str() {
+        let normalized = value.to_lowercase().replace('_', "");
+        match normalized.as_str() {
             "draft" => Ok(TemplateStatus::Draft),
-            "pending_review" => Ok(TemplateStatus::PendingReview),
-            "reviewed_once" => Ok(TemplateStatus::ReviewedOnce),
+            "pendingreview" => Ok(TemplateStatus::PendingReview),
+            "reviewedonce" => Ok(TemplateStatus::ReviewedOnce),
             "ready" => Ok(TemplateStatus::Ready),
             "published" => Ok(TemplateStatus::Published),
             "deprecated" => Ok(TemplateStatus::Deprecated),
@@ -306,10 +307,10 @@ pub enum LevelDifficulty {
 impl LevelDifficulty {
     pub fn as_str(&self) -> &'static str {
         match self {
-            LevelDifficulty::A1 => "A1",
-            LevelDifficulty::A2 => "A2",
-            LevelDifficulty::B1 => "B1",
-            LevelDifficulty::B2 => "B2",
+            LevelDifficulty::A1 => "a1",
+            LevelDifficulty::A2 => "a2",
+            LevelDifficulty::B1 => "b1",
+            LevelDifficulty::B2 => "b2",
         }
     }
 }

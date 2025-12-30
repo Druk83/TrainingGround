@@ -167,10 +167,6 @@ fn admin_routes(
             get(handlers::admin::embedding_consistency),
         )
         .route(
-            "/templates/duplicates",
-            get(handlers::admin::list_duplicates),
-        )
-        .route(
             "/topics",
             get(handlers::admin::list_topics).post(handlers::admin::create_topic),
         )

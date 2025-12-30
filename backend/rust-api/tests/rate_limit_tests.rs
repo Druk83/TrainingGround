@@ -111,6 +111,7 @@ async fn register_with_ip(
 /// Проверка RATE_LIMIT_LOGIN_ATTEMPTS=10
 /// NOTE: Tests IP-based rate limiting, not failed auth monitoring
 #[tokio::test]
+#[serial_test::serial]
 async fn test_login_rate_limiting_per_ip() {
     // Clean up Redis before test
     flush_rate_limit_keys().await;
@@ -171,6 +172,7 @@ async fn test_login_rate_limiting_per_ip() {
 /// Test register rate limiting (5 attempts per hour per IP)
 /// Проверка RATE_LIMIT_REGISTER_ATTEMPTS=5
 #[tokio::test]
+#[serial_test::serial]
 async fn test_register_rate_limiting_per_ip() {
     // Clean up Redis before test
     flush_rate_limit_keys().await;
@@ -220,6 +222,7 @@ async fn test_register_rate_limiting_per_ip() {
 /// Test failed auth monitoring (5 failed attempts → block)
 /// Проверка что после 5 неудачных попыток пользователь блокируется
 #[tokio::test]
+#[serial_test::serial]
 async fn test_failed_auth_monitoring_blocks_user() {
     // Clean up Redis before test
     flush_rate_limit_keys().await;
@@ -274,6 +277,7 @@ async fn test_failed_auth_monitoring_blocks_user() {
 /// Test rate limiter with concurrent requests
 /// Нагрузочное тестирование Redis rate limiter
 #[tokio::test]
+#[serial_test::serial]
 async fn test_concurrent_login_requests_rate_limiting() {
     // Clean up Redis before test
     flush_rate_limit_keys().await;
@@ -356,6 +360,7 @@ async fn test_concurrent_login_requests_rate_limiting() {
 
 /// Test rate limiter with concurrent register requests
 #[tokio::test]
+#[serial_test::serial]
 async fn test_concurrent_register_requests_rate_limiting() {
     // Clean up Redis before test
     flush_rate_limit_keys().await;
@@ -430,6 +435,7 @@ async fn test_concurrent_register_requests_rate_limiting() {
 
 /// Test that rate limits can be disabled via environment variable
 #[tokio::test]
+#[serial_test::serial]
 async fn test_rate_limiting_can_be_disabled() {
     // Clean up Redis before test
     flush_rate_limit_keys().await;
@@ -476,6 +482,7 @@ async fn test_rate_limiting_can_be_disabled() {
 /// Test rate limit window expiration
 /// Проверка что после истечения окна (5 мин для login) счетчик сбрасывается
 #[tokio::test]
+#[serial_test::serial]
 #[ignore] // Ignore by default because it requires waiting for window expiration (slow test)
 async fn test_rate_limit_window_expiration() {
     // Clean up Redis before test

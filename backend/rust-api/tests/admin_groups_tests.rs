@@ -4,14 +4,16 @@ use axum::{
 };
 use serde_json::json;
 use tower::ServiceExt;
+use uuid::Uuid;
 
 mod common;
 
 /// Helper: создать admin пользователя и получить токен
 async fn create_admin_with_token(app: &axum::Router) -> (String, String) {
     // Регистрируем пользователя
+    let email = format!("admin-groups+{}@test.com", Uuid::new_v4());
     let register_body = json!({
-        "email": "admin-groups@test.com",
+        "email": email,
         "password": "Admin123!@#",
         "name": "Admin User",
     });
@@ -52,7 +54,7 @@ async fn create_admin_with_token(app: &axum::Router) -> (String, String) {
 
     // Логинимся заново чтобы получить токен с ролью admin
     let login_body = json!({
-        "email": "admin-groups@test.com",
+        "email": email,
         "password": "Admin123!@#",
     });
 
@@ -410,6 +412,7 @@ async fn test_update_group() {
         "description": "Updated description",
     });
 
+    let (csrf_token, csrf_cookie) = get_csrf_token(&app).await;
     let response = app
         .clone()
         .oneshot(

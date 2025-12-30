@@ -40,6 +40,24 @@ if ! command -v docker &> /dev/null; then
 fi
 echo "[INFO] Docker version: $(docker --version)"
 
+# pkg-config + OpenSSL headers
+if ! command -v pkg-config &> /dev/null; then
+    echo "[WARN] pkg-config not found; install it with your package manager (e.g. sudo apt install pkg-config)"
+else
+    if ! pkg-config --exists openssl; then
+        echo "[WARN] OpenSSL dev files missing; install libssl-dev (or the distro equivalent) so pkg-config can find OpenSSL"
+    else
+        echo "[INFO] OpenSSL found via pkg-config"
+    fi
+fi
+
+# Docker group membership (allows running docker without sudo)
+if id -Gn 2> /dev/null | grep -qw docker; then
+    echo "[INFO] User is in docker group"
+else
+    echo "[WARN] Current user is not in the 'docker' group; run sudo usermod -aG docker \$USER and relogin to avoid sudo when running make up"
+fi
+
 # 3. Создание директорий
 echo "Creating project directories..."
 mkdir -p frontend backend/rust-api backend/python-generator docs

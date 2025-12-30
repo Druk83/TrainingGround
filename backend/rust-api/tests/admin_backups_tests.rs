@@ -6,6 +6,7 @@ use serde_json::json;
 use tower::ServiceExt;
 
 mod common;
+use uuid::Uuid;
 
 #[tokio::test]
 async fn test_list_backups_returns_data() {
@@ -116,7 +117,7 @@ async fn test_restore_backup_returns_message() {
 
 async fn create_admin_with_token(app: &axum::Router) -> (String, String) {
     let register_body = json!({
-        "email": "backup-admin@test.com",
+        "email": format!("backup-admin+{}@test.com", Uuid::new_v4()),
         "password": "Admin123!@#",
         "name": "Backup Admin",
     });

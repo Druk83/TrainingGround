@@ -49,7 +49,16 @@ impl AppState {
                 "Initializing object storage client for bucket {}",
                 storage_cfg.bucket
             );
-            Some(ObjectStorageClient::new(storage_cfg)?)
+            match ObjectStorageClient::new(storage_cfg) {
+                Ok(client) => Some(client),
+                Err(err) => {
+                    tracing::error!(
+                        "Failed to initialize object storage client, report exports disabled: {}",
+                        err
+                    );
+                    None
+                }
+            }
         } else {
             tracing::warn!("Object storage config is not set, report exports disabled");
             None

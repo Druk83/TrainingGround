@@ -127,3 +127,4 @@ tests/performance/results_smoke.jsondocker
 tests/performance/rust-api-logs.txtk6
 tasks/SECURITY-AUDIT-2025-12-22.md
 .claude/
+frontend/tests/e2e/responsive.spec.ts-snapshots
