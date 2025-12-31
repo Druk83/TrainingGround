@@ -4,6 +4,7 @@ REM Development commands for Windows
 if "%1"=="" goto help
 if "%1"=="up" goto up
 if "%1"=="down" goto down
+if "%1"=="restart" goto restart
 if "%1"=="deploy" goto deploy
 if "%1"=="init-mongo" goto init-mongo
 if "%1"=="frontend" goto frontend
@@ -23,6 +24,30 @@ goto end
 :down
 echo Stopping all services...
 docker-compose down
+goto end
+
+:restart
+echo Restarting all services...
+docker-compose down
+if errorlevel 1 (
+    echo [ERROR] Failed while stopping services.
+    exit /b 1
+)
+call :cleanup_vault_volume
+if errorlevel 1 (
+    echo [ERROR] Failed while cleaning up legacy Vault volume.
+    exit /b 1
+)
+docker-compose up -d
+if errorlevel 1 (
+    echo [ERROR] Failed while starting services.
+    exit /b 1
+)
+call :run_init_mongo
+if errorlevel 1 (
+    echo [ERROR] Restart failed during MongoDB initialization.
+    exit /b 1
+)
 goto end
 
 :deploy
@@ -58,6 +83,10 @@ echo [INFO] Superuser should be created at druk1983@gmail.com
 goto end
 
 :init-mongo
+call :run_init_mongo
+goto end
+
+:run_init_mongo
 echo Initializing MongoDB replica set...
 docker-compose --profile init run --rm mongodb-init
 if errorlevel 1 (
@@ -68,7 +97,27 @@ echo.
 echo [SUCCESS] MongoDB replica set initialized!
 echo Restarting rust-api...
 docker-compose restart rust-api
-goto end
+if errorlevel 1 (
+    echo [ERROR] Failed to restart rust-api after Mongo initialization!
+    exit /b 1
+)
+goto :eof
+
+:cleanup_vault_volume
+docker volume inspect mishagame_vault_data >nul 2>&1
+if not errorlevel 1 goto cleanup_vault_volume_exists
+echo [INFO] No legacy Vault dev volume detected.
+exit /b 0
+
+:cleanup_vault_volume_exists
+echo Removing legacy Vault dev volume...
+docker volume rm mishagame_vault_data >nul
+if errorlevel 1 (
+    echo [ERROR] Unable to remove mishagame_vault_data automatically.
+    exit /b 1
+)
+echo [SUCCESS] Legacy Vault dev volume removed.
+exit /b 0
 
 :frontend
 echo Starting frontend dev server...
@@ -140,6 +189,7 @@ echo Commands:
 echo   deploy      Full deployment from scratch (down -v, up, init replica set, create superuser)
 echo   up          Start all services (Docker Compose)
 echo   down        Stop all services
+echo   restart     Stop and start all services (down, cleanup, up, init replica set)
 echo   init-mongo  Initialize MongoDB replica set (run after first 'up')
 echo   frontend    Start frontend dev server on port 5173
 echo   logs        Show service logs
