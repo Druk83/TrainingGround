@@ -1,0 +1,38 @@
+﻿groups:
+  - name: trainingground-sla
+    rules:
+      - alert: ApiLatencyP95TooHigh
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{path!="/metrics"}[5m])) by (le)) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "API latency p95 превысил 200 мс"
+          description: "95-й перцентиль http_request_duration_seconds превышает SLA в течение последних 5 минут."
+      - alert: HintsUnavailable
+        expr: sum(rate(hints_requested_total[10m])) == 0
+        for: 10m
+        labels:
+          severity: critical
+          team: product
+        annotations:
+          summary: "Подсказки не выдаются"
+          description: "В журнале hints_requested_total нет событий за 10 минут — сервис подсказок недоступен."
+      - alert: AnticheatIncidentsSpike
+        expr: increase(anticheat_violations_total[5m]) > 25
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Рост античит-инцидентов"
+          description: "За 5 минут создано больше 25 инцидентов — возможна массовая атака или SmartCaptcha отключена."
+      - alert: ExportWorkerErrors
+        expr: rate(export_worker_ticks_total{status="error"}[10m]) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          team: reporting
+        annotations:
+          summary: "Очередь экспортов деградировала"
+          description: "Экспорт отчётов fails в export_worker_ticks_total{status=\"error\"} в течение последних 10 минут."

@@ -33,7 +33,10 @@ pub async fn register(
 
     tracing::info!("Registering new user: {}", req.email);
 
-    let jwt_service = JwtService::new(&state.config.jwt_secret);
+    let jwt_service = JwtService::new_with_fallbacks(
+        &state.config.jwt_secret,
+        &state.config.jwt_fallback_secrets,
+    );
     let service = AuthService::new(state.mongo.clone(), state.redis.clone(), jwt_service);
     let audit_service = AuditService::new(state.mongo.clone());
 
@@ -120,7 +123,10 @@ pub async fn login(
 
     tracing::info!("Login attempt for user: {}", req.email);
 
-    let jwt_service = JwtService::new(&state.config.jwt_secret);
+    let jwt_service = JwtService::new_with_fallbacks(
+        &state.config.jwt_secret,
+        &state.config.jwt_fallback_secrets,
+    );
     let service = AuthService::new(state.mongo.clone(), state.redis.clone(), jwt_service);
     let audit_service = AuditService::new(state.mongo.clone());
 
@@ -217,7 +223,10 @@ pub async fn refresh_token(
             )
         })?;
 
-    let jwt_service = JwtService::new(&state.config.jwt_secret);
+    let jwt_service = JwtService::new_with_fallbacks(
+        &state.config.jwt_secret,
+        &state.config.jwt_fallback_secrets,
+    );
     let service = AuthService::new(state.mongo.clone(), state.redis.clone(), jwt_service);
 
     match service.refresh_token(&refresh_token).await {
@@ -250,7 +259,10 @@ pub async fn logout(
             )
         })?;
 
-    let jwt_service = JwtService::new(&state.config.jwt_secret);
+    let jwt_service = JwtService::new_with_fallbacks(
+        &state.config.jwt_secret,
+        &state.config.jwt_fallback_secrets,
+    );
     let service = AuthService::new(state.mongo.clone(), state.redis.clone(), jwt_service);
     let audit_service = AuditService::new(state.mongo.clone());
 
@@ -288,7 +300,10 @@ pub async fn get_current_user(
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     tracing::debug!("Getting current user profile for user_id: {}", claims.sub);
 
-    let jwt_service = JwtService::new(&state.config.jwt_secret);
+    let jwt_service = JwtService::new_with_fallbacks(
+        &state.config.jwt_secret,
+        &state.config.jwt_fallback_secrets,
+    );
     let service = AuthService::new(state.mongo.clone(), state.redis.clone(), jwt_service);
 
     match service.get_user_by_id(&claims.sub).await {
@@ -310,7 +325,10 @@ pub async fn get_active_sessions(
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     tracing::debug!("Getting active sessions for user_id: {}", claims.sub);
 
-    let jwt_service = JwtService::new(&state.config.jwt_secret);
+    let jwt_service = JwtService::new_with_fallbacks(
+        &state.config.jwt_secret,
+        &state.config.jwt_fallback_secrets,
+    );
     let service = AuthService::new(state.mongo.clone(), state.redis.clone(), jwt_service);
 
     match service.get_active_sessions(&claims.sub, None).await {
@@ -341,7 +359,10 @@ pub async fn revoke_other_sessions(
             )
         })?;
 
-    let jwt_service = JwtService::new(&state.config.jwt_secret);
+    let jwt_service = JwtService::new_with_fallbacks(
+        &state.config.jwt_secret,
+        &state.config.jwt_fallback_secrets,
+    );
     let service = AuthService::new(state.mongo.clone(), state.redis.clone(), jwt_service);
 
     match service
@@ -375,7 +396,10 @@ pub async fn change_password(
 
     tracing::info!("Changing password for user_id: {}", claims.sub);
 
-    let jwt_service = JwtService::new(&state.config.jwt_secret);
+    let jwt_service = JwtService::new_with_fallbacks(
+        &state.config.jwt_secret,
+        &state.config.jwt_fallback_secrets,
+    );
     let service = AuthService::new(state.mongo.clone(), state.redis.clone(), jwt_service);
     let audit_service = AuditService::new(state.mongo.clone());
 
@@ -515,7 +539,10 @@ pub async fn get_user_by_id_admin(
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     tracing::debug!("Getting user by ID: {}", user_id);
 
-    let jwt_service = JwtService::new(&state.config.jwt_secret);
+    let jwt_service = JwtService::new_with_fallbacks(
+        &state.config.jwt_secret,
+        &state.config.jwt_fallback_secrets,
+    );
     let service = AuthService::new(state.mongo.clone(), state.redis.clone(), jwt_service);
 
     let user = service
@@ -585,7 +612,10 @@ pub async fn update_user(
     tracing::info!("User updated successfully: {}", user_id);
 
     // Fetch and return updated user
-    let jwt_service = JwtService::new(&state.config.jwt_secret);
+    let jwt_service = JwtService::new_with_fallbacks(
+        &state.config.jwt_secret,
+        &state.config.jwt_fallback_secrets,
+    );
     let service = AuthService::new(state.mongo.clone(), state.redis.clone(), jwt_service);
 
     let updated_user = service

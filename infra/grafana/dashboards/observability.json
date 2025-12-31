@@ -1,0 +1,85 @@
+﻿{
+  "uid": "trainingground-observability",
+  "title": "TrainingGround SLA Dashboard",
+  "schemaVersion": 37,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "HTTP p95 latency",
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{path!\\=\"/metrics\"}[$__interval])) by (le))",
+          "legendFormat": "p95"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Hints throughput",
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(hints_requested_total[$__interval]))",
+          "legendFormat": "hints/min"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Anticheat incidents",
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "increase(anticheat_violations_total[$__interval])",
+          "legendFormat": "violations"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 }
+    },
+    {
+      "id": 4,
+      "type": "logs",
+      "title": "API logs (Loki)",
+      "datasource": "Loki",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "{job=\"docker\", compose_service=\"trainingground-rust-api\"}"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": []
+  }
+}

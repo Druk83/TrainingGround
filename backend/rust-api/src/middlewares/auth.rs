@@ -7,6 +7,7 @@ use axum::{
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tracing::{field, Span};
 
 use crate::services::AppState;
 
@@ -43,13 +44,25 @@ impl std::error::Error for AuthError {}
 pub struct JwtService {
     encoding_key: EncodingKey,
     decoding_key: DecodingKey,
+    fallback_decoding_keys: Vec<DecodingKey>,
 }
 
 impl JwtService {
     pub fn new(secret: &str) -> Self {
+        Self::new_with_fallbacks(secret, &[])
+    }
+
+    pub fn new_with_fallbacks(secret: &str, fallback_secrets: &[String]) -> Self {
+        let fallback_decoding_keys = fallback_secrets
+            .iter()
+            .filter(|value| !value.trim().is_empty())
+            .map(|value| DecodingKey::from_secret(value.as_bytes()))
+            .collect();
+
         Self {
             encoding_key: EncodingKey::from_secret(secret.as_bytes()),
             decoding_key: DecodingKey::from_secret(secret.as_bytes()),
+            fallback_decoding_keys,
         }
     }
 
@@ -60,17 +73,26 @@ impl JwtService {
     pub fn validate_token(&self, token: &str) -> Result<JwtClaims, AuthError> {
         let validation = Validation::default();
 
-        decode::<JwtClaims>(token, &self.decoding_key, &validation)
-            .map(|data| data.claims)
-            .map_err(|e| {
+        match decode::<JwtClaims>(token, &self.decoding_key, &validation) {
+            Ok(data) => Ok(data.claims),
+            Err(e) => {
                 if e.to_string().contains("ExpiredSignature") {
-                    AuthError::ExpiredToken
-                } else if e.to_string().contains("InvalidSignature") {
-                    AuthError::InvalidSignature
-                } else {
-                    AuthError::InvalidToken
+                    return Err(AuthError::ExpiredToken);
                 }
-            })
+
+                if e.to_string().contains("InvalidSignature") {
+                    for key in &self.fallback_decoding_keys {
+                        if let Ok(data) = decode::<JwtClaims>(token, key, &validation) {
+                            tracing::info!("JWT validated using fallback secret (rotation window)");
+                            return Ok(data.claims);
+                        }
+                    }
+                    return Err(AuthError::InvalidSignature);
+                }
+
+                Err(AuthError::InvalidToken)
+            }
+        }
     }
 }
 
@@ -89,13 +111,17 @@ pub async fn auth_middleware(
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
     // Validate token
-    let jwt_service = JwtService::new(&state.config.jwt_secret);
+    let jwt_service = JwtService::new_with_fallbacks(
+        &state.config.jwt_secret,
+        &state.config.jwt_fallback_secrets,
+    );
     let claims = jwt_service.validate_token(token).map_err(|e| {
         tracing::warn!("JWT validation failed: {}", e);
         StatusCode::UNAUTHORIZED
     })?;
 
     tracing::debug!("Authenticated user: {} (role: {})", claims.sub, claims.role);
+    Span::current().record("user_id", field::display(&claims.sub));
 
     // Store claims in request extensions for handlers to use
     request.extensions_mut().insert(claims);
@@ -113,8 +139,12 @@ pub async fn optional_auth_middleware(
     if let Some(auth_header) = headers.get("authorization") {
         if let Ok(auth_str) = auth_header.to_str() {
             if let Some(token) = auth_str.strip_prefix("Bearer ") {
-                let jwt_service = JwtService::new(&state.config.jwt_secret);
+                let jwt_service = JwtService::new_with_fallbacks(
+                    &state.config.jwt_secret,
+                    &state.config.jwt_fallback_secrets,
+                );
                 if let Ok(claims) = jwt_service.validate_token(token) {
+                    Span::current().record("user_id", field::display(&claims.sub));
                     request.extensions_mut().insert(claims);
                 }
             }
@@ -156,5 +186,25 @@ mod tests {
 
         assert_eq!(validated.sub, claims.sub);
         assert_eq!(validated.role, claims.role);
+    }
+
+    #[test]
+    fn test_jwt_validation_with_fallback_secret() {
+        let primary = "primary-secret";
+        let previous = "previous-secret".to_string();
+        let service = JwtService::new_with_fallbacks(primary, std::slice::from_ref(&previous));
+
+        let legacy_service = JwtService::new(&previous);
+        let claims = JwtClaims {
+            sub: "legacy-user".to_string(),
+            role: "teacher".to_string(),
+            group_ids: vec![],
+            exp: (chrono::Utc::now().timestamp() + 3600) as usize,
+            iat: chrono::Utc::now().timestamp() as usize,
+        };
+
+        let token = legacy_service.generate_token(claims.clone()).unwrap();
+        let validated = service.validate_token(&token).unwrap();
+        assert_eq!(validated.sub, claims.sub);
     }
 }

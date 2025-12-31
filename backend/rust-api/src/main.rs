@@ -1,28 +1,31 @@
 #![allow(dead_code)]
 
 use std::sync::Arc;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use trainingground_api::{config::Config, create_router, services::AppState};
+use tracing_subscriber::{
+    layer::{Layer, SubscriberExt},
+    util::SubscriberInitExt,
+    EnvFilter,
+};
+use trainingground_api::{
+    config::{Config, LoggingSettings},
+    create_router,
+    services::AppState,
+};
 
 #[tokio::main]
 async fn main() {
+    // Load configuration (before tracing initialization to respect logging settings)
+    let config = Config::load().expect("Failed to load configuration");
+    let logging = config.logging.clone();
+
     // Initialize OpenTelemetry tracer (optional, can be disabled)
     let _tracer = init_telemetry();
 
-    // Initialize tracing with OpenTelemetry layer
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "trainingground_api=debug,tower_http=debug".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .with(tracing_opentelemetry::layer())
-        .init();
+    // Initialize tracing with OpenTelemetry layer and project defaults
+    init_tracing(&logging);
 
     tracing::info!("Starting TrainingGround Rust API");
 
-    // Load configuration
-    let config = Config::load().expect("Failed to load configuration");
     tracing::info!(
         "Configuration loaded for environment: {:?}",
         std::env::var("APP_ENV").unwrap_or_else(|_| "dev".to_string())
@@ -107,4 +110,28 @@ fn init_telemetry() -> opentelemetry_sdk::trace::Tracer {
 fn shutdown_telemetry() {
     tracing::info!("Shutting down OpenTelemetry");
     // In opentelemetry 0.31, shutdown is handled by dropping the provider
+}
+
+fn init_tracing(logging: &LoggingSettings) {
+    let env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(logging.directive()));
+
+    let fmt_layer = if logging.is_json() {
+        tracing_subscriber::fmt::layer()
+            .json()
+            .with_target(false)
+            .with_thread_ids(false)
+            .boxed()
+    } else {
+        tracing_subscriber::fmt::layer()
+            .with_target(false)
+            .with_thread_ids(false)
+            .boxed()
+    };
+
+    tracing_subscriber::registry()
+        .with(env_filter)
+        .with(fmt_layer)
+        .with(tracing_opentelemetry::layer())
+        .init();
 }

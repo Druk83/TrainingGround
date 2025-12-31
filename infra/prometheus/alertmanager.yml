@@ -1,0 +1,33 @@
+﻿global:
+  resolve_timeout: 5m
+
+route:
+  receiver: devops-telegram
+  group_by: ['alertname']
+  group_wait: 30s
+  group_interval: 2m
+  repeat_interval: 2h
+  routes:
+    - match:
+        severity: critical
+      receiver: devops-telegram
+    - match_re:
+        severity: '.*'
+      receiver: webhook-forwarder
+
+receivers:
+  - name: devops-telegram
+    telegram_configs:
+      - bot_token: '{{ getenv "ALERTMANAGER_TELEGRAM_BOT_TOKEN" }}'
+        chat_id: {{ getenv "ALERTMANAGER_TELEGRAM_CHAT_ID" | default "0" }}
+        disable_notifications: false
+        parse_mode: 'MarkdownV2'
+        message: |-
+          *{{ .CommonAnnotations.summary }}*
+          {{ .CommonAnnotations.description }}
+          
+          labels: {{ range $k, $v := .CommonLabels }}{{ $k }}={{ $v }} {{ end }}
+  - name: webhook-forwarder
+    webhook_configs:
+      - url: '{{ getenv "ALERTMANAGER_WEBHOOK_URL" | default "" }}'
+        send_resolved: true

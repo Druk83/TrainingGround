@@ -7,9 +7,11 @@ pub struct Config {
     pub redis_uri: String,
     pub mongo_database: String,
     pub jwt_secret: String,
+    pub jwt_fallback_secrets: Vec<String>,
     pub python_api_url: String,
     pub reporting: ReportingSettings,
     pub content: ContentSettings,
+    pub logging: LoggingSettings,
     pub cookie: CookieSettings,
     pub superuser_seed_file: Option<String>,
     pub object_storage: Option<ObjectStorageSettings>,
@@ -133,6 +135,39 @@ impl Default for ContentSettings {
         Self {
             stream_name: Self::default_stream_name().to_string(),
         }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct LoggingSettings {
+    #[serde(default = "LoggingSettings::default_level")]
+    pub level: String,
+    #[serde(default = "LoggingSettings::default_format")]
+    pub format: String,
+}
+
+impl LoggingSettings {
+    fn default_level() -> String {
+        "info".to_string()
+    }
+
+    fn default_format() -> String {
+        "pretty".to_string()
+    }
+
+    pub fn from_env() -> Self {
+        let level = env::var("LOG_LEVEL").unwrap_or_else(|_| Self::default_level());
+        let format = env::var("LOG_FORMAT").unwrap_or_else(|_| Self::default_format());
+        Self { level, format }
+    }
+
+    pub fn is_json(&self) -> bool {
+        self.format.eq_ignore_ascii_case("json")
+    }
+
+    pub fn directive(&self) -> String {
+        let level = self.level.trim();
+        format!("trainingground_api={level},tower_http={level},axum={level}")
     }
 }
 
@@ -304,6 +339,10 @@ impl Config {
                 "dev-secret-only-for-local-testing".to_string()
             });
 
+        let jwt_fallback_secrets = settings
+            .get::<Vec<String>>("auth.jwt_fallback_secrets")
+            .unwrap_or_else(|_| parse_csv_env_var("JWT_FALLBACK_SECRETS"));
+
         let python_api_url = settings
             .get_string("python_api.url")
             .or_else(|_| env::var("PYTHON_API_URL"))
@@ -326,6 +365,10 @@ impl Config {
             .get::<CookieSettings>("cookie")
             .unwrap_or_else(|_| CookieSettings::from_env());
 
+        let logging = settings
+            .get::<LoggingSettings>("logging")
+            .unwrap_or_else(|_| LoggingSettings::from_env());
+
         let superuser_seed_file = settings
             .get_string("superuser_seed_file")
             .ok()
@@ -342,9 +385,11 @@ impl Config {
             redis_uri,
             mongo_database,
             jwt_secret,
+            jwt_fallback_secrets,
             python_api_url,
             reporting,
             content,
+            logging,
             cookie,
             superuser_seed_file,
             object_storage,
@@ -360,4 +405,22 @@ fn parse_bool_env_var(key: &str) -> Option<bool> {
             "1" | "true" | "yes" | "on"
         )
     })
+}
+
+fn parse_csv_env_var(key: &str) -> Vec<String> {
+    env::var(key)
+        .map(|value| {
+            value
+                .split(',')
+                .filter_map(|part| {
+                    let trimmed = part.trim();
+                    if trimmed.is_empty() {
+                        None
+                    } else {
+                        Some(trimmed.to_string())
+                    }
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }

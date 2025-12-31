@@ -1,4 +1,4 @@
-# Русский язык: тренировочный полигон
+﻿# Русский язык: тренировочный полигон
 
 Игровой тренажёр по русскому языку, который помогает школьникам 8–11 классов и взрослым тренировать грамматику, орфографию и пунктуацию через короткие сессии с таймерами, баллами, подсказками и аналитикой. Проект ведётся по комплекту требований в папке `requirements/`.
 
@@ -76,6 +76,25 @@ npm run lighthouse:ci  # JSON отчет для CI
 npm run storybook      # Storybook с интерактивными story компонентов
 npm run build-storybook # статическая сборка Storybook для публикации
 ```
+
+### Тесты Rust через Docker
+Если на Windows нет MSVC и `cargo test` падает, используйте контейнер:
+
+```powershell
+scripts\cargo-test-docker.ps1   # Windows PowerShell/Developer PowerShell
+```
+
+```bash
+./scripts/cargo-test-docker.sh  # bash/zsh
+```
+
+Скрипт выполняет `cargo +nightly test` внутри образа `rust:1.81-bookworm`: контейнер автоматически устанавливает `pkg-config`, `libssl-dev` и обновляет nightly toolchain.
+## Мониторинг и алерты
+- `Prometheus` — http://localhost:9090 (`docker compose --profile monitoring up` уже активирует сервис).
+- `Alertmanager` — http://localhost:9093 (уведомления также уходят в Telegram/webhook, параметры в `.env`).
+- `Grafana` — http://localhost:3000 (см. дашборд *TrainingGround SLA Dashboard*).
+- `Loki/Promtail` — http://localhost:3100, логи содержат поля `trace_id` и `user_id` из middleware.
+- Подробности и runbooks: `docs/security.md`, `docs/anticheat.md`, `docs/devops/runbooks.md`.
 
 ## Git Hooks и безопасность
 
@@ -222,7 +241,10 @@ Business Layer сценарии (`requirements/архитектура/описа
 - `requirements/струтура%20Данных/описани%20БД.md` — модели данных MongoDB/Redis/Qdrant.
 - `requirements/сценарии/требования.md` — формализованное ТЗ.
 - `requirements/тестирование/` — стратегия тестов и план испытаний.
-- `docs/offline-sync.md` — устройство offline‑очереди, конфликты и диагностика.
-- `docs/pwa-deployment.md` — чеклист сборки и выката PWA, запуск Lighthouse/a11y.
+  - `docs/offline-sync.md` — устройство offline‑очереди, конфликты и диагностика.
+  - `docs/pwa-deployment.md` — чеклист сборки и выката PWA, запуск Lighthouse/a11y.
+  - `docs/security.md` — TLS/HSTS, CSRF/replay защита, ротация JWT/SSO.
+  - `docs/anticheat.md` — правила античита, инциденты и интеграции с Telegram/webhook.
+  - `docs/devops/runbooks.md` — runbooks для алертов Prometheus/Alertmanager.
 
-Обновление README происходит вместе с изменениями в этих документах, чтобы новые участники могли быстро понять состояние проекта и найти актуальные спецификации.
+  Обновление README происходит вместе с изменениями в этих документах, чтобы новые участники могли быстро понять состояние проекта и найти актуальные спецификации.

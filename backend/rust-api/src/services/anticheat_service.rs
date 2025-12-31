@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use chrono::Utc;
 use mongodb::Database;
 use redis::aio::ConnectionManager;
+use reqwest::Client;
 use uuid::Uuid;
 
 use crate::models::anticheat::{
@@ -19,11 +20,16 @@ const TIME_WINDOW_SECONDS: u64 = 3600; // 1 hour
 pub struct AnticheatService {
     mongo: Database,
     redis: ConnectionManager,
+    http_client: Client,
 }
 
 impl AnticheatService {
     pub fn new(mongo: Database, redis: ConnectionManager) -> Self {
-        Self { mongo, redis }
+        Self {
+            mongo,
+            redis,
+            http_client: Client::new(),
+        }
     }
 
     /// Track answer submission and check for violations
@@ -252,6 +258,8 @@ impl AnticheatService {
             retry_async_with_config(cfg, || async { self.save_incident(&incident).await }).await?;
         }
 
+        self.dispatch_notifications(incident.clone());
+
         Ok(())
     }
 
@@ -354,6 +362,82 @@ impl AnticheatService {
         let mut hasher = DefaultHasher::new();
         answer.trim().to_lowercase().hash(&mut hasher);
         format!("{:x}", hasher.finish())
+    }
+
+    fn dispatch_notifications(&self, incident: IncidentRecord) {
+        if !Self::should_notify(&incident) {
+            return;
+        }
+
+        let client = self.http_client.clone();
+        tokio::spawn(async move {
+            if let Err(err) = Self::send_telegram_alert(&client, &incident).await {
+                tracing::error!("Failed to send Telegram alert: {:#?}", err);
+            }
+            if let Err(err) = Self::send_webhook_alert(&client, &incident).await {
+                tracing::error!("Failed to send webhook alert: {:#?}", err);
+            }
+        });
+    }
+
+    fn should_notify(incident: &IncidentRecord) -> bool {
+        matches!(
+            incident.severity,
+            IncidentSeverity::High | IncidentSeverity::Critical
+        ) || matches!(
+            incident.action_taken,
+            ActionTaken::Blocked | ActionTaken::Suspended
+        )
+    }
+
+    async fn send_telegram_alert(client: &Client, incident: &IncidentRecord) -> Result<()> {
+        let bot_token = std::env::var("ANTICHEAT_TELEGRAM_BOT_TOKEN")
+            .ok()
+            .filter(|value| !value.is_empty());
+        let chat_id = std::env::var("ANTICHEAT_TELEGRAM_CHAT_ID")
+            .ok()
+            .filter(|value| !value.is_empty());
+
+        if let (Some(token), Some(chat_id)) = (bot_token, chat_id) {
+            let url = format!("https://api.telegram.org/bot{token}/sendMessage");
+            let text = format!(
+                "🚨 Anticheat {:?} for user {}\nSpeed: {}\nRepeated: {}\nAction: {:?}",
+                incident.incident_type,
+                incident.user_id,
+                incident.details.speed_hits.unwrap_or(0),
+                incident.details.repeated_hits.unwrap_or(0),
+                incident.action_taken
+            );
+
+            client
+                .post(url)
+                .json(&serde_json::json!({
+                    "chat_id": chat_id,
+                    "text": text,
+                }))
+                .send()
+                .await?
+                .error_for_status()?;
+        }
+
+        Ok(())
+    }
+
+    async fn send_webhook_alert(client: &Client, incident: &IncidentRecord) -> Result<()> {
+        let webhook_url = std::env::var("ANTICHEAT_INCIDENT_WEBHOOK_URL")
+            .ok()
+            .filter(|value| !value.is_empty());
+
+        if let Some(url) = webhook_url {
+            client
+                .post(url)
+                .json(incident)
+                .send()
+                .await?
+                .error_for_status()?;
+        }
+
+        Ok(())
     }
 }
 

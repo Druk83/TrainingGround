@@ -8,7 +8,10 @@ use axum::{
     routing::{get, post, put},
     Router,
 };
+use std::time::Duration;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tracing::{field, Span};
+use uuid::Uuid;
 
 pub mod config;
 pub mod handlers;
@@ -28,11 +31,19 @@ async fn csp_middleware(request: Request, next: Next) -> Response {
         header::CONTENT_SECURITY_POLICY,
         HeaderValue::from_static(
             "default-src 'self'; \
-             script-src 'self' 'unsafe-inline'; \
+             script-src 'self'; \
              style-src 'self' 'unsafe-inline'; \
              img-src 'self' data: https:; \
-             connect-src 'self'",
+             connect-src 'self'; \
+             frame-ancestors 'none'; \
+             base-uri 'self'; \
+             form-action 'self'; \
+             object-src 'none'",
         ),
+    );
+    response.headers_mut().insert(
+        header::STRICT_TRANSPORT_SECURITY,
+        HeaderValue::from_static("max-age=31536000; includeSubDomains"),
     );
     response
 }
@@ -98,7 +109,38 @@ pub fn create_router(app_state: std::sync::Arc<services::AppState>) -> Router {
         .layer(middleware::from_fn(
             middlewares::metrics::metrics_middleware,
         ))
-        .layer(TraceLayer::new_for_http())
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(|request: &Request<_>| {
+                    let trace_id = request
+                        .extensions()
+                        .get::<middlewares::trace::RequestTraceContext>()
+                        .map(|ctx| ctx.trace_id.clone())
+                        .unwrap_or_else(|| Uuid::new_v4().to_string());
+                    let method = request.method().clone();
+                    let path = request.uri().path().to_string();
+
+                    tracing::info_span!(
+                        "http_request",
+                        trace_id = %trace_id,
+                        method = %method,
+                        path = %path,
+                        status = field::Empty,
+                        user_id = field::Empty
+                    )
+                })
+                .on_response(|response: &Response, latency: Duration, span: &Span| {
+                    span.record("status", field::display(response.status().as_u16()));
+                    tracing::info!(
+                        parent: span,
+                        latency_ms = latency.as_millis(),
+                        "request completed"
+                    );
+                }),
+        )
+        .layer(middleware::from_fn(
+            middlewares::trace::trace_context_middleware,
+        ))
 }
 
 fn sessions_routes() -> Router<std::sync::Arc<services::AppState>> {
