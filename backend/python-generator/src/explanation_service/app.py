@@ -19,6 +19,9 @@ from .jobs.scheduler import MaintenanceScheduler
 from .middleware import CircuitBreakerMiddleware, RateLimitMiddleware
 from .services.explanations import ExplanationService
 from .services.metrics import register_metrics
+from .template_generator.repository import MongoExampleSentenceBank, MongoWordBank
+from .template_generator.routes import router as template_router
+from .template_generator.service import TemplateGeneratorService
 from .utils.logging import configure_logging
 from .workers.embedding_worker import EmbeddingWorker
 
@@ -47,6 +50,7 @@ def create_app() -> FastAPI:
 
     register_metrics(app)
     app.include_router(explanations_router, prefix="/v1")
+    app.include_router(template_router)
 
     @app.get("/health")
     async def health_check() -> dict[str, str]:
@@ -71,6 +75,15 @@ def create_app() -> FastAPI:
         app.state.redis = redis_client
         app.state.qdrant = qdrant_client
         app.state.yandex_client = yandex_client
+        word_bank = MongoWordBank(app.state.mongo_db["word_forms"])
+        example_bank = MongoExampleSentenceBank(app.state.mongo_db["example_sentences"])
+        app.state.template_generator_service = TemplateGeneratorService(
+            settings=settings,
+            mongo=app.state.mongo_db,
+            redis=redis_client,
+            word_bank=word_bank,
+            example_bank=example_bank,
+        )
         worker = EmbeddingWorker(
             settings, app.state.mongo_db, redis_client, qdrant_client
         )

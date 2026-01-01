@@ -30,7 +30,18 @@ class Settings(BaseSettings):
 
     mongodb_uri: str = Field(default="mongodb://localhost:27017")
     mongodb_db: str = Field(default="trainingground")
-    redis_url: str = Field(default="redis://localhost:6379/0")
+
+    redis_host: str = Field(default="localhost")
+    redis_port: int = Field(default=6379)
+    redis_password: str | None = Field(default=None)
+    redis_db: int = Field(default=0)
+
+    @property
+    def redis_url(self) -> str:
+        """Construct Redis URL from components."""
+        if self.redis_password:
+            return f"redis://:{self.redis_password}@{self.redis_host}:{self.redis_port}/{self.redis_db}"
+        return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
 
     qdrant_url: AnyHttpUrl = Field(
         default_factory=lambda: cast(AnyHttpUrl, "http://localhost:6333")
@@ -70,6 +81,18 @@ class Settings(BaseSettings):
 
     metrics_namespace: str = Field(default="explanation_service")
     cache_enabled: bool = Field(default=True)
+    template_instance_cache_ttl_seconds: int = Field(
+        default=600,
+        description="TTL (seconds) for cached rendered task instance per template.",
+    )
+    template_seen_tasks_ttl_seconds: int = Field(
+        default=86_400,
+        description="TTL (seconds) to keep track of templates already shown to a user.",
+    )
+    template_generation_limit: int = Field(
+        default=20,
+        description="Maximum number of instances that can be requested in one call.",
+    )
 
     snapshot_cron: str = Field(default="0 * * * *")  # hourly by default
     snapshot_retention: int = Field(default=24)

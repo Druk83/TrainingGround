@@ -27,7 +27,11 @@ pub async fn session_stream(
     tracing::info!("Client connected to SSE stream: session={}", session_id);
 
     // Verify session exists
-    let session_service = SessionService::new(state.mongo.clone(), state.redis.clone());
+    let session_service = SessionService::new(
+        state.mongo.clone(),
+        state.redis.clone(),
+        state.config.python_api_url.clone(),
+    );
     let session = session_service
         .get_session(&session_id)
         .await

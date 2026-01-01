@@ -189,7 +189,41 @@ db.createCollection('rules', {
   }
 });
 
-// 11. Incidents collection (anticheat)
+// 11. Word forms collection (Template Generator)
+db.createCollection('word_forms', {
+  validator: {
+    $jsonSchema: {
+      bsonType: 'object',
+      required: ['word', 'lemma', 'pos'],
+      properties: {
+        word: { bsonType: 'string', minLength: 1 },
+        lemma: { bsonType: 'string', minLength: 1 },
+        pos: { enum: ['noun', 'verb', 'adjective', 'adverb', 'pronoun', 'numeral'] },
+        grammemes: { bsonType: 'object' },
+        frequency: { bsonType: 'int', minimum: 0 }
+      }
+    }
+  }
+});
+
+// 12. Example sentences collection (Template Generator)
+db.createCollection('example_sentences', {
+  validator: {
+    $jsonSchema: {
+      bsonType: 'object',
+      required: ['text', 'topic'],
+      properties: {
+        text: { bsonType: 'string', minLength: 1 },
+        topic: { bsonType: 'string' },
+        level: { enum: ['beginner', 'intermediate', 'advanced'] },
+        tags: { bsonType: 'array', items: { bsonType: 'string' } },
+        length: { bsonType: 'int', minimum: 0 }
+      }
+    }
+  }
+});
+
+// 13. Incidents collection (anticheat)
 db.createCollection('incidents', {
   validator: {
     $jsonSchema: {
@@ -207,7 +241,7 @@ db.createCollection('incidents', {
   }
 });
 
-// 12. Feature flags collection
+// 14. Feature flags collection
 db.createCollection('feature_flags', {
   validator: {
     $jsonSchema: {
@@ -224,7 +258,7 @@ db.createCollection('feature_flags', {
   }
 });
 
-// 13. Materialized stats collection
+// 15. Materialized stats collection
 db.createCollection('materialized_stats', {
   validator: {
     $jsonSchema: {
@@ -240,7 +274,7 @@ db.createCollection('materialized_stats', {
   }
 });
 
-// 14. Leaderboards collection (TTL 24 hours)
+// 16. Leaderboards collection (TTL 24 hours)
 db.createCollection('leaderboards', {
   validator: {
     $jsonSchema: {
@@ -257,3 +291,80 @@ db.createCollection('leaderboards', {
 });
 
 print('[SUCCESS] Collections created');
+
+// Create indexes
+print('[INFO] Creating indexes...');
+
+// User indexes
+db.users.createIndex({ email: 1 }, { unique: true });
+db.users.createIndex({ role: 1 });
+db.users.createIndex({ 'groups': 1 });
+db.users.createIndex({ createdAt: -1 });
+
+// Group indexes
+db.groups.createIndex({ teacher_id: 1 });
+db.groups.createIndex({ 'student_ids': 1 });
+
+// Topic indexes
+db.topics.createIndex({ slug: 1 }, { unique: true });
+db.topics.createIndex({ order: 1 });
+
+// Level indexes
+db.levels.createIndex({ topic_id: 1, order: 1 });
+
+// Template indexes
+db.templates.createIndex({ level_id: 1, active: 1 });
+db.templates.createIndex({ 'rule_ids': 1 });
+db.templates.createIndex({ version: -1 });
+db.templates.createIndex({ createdAt: -1 });
+
+// Task indexes with TTL (30 days)
+db.tasks.createIndex({ session_id: 1 });
+db.tasks.createIndex({ template_id: 1 });
+db.tasks.createIndex({ createdAt: 1 }, { expireAfterSeconds: 2592000 });
+
+// Attempt indexes
+db.attempts.createIndex({ session_id: 1 });
+db.attempts.createIndex({ task_id: 1 });
+db.attempts.createIndex({ timestamp: -1 });
+
+// Progress summary indexes
+db.progress_summary.createIndex({ user_id: 1, level_id: 1 }, { unique: true });
+db.progress_summary.createIndex({ level_id: 1, accuracy: -1 });
+
+// Hints log indexes
+db.hints_log.createIndex({ session_id: 1 });
+db.hints_log.createIndex({ task_id: 1 });
+
+// Rule indexes
+db.rules.createIndex({ slug: 1 }, { unique: true });
+
+// Word forms indexes (Template Generator)
+db.word_forms.createIndex({ pos: 1 });
+db.word_forms.createIndex({ lemma: 1 });
+db.word_forms.createIndex({ pos: 1, lemma: 1 });
+db.word_forms.createIndex({ frequency: -1 });
+
+// Example sentences indexes (Template Generator)
+db.example_sentences.createIndex({ topic: 1 });
+db.example_sentences.createIndex({ level: 1 });
+db.example_sentences.createIndex({ 'tags': 1 });
+db.example_sentences.createIndex({ topic: 1, level: 1 });
+
+// Incident indexes
+db.incidents.createIndex({ user_id: 1, timestamp: -1 });
+db.incidents.createIndex({ session_id: 1 });
+db.incidents.createIndex({ type: 1, severity: 1 });
+
+// Feature flag indexes
+db.feature_flags.createIndex({ flag_name: 1 }, { unique: true });
+
+// Materialized stats indexes
+db.materialized_stats.createIndex({ type: 1, entity_id: 1 }, { unique: true });
+db.materialized_stats.createIndex({ calculatedAt: -1 });
+
+// Leaderboard indexes with TTL (24 hours)
+db.leaderboards.createIndex({ scope: 1, scope_id: 1 }, { unique: true });
+db.leaderboards.createIndex({ generatedAt: 1 }, { expireAfterSeconds: 86400 });
+
+print('[SUCCESS] Indexes created');

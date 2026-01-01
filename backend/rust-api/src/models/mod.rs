@@ -28,6 +28,8 @@ pub struct CreateSessionRequest {
     pub user_id: String,
     pub task_id: String,
     pub group_id: Option<String>,
+    /// Опциональный level_id для генерации заданий через Template Generator
+    pub level_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

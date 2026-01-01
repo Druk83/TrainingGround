@@ -24,7 +24,11 @@ pub async fn create_session(
         req.task_id
     );
 
-    let service = SessionService::new(state.mongo.clone(), state.redis.clone());
+    let service = SessionService::new(
+        state.mongo.clone(),
+        state.redis.clone(),
+        state.config.python_api_url.clone(),
+    );
 
     match service.create_session(req).await {
         Ok(response) => Ok((StatusCode::CREATED, Json(response))),
@@ -47,7 +51,11 @@ pub async fn get_session(
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     tracing::info!("Getting session: {}", session_id);
 
-    let service = SessionService::new(state.mongo.clone(), state.redis.clone());
+    let service = SessionService::new(
+        state.mongo.clone(),
+        state.redis.clone(),
+        state.config.python_api_url.clone(),
+    );
 
     match service.get_session(&session_id).await {
         Ok(session) => Ok((StatusCode::OK, Json(session))),
@@ -61,7 +69,11 @@ pub async fn complete_session(
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     tracing::info!("Completing session: {}", session_id);
 
-    let service = SessionService::new(state.mongo.clone(), state.redis.clone());
+    let service = SessionService::new(
+        state.mongo.clone(),
+        state.redis.clone(),
+        state.config.python_api_url.clone(),
+    );
 
     match service.complete_session(&session_id).await {
         Ok(_) => Ok((StatusCode::NO_CONTENT, ())),
@@ -80,7 +92,11 @@ pub async fn submit_answer(
     tracing::info!("Submitting answer for session: {}", session_id);
 
     // Get session to verify it exists and get user_id, task_id
-    let session_service = SessionService::new(state.mongo.clone(), state.redis.clone());
+    let session_service = SessionService::new(
+        state.mongo.clone(),
+        state.redis.clone(),
+        state.config.python_api_url.clone(),
+    );
     let session = session_service
         .get_session(&session_id)
         .await
@@ -109,7 +125,11 @@ pub async fn request_hint(
     tracing::info!("Requesting hint for session: {}", session_id);
 
     // Get session to extract user_id and task_id
-    let session_service = SessionService::new(state.mongo.clone(), state.redis.clone());
+    let session_service = SessionService::new(
+        state.mongo.clone(),
+        state.redis.clone(),
+        state.config.python_api_url.clone(),
+    );
     let session = session_service
         .get_session(&session_id)
         .await

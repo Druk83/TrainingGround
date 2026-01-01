@@ -7,21 +7,74 @@ use chrono::Utc;
 use mongodb::bson::{doc, oid::ObjectId, Bson, Document};
 use mongodb::Database;
 use redis::aio::ConnectionManager;
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+#[derive(Debug, Serialize)]
+struct GenerateInstancesRequest {
+    level_id: String,
+    count: u32,
+    user_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GenerateInstancesResponse {
+    instances: Vec<TaskInstance>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TaskInstance {
+    task_id: String,
+    text: String,
+    correct_answer: String,
+    options: Option<Vec<String>>,
+    metadata: serde_json::Value,
+}
 
 pub struct SessionService {
     mongo: Database,
     redis: ConnectionManager,
+    http_client: Client,
+    python_api_url: String,
 }
 
 impl SessionService {
-    pub fn new(mongo: Database, redis: ConnectionManager) -> Self {
-        Self { mongo, redis }
+    pub fn new(mongo: Database, redis: ConnectionManager, python_api_url: String) -> Self {
+        Self {
+            mongo,
+            redis,
+            http_client: Client::new(),
+            python_api_url,
+        }
     }
 
     pub async fn create_session(&self, req: CreateSessionRequest) -> Result<CreateSessionResponse> {
         let session_id = Uuid::new_v4().to_string();
-        let task = self.fetch_task(&req.task_id).await?;
+
+        // Попытка генерации через Template Generator если указан level_id
+        let task = if let Some(ref level_id) = req.level_id {
+            match self.generate_and_store_task(level_id, &req.user_id).await {
+                Ok(generated_task) => {
+                    tracing::info!(
+                        "Generated task via Template Generator for level: {}",
+                        level_id
+                    );
+                    generated_task
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Template Generator failed ({}), falling back to MongoDB task_id: {}",
+                        e,
+                        req.task_id
+                    );
+                    self.fetch_task(&req.task_id).await?
+                }
+            }
+        } else {
+            // Fallback на готовое задание из MongoDB
+            self.fetch_task(&req.task_id).await?
+        };
 
         let now = Utc::now();
         let session_ttl = std::env::var("SESSION_DURATION_SECONDS")
@@ -162,6 +215,122 @@ impl SessionService {
             description,
             time_limit_seconds: time_limit_seconds as u32,
         })
+    }
+
+    /// Генерация задания через Template Generator и сохранение в MongoDB
+    async fn generate_and_store_task(&self, level_id: &str, user_id: &str) -> Result<FetchedTask> {
+        // Генерируем одно задание через Template Generator
+        let instances = self.generate_task_instances(level_id, user_id, 1).await?;
+
+        if instances.is_empty() {
+            return Err(anyhow!("Template Generator returned no instances"));
+        }
+
+        let instance = &instances[0];
+
+        // Сохраняем сгенерированное задание в MongoDB tasks коллекцию
+        let tasks_collection = self.mongo.collection::<Document>("tasks");
+
+        let now = Utc::now();
+        let now_bson = mongodb::bson::DateTime::from_millis(now.timestamp_millis());
+
+        let metadata_bson =
+            mongodb::bson::to_bson(&instance.metadata).unwrap_or(Bson::Document(doc! {}));
+
+        let task_doc = doc! {
+            "template_id": &instance.task_id,
+            "session_id": Uuid::new_v4().to_string(),
+            "content": {
+                "text": &instance.text,
+                "correct_answer": &instance.correct_answer,
+                "options": instance.options.as_ref().map(|opts| {
+                    opts.iter().map(|s| Bson::String(s.clone())).collect::<Vec<Bson>>()
+                }),
+            },
+            "correct_answer": &instance.correct_answer,
+            "hints": [],
+            "createdAt": now_bson,
+            "metadata": metadata_bson,
+        };
+
+        let insert_result = tasks_collection
+            .insert_one(task_doc)
+            .await
+            .context("Failed to insert generated task into MongoDB")?;
+
+        let inserted_id = match insert_result.inserted_id {
+            Bson::ObjectId(oid) => oid.to_hex(),
+            _ => return Err(anyhow!("Failed to get inserted task ID")),
+        };
+
+        tracing::info!("Stored generated task in MongoDB: {}", inserted_id);
+
+        // Возвращаем задание в формате FetchedTask
+        Ok(FetchedTask {
+            id: inserted_id,
+            title: format!("Generated task from level {}", level_id),
+            description: instance.text.clone(),
+            time_limit_seconds: 300, // 5 минут по умолчанию
+        })
+    }
+
+    /// Генерация экземпляров заданий через Template Generator (Python API)
+    async fn generate_task_instances(
+        &self,
+        level_id: &str,
+        user_id: &str,
+        count: u32,
+    ) -> Result<Vec<TaskInstance>> {
+        let url = format!("{}/internal/generate_instances", self.python_api_url);
+
+        let request_payload = GenerateInstancesRequest {
+            level_id: level_id.to_string(),
+            count,
+            user_id: user_id.to_string(),
+        };
+
+        tracing::debug!(
+            "Calling Template Generator API: {} with level_id={}, count={}",
+            url,
+            level_id,
+            count
+        );
+
+        let response = self
+            .http_client
+            .post(&url)
+            .json(&request_payload)
+            .timeout(std::time::Duration::from_secs(5))
+            .send()
+            .await
+            .context("Failed to call Template Generator API")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(anyhow!(
+                "Template Generator returned error {}: {}",
+                status,
+                error_text
+            ));
+        }
+
+        let api_response: GenerateInstancesResponse = response
+            .json()
+            .await
+            .context("Failed to parse Template Generator response")?;
+
+        tracing::info!(
+            "Generated {} task instances for level {} and user {}",
+            api_response.instances.len(),
+            level_id,
+            user_id
+        );
+
+        Ok(api_response.instances)
     }
 }
 
