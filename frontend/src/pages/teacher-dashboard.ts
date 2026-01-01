@@ -1,8 +1,8 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
+import '@/components/app-header';
 import { ApiClient } from '@/lib/api-client';
-import { authService } from '@/lib/auth-service';
 import type {
   ActivityEntry,
   ExportRequestPayload,
@@ -12,8 +12,8 @@ import type {
   RecommendationEntry,
   TopicAnalyticsEntry,
 } from '@/lib/api-types';
+import { authService } from '@/lib/auth-service';
 import { sanitizeDisplayName } from '@/lib/sanitization';
-import '@/components/app-header';
 
 type PeriodKey = 'day' | 'week' | 'month';
 
@@ -446,7 +446,8 @@ export class TeacherDashboard extends LitElement {
               : this.renderGroupSelector()}
             <div class="header-buttons">
               <a class="action-link primary" href=${this.studentListUrl}>Ученики</a>
-              <a class="action-link" href="#export-form">Экспорт</a>
+              <a class="action-link" href="/teacher/analytics">Аналитика</a>
+              <a class="action-link" href="/teacher/reports">Отчёты</a>
               <a class="action-link" href="/teacher/notifications">Уведомления</a>
             </div>
           </div>

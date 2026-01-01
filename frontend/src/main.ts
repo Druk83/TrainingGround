@@ -42,10 +42,13 @@ const isLogin = pathname.startsWith('/login');
 const isRegister = pathname.startsWith('/register');
 const isForbidden = pathname.startsWith('/forbidden') || pathname.startsWith('/403');
 const isProfile = pathname.startsWith('/profile');
-const isTeacherDashboard = pathname.startsWith('/teacher-dashboard');
+const isTeacherDashboard =
+  pathname.startsWith('/teacher-dashboard') || pathname === '/teacher';
 const isTeacherStudentsList = pathname === '/teacher/students';
 const isTeacherStudentDetail =
   pathname.startsWith('/teacher/students/') && pathname.split('/').length >= 4;
+const isTeacherAnalytics = pathname === '/teacher/analytics';
+const isTeacherReports = pathname === '/teacher/reports';
 const isTeacherNotifications = pathname.startsWith('/teacher/notifications');
 const isUsersManagement = pathname.startsWith('/admin/users');
 const isGroupsManagement = pathname.startsWith('/admin/groups');
@@ -72,6 +75,9 @@ const isAdminConsole = pathname.startsWith('/admin-console') || pathname === '/a
     !isAuditLogs &&
     !isSystemSettings &&
     !isTeacherDashboard &&
+    !isTeacherStudentsList &&
+    !isTeacherAnalytics &&
+    !isTeacherReports &&
     !isTeacherNotifications;
 
   if (appShell) {
@@ -181,6 +187,26 @@ const isAdminConsole = pathname.startsWith('/admin-console') || pathname === '/a
       wrapper.style.minHeight = '100vh';
       document.body.appendChild(wrapper);
       wrapper.appendChild(document.createElement('teacher-notifications'));
+    });
+  } else if (isTeacherAnalytics) {
+    if (!requireAuth()) return;
+    if (!requireRole(['teacher', 'admin'])) return;
+
+    import('./pages/teacher-analytics').then(() => {
+      const wrapper = document.createElement('div');
+      wrapper.style.minHeight = '100vh';
+      document.body.appendChild(wrapper);
+      wrapper.appendChild(document.createElement('teacher-analytics'));
+    });
+  } else if (isTeacherReports) {
+    if (!requireAuth()) return;
+    if (!requireRole(['teacher', 'admin'])) return;
+
+    import('./pages/teacher-reports').then(() => {
+      const wrapper = document.createElement('div');
+      wrapper.style.minHeight = '100vh';
+      document.body.appendChild(wrapper);
+      wrapper.appendChild(document.createElement('teacher-reports'));
     });
   } else if (isTeacherDashboard) {
     if (!requireAuth()) return;

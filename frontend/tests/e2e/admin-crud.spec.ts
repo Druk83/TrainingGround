@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const adminProfile = {
   id: 'admin-e2e',
@@ -9,8 +9,8 @@ const adminProfile = {
   created_at: new Date().toISOString(),
 };
 
-function seedAdminProfile(page) {
-  return page.addInitScript((user) => {
+function seedAdminProfile(page: Page) {
+  return page.addInitScript((user: typeof adminProfile) => {
     try {
       window.localStorage.setItem('access_token', 'e2e-admin-token');
       window.localStorage.setItem('user', JSON.stringify(user));
