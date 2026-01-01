@@ -1,8 +1,10 @@
-import { LitElement, html, css, nothing } from 'lit';
+import type { LessonStoreSnapshot, ScoreState, TimerState } from '@/lib/session-store';
+import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import type { LessonStoreSnapshot, TimerState, ScoreState } from '@/lib/session-store';
-import './timer-display';
+import './question-renderer';
+import type { Question } from './question-renderer';
 import './score-board';
+import './timer-display';
 
 type ActiveSession = LessonStoreSnapshot['activeSession'];
 
@@ -12,6 +14,7 @@ export class LessonPlayer extends LitElement {
     session: { type: Object },
     timer: { type: Object },
     scoreboard: { type: Object },
+    question: { type: Object },
     answer: { type: String },
     hotkeysEnabled: { type: Boolean },
   };
@@ -19,17 +22,68 @@ export class LessonPlayer extends LitElement {
   declare session?: ActiveSession;
   declare timer?: TimerState;
   declare scoreboard?: ScoreState;
+  declare question?: Question;
   declare answer: string;
   declare hotkeysEnabled: boolean;
 
   @state()
   declare private answerError?: string;
 
+  private questionRendererRef?: HTMLElement;
+
   constructor() {
     super();
     this.answer = '';
     this.hotkeysEnabled = false;
+    this.setupDocumentListeners();
   }
+
+  connectedCallback() {
+    super.connectedCallback();
+    document.addEventListener('keydown', this.handleDocumentKeydown);
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    document.removeEventListener('keydown', this.handleDocumentKeydown);
+  }
+
+  private setupDocumentListeners() {
+    this.handleDocumentKeydown = this.handleDocumentKeydown.bind(this);
+  }
+
+  private handleDocumentKeydown = (event: KeyboardEvent) => {
+    if (!this.hotkeysEnabled) return;
+
+    if (event.key === 'h' || event.key === 'H') {
+      event.preventDefault();
+      this.dispatchEvent(
+        new CustomEvent('request-hint', { bubbles: true, composed: true }),
+      );
+    } else if (event.key === 's' || event.key === 'S') {
+      const isInTextarea = (event.target as HTMLElement)?.tagName === 'TEXTAREA';
+      if (!isInTextarea) {
+        event.preventDefault();
+        const renderer = this.querySelector('question-renderer') as HTMLElement & {
+          getAnswer?: () => string | undefined;
+        };
+        if (renderer) {
+          renderer.dispatchEvent(
+            new CustomEvent('answer-submit', {
+              detail: { answer: renderer.getAnswer?.() },
+              bubbles: true,
+              composed: true,
+            }),
+          );
+        }
+      }
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      this.dispatchEvent(
+        new CustomEvent('close-modal', { bubbles: true, composed: true }),
+      );
+    }
+  };
 
   static styles = css`
     :host {
@@ -137,11 +191,6 @@ export class LessonPlayer extends LitElement {
       return html`<p>Выберите урок в каталоге, чтобы начать тренировку.</p>`;
     }
 
-    const descriptionIds = ['answer-instructions'];
-    if (this.answerError) {
-      descriptionIds.push('answer-error');
-    }
-
     return html`
       <div>
         <h1>${this.session.title}</h1>
@@ -149,77 +198,47 @@ export class LessonPlayer extends LitElement {
       </div>
       <timer-display .data=${this.timer}></timer-display>
       <score-board .data=${this.scoreboard}></score-board>
-      <label>
-        <span class="sr-only">Поле для ответа</span>
-        <textarea
-          .value=${this.answer}
-          @input=${this.onInput}
-          @keydown=${this.onKeyDown}
-          aria-label="Ответ на задание"
-          aria-describedby=${descriptionIds.join(' ')}
-          aria-invalid=${this.answerError ? 'true' : 'false'}
-        ></textarea>
-      </label>
-      <div class="field-meta" id="answer-instructions">
-        ${this.hotkeysEnabled
-          ? html`Горячие клавиши: Ctrl+Enter внутри поля, S (вне поля ввода).`
-          : html`Введите развёрнутый ответ и нажмите «Отправить».`}
-      </div>
+      ${this.question
+        ? html`
+            <question-renderer
+              .question=${this.question}
+              .answer=${this.answer}
+              .hotkeysEnabled=${this.hotkeysEnabled}
+              @answer-submit=${this.onAnswerSubmit}
+              @answer-error=${this.onAnswerError}
+              @answer-typing=${this.onAnswerTyping}
+            ></question-renderer>
+          `
+        : html`<p>Загрузка задания...</p>`}
       ${this.answerError
-        ? html`<p class="field-error" id="answer-error" role="alert" aria-live="polite">
+        ? html`<p class="field-error" role="alert" aria-live="polite">
             ${this.answerError}
           </p>`
         : null}
-      <button
-        class="submit"
-        @click=${this.handleSubmitClick}
-        title=${this.hotkeysEnabled ? 'Ctrl+Enter или S (вне поля ввода)' : nothing}
-      >
-        Отправить ответ
-        ${this.hotkeysEnabled
-          ? html`<span class="hotkey-badge" aria-hidden="true">S</span>`
-          : null}
-      </button>
     `;
   }
 
-  private onInput(event: Event) {
-    const target = event.target as HTMLTextAreaElement;
-    this.answer = target.value;
-    this.answerError = undefined;
-    this.dispatchEvent(
-      new CustomEvent('answer-typing', { bubbles: true, composed: true }),
-    );
-  }
-
-  private onKeyDown(event: KeyboardEvent) {
-    if (event.ctrlKey && event.key === 'Enter') {
-      event.preventDefault();
-      this.attemptSubmit();
-    }
-  }
-
-  private handleSubmitClick = () => {
-    this.attemptSubmit();
-  };
-
-  public submitAnswerFromHost() {
-    this.attemptSubmit();
-  }
-
-  private attemptSubmit() {
-    if (!this.answer.trim()) {
-      this.answerError = 'Введите ответ перед отправкой.';
-      return;
-    }
+  private onAnswerSubmit = (event: CustomEvent) => {
     this.answerError = undefined;
     this.dispatchEvent(
       new CustomEvent('answer-submit', {
-        detail: { answer: this.answer },
+        detail: event.detail,
         bubbles: true,
         composed: true,
       }),
     );
-    this.answer = '';
-  }
+  };
+
+  private onAnswerError = (event: CustomEvent) => {
+    this.answerError = event.detail.message;
+  };
+
+  private onAnswerTyping = (_event: CustomEvent) => {
+    this.dispatchEvent(
+      new CustomEvent('answer-typing', {
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  };
 }

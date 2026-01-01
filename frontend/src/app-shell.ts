@@ -1,22 +1,21 @@
-import { LitElement, html, css, PropertyValues } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
-import { classMap } from 'lit/directives/class-map.js';
-import {
-  lessonStore,
-  type LessonStoreSnapshot,
-  type ScoreState,
-  type TimerState,
-  type ConflictResolution,
-  MAX_HINTS_PER_SESSION,
-} from '@/lib/session-store';
-import { isFeatureEnabled } from '@/lib/feature-flags';
+import '@/components/conflict-resolver';
+import '@/components/connection-indicator';
+import '@/components/hint-panel';
 import '@/components/lesson-catalog';
 import '@/components/lesson-player';
 import '@/components/lesson-results';
-import '@/components/hint-panel';
-import '@/components/connection-indicator';
-import '@/components/conflict-resolver';
-import type { LessonPlayer } from '@/components/lesson-player';
+import { isFeatureEnabled } from '@/lib/feature-flags';
+import {
+  type ConflictResolution,
+  lessonStore,
+  type LessonStoreSnapshot,
+  MAX_HINTS_PER_SESSION,
+  type ScoreState,
+  type TimerState,
+} from '@/lib/session-store';
+import { css, html, LitElement, PropertyValues } from 'lit';
+import { customElement, state } from 'lit/decorators.js';
+import { classMap } from 'lit/directives/class-map.js';
 
 // Reserved for future state management (currently using lessonStore directly)
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -688,17 +687,9 @@ export class AppShell extends LitElement {
       this.forwardHint();
     } else if (key === 's' || isCtrlEnter) {
       event.preventDefault();
-      this.submitAnswerFromHotkey();
+      // Отправка ответа обрабатывается в lesson-player через обработчик события
     }
   };
-
-  private submitAnswerFromHotkey() {
-    if (!this.snapshot.activeSession) {
-      return;
-    }
-    const player = this.renderRoot?.querySelector<LessonPlayer>('lesson-player');
-    player?.submitAnswerFromHost();
-  }
 
   private isInputLikeTarget(target: HTMLElement | null) {
     if (!target) {
