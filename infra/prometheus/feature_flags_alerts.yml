@@ -1,0 +1,85 @@
+# Feature Flags metrics configuration for Prometheus
+
+# Metrics to add to Prometheus scrape config:
+# - feature_flags_active_total: gauge - количество активных (enabled=true) флагов
+# - feature_flags_check_total: counter - общее количество проверок флагов
+# - feature_flags_cache_hits: counter - попадания в Redis кэш
+# - feature_flags_cache_misses: counter - промахи кэша
+# - feature_flags_update_timestamp: gauge - timestamp последнего обновления флага
+
+# Alert rules for alerting:
+groups:
+  - name: feature_flags
+    interval: 30s
+    rules:
+      # Alert if more than 5 feature flags were changed in last 5 minutes
+      - alert: FeatureFlagsUpdatedFrequently
+        expr: increase(feature_flags_updated_total[5m]) > 5
+        for: 1m
+        labels:
+          severity: warning
+          component: feature_flags
+        annotations:
+          summary: "Feature flags updated too frequently"
+          description: "{{ $value }} feature flags were updated in the last 5 minutes"
+
+      # Alert if cache hit rate drops below 70%
+      - alert: FeatureFlagsCacheHitRateLow
+        expr: |
+          (increase(feature_flags_cache_hits[5m]) / 
+           (increase(feature_flags_cache_hits[5m]) + increase(feature_flags_cache_misses[5m]))) < 0.7
+        for: 5m
+        labels:
+          severity: warning
+          component: feature_flags
+        annotations:
+          summary: "Feature flags cache hit rate is low"
+          description: "Cache hit rate is {{ $value | humanizePercentage }}"
+
+      # Alert if no flags are active (likely misconfiguration)
+      - alert: NoActiveFeatureFlags
+        expr: feature_flags_active_total == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: feature_flags
+        annotations:
+          summary: "No active feature flags found"
+          description: "All feature flags are disabled - possible configuration error"
+
+      # Alert if flag check rate is unusually high (possible DoS)
+      - alert: FeatureFlagsCheckRateAnomaly
+        expr: rate(feature_flags_check_total[1m]) > 10000
+        for: 2m
+        labels:
+          severity: warning
+          component: feature_flags
+        annotations:
+          summary: "Unusual feature flags check rate"
+          description: "Check rate is {{ $value | humanize }} per second"
+
+# Slack/Telegram webhook configuration for alerts
+# Add to Alertmanager config:
+receivers:
+  - name: 'feature-flags-alerts'
+    webhook_configs:
+      - url: 'http://slack-webhook:5001/api/slack'
+        # OR for Telegram:
+        # - url: 'http://telegram-webhook:5002/api/telegram'
+        send_resolved: true
+    
+# Example Slack message template:
+# Message will include:
+# - Alert name (e.g., "FeatureFlagsUpdatedFrequently")
+# - Severity level (warning/critical)
+# - Description with current value
+# - Link to Grafana dashboard (if configured)
+
+# Grafana dashboard JSON should be created manually or imported from:
+# - Example dashboard: https://grafana.com/grafana/dashboards/[ID]
+# Key panels:
+# 1. Active flags gauge
+# 2. Check rate line chart
+# 3. Cache hit rate percentage
+# 4. Flag update timeline (last 24h)
+# 5. Error rate by flag

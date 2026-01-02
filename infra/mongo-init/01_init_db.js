@@ -246,13 +246,18 @@ db.createCollection('feature_flags', {
   validator: {
     $jsonSchema: {
       bsonType: 'object',
-      required: ['flag_name', 'enabled', 'updatedAt'],
+      required: ['flag_key', 'enabled', 'scope', 'version', 'updated_at'],
       properties: {
-        flag_name: { bsonType: 'string', pattern: '^[a-z_]+$' },
+        flag_key: { bsonType: 'string', pattern: '^[a-z0-9_]+$' },
+        description: { bsonType: 'string' },
         enabled: { bsonType: 'bool' },
-        rollout_percentage: { bsonType: 'int', minimum: 0, maximum: 100 },
-        target_groups: { bsonType: 'array', items: { bsonType: 'string' } },
-        updatedAt: { bsonType: 'date' }
+        scope: { enum: ['global', 'group', 'user'] },
+        target_ids: { bsonType: 'array', items: { bsonType: 'string' } },
+        config: { bsonType: 'object' },
+        version: { bsonType: 'int', minimum: 1 },
+        updated_at: { bsonType: 'date' },
+        updated_by: { bsonType: 'string' },
+        change_reason: { bsonType: 'string' }
       }
     }
   }

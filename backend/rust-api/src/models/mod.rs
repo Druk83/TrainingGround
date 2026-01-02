@@ -52,6 +52,7 @@ pub mod anticheat;
 pub mod audit_log;
 pub mod backup;
 pub mod content;
+pub mod feature_flag;
 pub mod group;
 pub mod hint;
 pub mod notification;

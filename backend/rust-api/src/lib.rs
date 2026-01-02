@@ -58,6 +58,10 @@ pub fn create_router(app_state: std::sync::Arc<services::AppState>) -> Router {
     Router::new()
         // Public endpoints (no auth required)
         .route("/health", get(handlers::health_check))
+        .route(
+            "/api/feature-flags",
+            get(handlers::feature_flags::get_feature_flags),
+        )
         // Metrics endpoint with Basic Auth protection
         .route(
             "/metrics",
@@ -281,10 +285,15 @@ fn admin_routes(
         )
         .route("/rules/coverage", get(handlers::admin::rule_coverage))
         .route("/queue", get(handlers::admin::queue_status))
-        .route("/feature-flags", get(handlers::admin::list_feature_flags))
         .route(
-            "/feature-flags/{flag_name}",
-            put(handlers::admin::update_feature_flag),
+            "/feature-flags",
+            get(handlers::admin::list_feature_flags).post(handlers::admin::create_feature_flag),
+        )
+        .route(
+            "/feature-flags/{flag_key}",
+            get(handlers::admin::get_feature_flag)
+                .put(handlers::admin::update_feature_flag)
+                .delete(handlers::admin::delete_feature_flag),
         )
         // Backups
         .route(

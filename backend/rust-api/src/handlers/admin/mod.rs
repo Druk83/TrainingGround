@@ -1,5 +1,6 @@
 mod audit;
 mod backups;
+mod feature_flags;
 mod groups;
 mod incidents;
 mod settings;
@@ -8,6 +9,7 @@ mod users;
 
 pub use audit::*;
 pub use backups::*;
+pub use feature_flags::*;
 pub use groups::*;
 pub use incidents::*;
 pub use settings::*;
@@ -27,12 +29,11 @@ use crate::{
     middlewares::auth::JwtClaims,
     models::content::{
         EmbeddingConsistencyReport, EmbeddingJobSummary, EmbeddingRebuildRequest,
-        FeatureFlagRecord, FeatureFlagUpdateRequest, LevelCreateRequest, LevelRecord,
-        LevelReorderRequest, LevelUpdateRequest, QueueStatus, RuleCoverage, RuleCreateRequest,
-        RuleRecord, RuleUpdateRequest, TemplateCreateRequest, TemplateDetail, TemplateDuplicate,
-        TemplateListQuery, TemplateRevertRequest, TemplateSummary, TemplateUpdateRequest,
-        TemplateValidationIssue, TemplateVersionSummary, TopicCreateRequest, TopicRecord,
-        TopicUpdateRequest,
+        LevelCreateRequest, LevelRecord, LevelReorderRequest, LevelUpdateRequest, QueueStatus,
+        RuleCoverage, RuleCreateRequest, RuleRecord, RuleUpdateRequest, TemplateCreateRequest,
+        TemplateDetail, TemplateDuplicate, TemplateListQuery, TemplateRevertRequest,
+        TemplateSummary, TemplateUpdateRequest, TemplateValidationIssue, TemplateVersionSummary,
+        TopicCreateRequest, TopicRecord, TopicUpdateRequest,
     },
     services::{content_service::ContentService, AppState},
 };
@@ -335,27 +336,6 @@ pub async fn queue_status(
     let service = ContentService::new(&state);
     let status = service.queue_status().await?;
     Ok(Json(status))
-}
-
-pub async fn list_feature_flags(
-    State(state): State<Arc<AppState>>,
-) -> Result<Json<Vec<FeatureFlagRecord>>, ApiError> {
-    let service = ContentService::new(&state);
-    let list = service.list_feature_flags().await?;
-    Ok(Json(list))
-}
-
-pub async fn update_feature_flag(
-    State(state): State<Arc<AppState>>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(flag_name): Path<String>,
-    Json(payload): Json<FeatureFlagUpdateRequest>,
-) -> Result<Json<FeatureFlagRecord>, ApiError> {
-    let service = ContentService::new(&state);
-    let updated = service
-        .update_feature_flag(&flag_name, payload, &claims)
-        .await?;
-    Ok(Json(updated))
 }
 
 fn parse_object_id(value: &str, field: &str) -> Result<ObjectId, ApiError> {
