@@ -1,0 +1,117 @@
+# ZAP Scanning Rules
+# Format: <rule_id>	<threshold>	<action>
+# Threshold: OFF, DEFAULT, LOW, MEDIUM, HIGH
+# Action: IGNORE, WARN, FAIL
+
+# Игнорировать для development endpoints
+10011	IGNORE	dev	# Cookie Without Secure Flag (dev only)
+10015	IGNORE	dev	# Incomplete or No Cache-control Header Set (dev only)
+
+# Критичные правила - FAIL
+10016	HIGH	FAIL	# Web Browser XSS Protection Not Enabled
+10017	HIGH	FAIL	# Cross-Domain JavaScript Source File Inclusion
+10020	HIGH	FAIL	# X-Frame-Options Header Not Set
+10021	HIGH	FAIL	# X-Content-Type-Options Header Missing
+10023	HIGH	FAIL	# Information Disclosure - Debug Error Messages
+10024	HIGH	FAIL	# Information Disclosure - Sensitive Information in URL
+10025	HIGH	FAIL	# Information Disclosure - Sensitive Information in HTTP Referrer Header
+10026	HIGH	FAIL	# HTTP Parameter Override
+10027	HIGH	FAIL	# Information Disclosure - Suspicious Comments
+10028	HIGH	FAIL	# Open Redirect
+10029	HIGH	FAIL	# Cookie Poisoning
+10030	HIGH	FAIL	# User Controllable Charset
+10031	HIGH	FAIL	# User Controllable HTML Element Attribute
+10032	HIGH	FAIL	# Viewstate Scanner
+10033	HIGH	FAIL	# Directory Browsing
+10034	HIGH	FAIL	# Heartbleed OpenSSL Vulnerability
+10035	HIGH	FAIL	# Strict-Transport-Security Header Not Set
+10036	HIGH	FAIL	# HTTP Server Response Header
+10037	HIGH	FAIL	# Server Leaks Information via "X-Powered-By" HTTP Response Header
+10038	HIGH	FAIL	# Content Security Policy (CSP) Header Not Set
+10039	HIGH	FAIL	# X-Backend-Server Header Information Leak
+10040	HIGH	FAIL	# Secure Pages Include Mixed Content
+10041	HIGH	FAIL	# HTTP to HTTPS Insecure Transition in Form Post
+10042	HIGH	FAIL	# HTTPS to HTTP Insecure Transition in Form Post
+10043	HIGH	FAIL	# User Controllable JavaScript Event (XSS)
+10044	HIGH	FAIL	# Big Redirect Detected (Potential Sensitive Information Leak)
+10045	HIGH	FAIL	# Source Code Disclosure - /WEB-INF folder
+10046	HIGH	FAIL	# Insecure HTTP Method
+10047	HIGH	FAIL	# HTTPS Content Available via HTTP
+10048	HIGH	FAIL	# Remote Code Execution - Shell Shock
+10049	HIGH	FAIL	# Content Cacheability
+10050	HIGH	FAIL	# Retrieved from Cache
+10051	HIGH	FAIL	# Relative Path Confusion
+10052	HIGH	FAIL	# X-ChromeLogger-Data Header Information Leak
+10053	HIGH	FAIL	# Apache Range Header DoS (CVE-2011-3192)
+10054	HIGH	FAIL	# Cookie Without SameSite Attribute
+10055	HIGH	FAIL	# CSP Scanner
+10056	HIGH	FAIL	# X-Debug-Token Information Leak
+10057	HIGH	FAIL	# Username Hash Found
+10058	HIGH	FAIL	# GET for POST
+10059	HIGH	FAIL	# Feature Policy Header Not Set
+10060	HIGH	FAIL	# X-AspNet-Version Response Header
+10061	HIGH	FAIL	# X-AspNetMvc-Version Response Header
+10062	HIGH	FAIL	# PII Disclosure
+10063	HIGH	FAIL	# Permissions Policy Header Not Set
+10094	HIGH	FAIL	# Base64 Disclosure
+10095	HIGH	FAIL	# Backup File Disclosure
+10096	HIGH	FAIL	# Timestamp Disclosure
+10097	HIGH	FAIL	# Hash Disclosure
+10098	HIGH	FAIL	# Cross-Domain Misconfiguration
+10099	HIGH	FAIL	# Source Code Disclosure
+10103	HIGH	FAIL	# Clickjacking
+10104	HIGH	FAIL	# User Agent Fuzzer
+10105	HIGH	FAIL	# Weak Authentication Method
+
+# SQL Injection
+40018	HIGH	FAIL	# SQL Injection
+40019	HIGH	FAIL	# SQL Injection - MySQL
+40020	HIGH	FAIL	# SQL Injection - Hypersonic SQL
+40021	HIGH	FAIL	# SQL Injection - Oracle
+40022	HIGH	FAIL	# SQL Injection - PostgreSQL
+40023	HIGH	FAIL	# SQL Injection - SQLite
+
+# XSS
+40012	HIGH	FAIL	# Cross Site Scripting (Reflected)
+40013	HIGH	FAIL	# Cross Site Scripting (Persistent)
+40014	HIGH	FAIL	# Cross Site Scripting (DOM Based)
+40016	HIGH	FAIL	# Cross Site Scripting (Persistent) - Prime
+40017	HIGH	FAIL	# Cross Site Scripting (Persistent) - Spider
+
+# Path Traversal
+6	HIGH	FAIL	# Path Traversal
+
+# External Redirect
+20019	HIGH	FAIL	# External Redirect
+
+# CSRF
+10202	HIGH	FAIL	# Absence of Anti-CSRF Tokens
+
+# Command Injection
+90020	HIGH	FAIL	# Remote OS Command Injection
+
+# Buffer Overflow
+30001	HIGH	FAIL	# Buffer Overflow
+
+# Format String
+30002	HIGH	FAIL	# Format String Error
+
+# CRLF Injection
+40003	HIGH	FAIL	# CRLF Injection
+
+# LDAP Injection
+40015	HIGH	FAIL	# LDAP Injection
+
+# XML/XXE
+90019	HIGH	FAIL	# Server Side Code Injection
+90021	HIGH	FAIL	# XML External Entity Attack
+90022	HIGH	FAIL	# XML Entity Expansion
+
+# Warnings для менее критичных проблем
+10010	MEDIUM	WARN	# Cookie No HttpOnly Flag
+10011	MEDIUM	WARN	# Cookie Without Secure Flag
+10015	MEDIUM	WARN	# Incomplete or No Cache-control Header Set
+10019	MEDIUM	WARN	# Content-Type Header Missing
+10109	MEDIUM	WARN	# Modern Web Application
+10110	MEDIUM	WARN	# Dangerous JS Functions
+10202	MEDIUM	WARN	# Absence of Anti-CSRF Tokens

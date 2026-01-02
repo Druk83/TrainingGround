@@ -401,7 +401,7 @@ impl AnticheatService {
         if let (Some(token), Some(chat_id)) = (bot_token, chat_id) {
             let url = format!("https://api.telegram.org/bot{token}/sendMessage");
             let text = format!(
-                "🚨 Anticheat {:?} for user {}\nSpeed: {}\nRepeated: {}\nAction: {:?}",
+                "ALERT: Anticheat {:?} for user {}\nSpeed: {}\nRepeated: {}\nAction: {:?}",
                 incident.incident_type,
                 incident.user_id,
                 incident.details.speed_hits.unwrap_or(0),

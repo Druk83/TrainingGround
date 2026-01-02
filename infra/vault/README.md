@@ -143,12 +143,22 @@ export VAULT_TOKEN=<your-root-token>
 После ротации ключей рекомендуется перешифровать старые данные:
 
 ```bash
-# TODO: Создать скрипт reencrypt-old-data.sh
-# Скрипт должен:
-# 1. Читать старые данные (они расшифруются старым ключом)
-# 2. Записывать обратно (зашифруются новым ключом)
-# 3. Выполняться порционно для избежания нагрузки
+# Dry run (проверка без изменений)
+DRY_RUN=true ./infra/vault/reencrypt-old-data.sh
+
+# Реальная re-encryption
+VAULT_TOKEN=<your-token> ./infra/vault/reencrypt-old-data.sh
+
+# С custom параметрами
+BATCH_SIZE=50 MONGO_URI=mongodb://... ./infra/vault/reencrypt-old-data.sh
 ```
+
+Скрипт выполняет:
+1. Проверку подключения к MongoDB и Vault
+2. Чтение старых данных (расшифровка старым ключом)
+3. Запись обратно (шифрование новым ключом)
+4. Обработку порциями для снижения нагрузки
+5. Верификацию успешности re-encryption
 
 ## Production Setup
 
