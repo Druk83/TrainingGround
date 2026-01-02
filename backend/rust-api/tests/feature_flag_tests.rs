@@ -38,7 +38,7 @@ mod tests {
             "target_ids": [],
         };
 
-        // Group flag (disabled)
+        // Group flag (disabled, but matches scope)
         let group_flag = doc! {
             "flag_key": "test",
             "enabled": false,
@@ -54,10 +54,10 @@ mod tests {
             "target_ids": vec![user_id],
         };
 
-        // With user flag enabled, should be enabled even if group is disabled
+        // User flag matches user scope
         assert!(matches_scope_and_targets(&user_flag, user_id, group_id));
-        // If user flag wasn't provided, group would take precedence
-        assert!(!matches_scope_and_targets(&group_flag, user_id, group_id));
+        // Group flag matches group scope
+        assert!(matches_scope_and_targets(&group_flag, user_id, group_id));
     }
 
     #[test]
@@ -171,13 +171,22 @@ mod tests {
 
     #[test]
     fn test_dependency_validation_hints_needs_explanation_api() {
+        let explanation_api_enabled = create_test_flag("explanation_api_enabled", true, "global");
         let explanation_api_disabled = create_test_flag("explanation_api_enabled", false, "global");
         let _hints_flag = create_test_flag("hints_enabled", true, "global");
 
-        // Trying to enable hints when explanation_api is disabled should fail
+        // Dependencies: hints requires explanation_api
         let dependencies = vec![("hints_enabled", "explanation_api_enabled")];
 
+        // When parent is enabled, validation passes
         assert!(validate_dependency(
+            &explanation_api_enabled,
+            &explanation_api_enabled,
+            &dependencies
+        ));
+
+        // When parent is disabled, validation fails
+        assert!(!validate_dependency(
             &explanation_api_disabled,
             &explanation_api_disabled,
             &dependencies
