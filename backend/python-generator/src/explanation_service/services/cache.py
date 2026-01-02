@@ -32,7 +32,7 @@ class ExplanationCache:
         encoded = json.dumps(serializable, sort_keys=True, ensure_ascii=False).encode(
             "utf-8"
         )
-        return hashlib.sha1(encoded).hexdigest()
+        return hashlib.sha256(encoded).hexdigest()
 
     def _key(self, task_id: str) -> str:
         return f"explanation:cache:{task_id}"

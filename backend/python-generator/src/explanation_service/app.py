@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
 
 import redis.asyncio as redis
 from fastapi import FastAPI
@@ -39,11 +40,16 @@ def create_app() -> FastAPI:
         redoc_url=None,
     )
 
+    # CORS: использовать конкретные origins вместо wildcard
+    allowed_origins = os.getenv(
+        "CORS_ALLOWED_ORIGINS", "http://localhost:4173,http://localhost:8081"
+    ).split(",")
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=allowed_origins,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
+        allow_credentials=True,
     )
     app.add_middleware(RateLimitMiddleware, limit=120, window_seconds=60)
     app.add_middleware(CircuitBreakerMiddleware, failure_threshold=4, recovery_time=20)

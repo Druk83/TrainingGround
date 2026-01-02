@@ -63,12 +63,12 @@ jobs:
 
       - name: Setup Docker Compose
         run: |
-          docker-compose --version
+          docker compose version
 
       - name: Start application
         run: |
           # Запуск в тестовом режиме
-          docker-compose up -d mongodb-primary redis rust-api
+          docker compose up -d mongodb-primary redis rust-api
           echo "Waiting for services to start..."
           sleep 30
 
@@ -110,7 +110,7 @@ jobs:
 
       - name: Shutdown services
         if: always()
-        run: docker-compose down
+        run: docker compose down
 
   sast-analysis:
     name: SAST Analysis

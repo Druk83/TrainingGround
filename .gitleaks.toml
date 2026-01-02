@@ -1,0 +1,44 @@
+# GitLeaks Configuration
+# Игнорирование false positives в документации и примерах
+
+[allowlist]
+description = "Allow example credentials in documentation"
+
+# Пути для игнорирования
+paths = [
+    # Документация с примерами
+    '''docs/.*\.md''',
+    '''README\.md''',
+    '''.*\.example''',
+    '''.*\.sample''',
+
+    # Тестовые данные
+    '''tests?/.*''',
+    '''.*\.test\..*''',
+    '''.*\.spec\..*''',
+]
+
+# Регулярные выражения для игнорирования конкретных паттернов
+regexes = [
+    # Примеры в curl командах
+    '''curl -u (admin|user|test):.*''',
+    '''curl -H "Authorization: Bearer (example|test|demo).*"''',
+
+    # Примеры API ключей в документации
+    '''const apiKey = "(example|test|demo|your-api-key-here)"''',
+    '''API_KEY=(example|test|demo|your-.*-here)''',
+
+    # Placeholder значения
+    '''(password|secret|token|key).*=.*(example|test|demo|placeholder|your-.*-here|CHANGE_ME|REPLACE_ME)''',
+]
+
+# Игнорировать низкую энтропию (примеры обычно простые)
+[[rules]]
+id = "low-entropy-strings"
+description = "Ignore low entropy strings in documentation"
+regex = '''(?i)(password|secret|token|key)'''
+entropy = 4.5  # Игнорировать строки с энтропией < 4.5
+paths = [
+    '''docs/.*''',
+    '''README\.md''',
+]

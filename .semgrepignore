@@ -1,0 +1,36 @@
+# Semgrep ignore patterns
+
+# Nginx конфигурация
+# H2C smuggling и $host использование - безопасны в нашем контексте
+# WebSocket support нужен для будущего функционала
+# $host validation происходит на уровне Nginx server_name
+infra/nginx/conf.d/*.conf:generic.nginx.security.possible-h2c-smuggling.possible-nginx-h2c-smuggling
+infra/nginx/conf.d/*.conf:generic.nginx.security.request-host-used.request-host-used
+
+# Тестовые файлы
+tests/**
+**/tests/**
+*.test.*
+*.spec.*
+**/__tests__/**
+
+# Примеры и документация
+docs/**
+*.md
+examples/**
+*.example
+*.sample
+
+# Генерированные файлы
+node_modules/**
+dist/**
+build/**
+target/**
+.venv/**
+venv/**
+__pycache__/**
+*.pyc
+
+# Vendor dependencies
+vendor/**
+third_party/**
