@@ -25,10 +25,11 @@ services:
     networks:
       - trainingground-network
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      test: ["CMD", "mongosh", "admin", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   mongodb-secondary1:
     image: mongo:6
@@ -51,10 +52,11 @@ services:
     networks:
       - trainingground-network
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      test: ["CMD", "mongosh", "admin", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   mongodb-secondary2:
     image: mongo:6
@@ -77,10 +79,11 @@ services:
     networks:
       - trainingground-network
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      test: ["CMD", "mongosh", "admin", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   # Инициализатор MongoDB Replica Set — запускается один раз для настройки реплика-сета
   mongodb-init:
