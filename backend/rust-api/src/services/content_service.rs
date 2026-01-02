@@ -178,6 +178,7 @@ impl ContentService {
         let rule_ids = parse_object_id_list(&payload.rule_ids)?;
         self.ensure_level_exists(&level_obj).await?;
         self.ensure_rules_exist(&rule_ids).await?;
+        self.validate_slug(&payload.slug)?;
         self.ensure_unique_slug(&payload.slug, &level_obj, None)
             .await?;
         self.validate_content(&payload.content)?;
@@ -817,6 +818,7 @@ impl ContentService {
         claims: &JwtClaims,
     ) -> Result<TopicRecord> {
         let collection: Collection<TopicRecord> = self.mongo.collection("topics");
+        self.validate_slug(&payload.slug)?;
         self.ensure_unique_topic_slug(&payload.slug).await?;
         let now = now_bson_datetime();
         let record = doc! {
@@ -1519,6 +1521,24 @@ impl ContentService {
         let pii = self.scan_pii(content);
         if !pii.is_empty() {
             return Err(anyhow!("PII detected: {:?}", pii));
+        }
+        Ok(())
+    }
+
+    fn validate_slug(&self, slug: &str) -> Result<()> {
+        if slug.is_empty() {
+            return Err(anyhow!("Slug cannot be empty"));
+        }
+        if slug.contains(' ') {
+            return Err(anyhow!("Slug cannot contain spaces"));
+        }
+        if !slug
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        {
+            return Err(anyhow!(
+                "Slug can only contain alphanumeric characters, hyphens, and underscores"
+            ));
         }
         Ok(())
     }

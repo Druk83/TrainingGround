@@ -308,6 +308,7 @@ export class AdminConsole extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    document.title = 'Администрирование контента - TrainingGround';
     this.refreshData();
   }
 

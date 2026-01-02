@@ -51,7 +51,7 @@ test.describe('Admin form validation', () => {
     await page.fill('input[name="password"]', 'ValidPass123!');
     await page.fill('input[name="name"]', 'Invalid Email User');
     await page.selectOption('select[name="role"]', 'student');
-    await page.getByRole('button', { name: 'Создать' }).click();
+    await page.getByRole('button', { name: 'Создать', exact: true }).click();
 
     const emailMessage = await page
       .locator('input[name="email"]')
@@ -67,7 +67,7 @@ test.describe('Admin form validation', () => {
     await page.fill('input[name="password"]', '123');
     await page.fill('input[name="name"]', 'Short Password');
     await page.selectOption('select[name="role"]', 'student');
-    await page.getByRole('button', { name: 'Создать' }).click();
+    await page.getByRole('button', { name: 'Создать', exact: true }).click();
 
     const passwordValidity = await page
       .locator('input[name="password"]')

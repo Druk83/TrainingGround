@@ -79,6 +79,32 @@ const templates: TemplateRecord[] = [];
       });
     });
 
+    await page.route('**/api/admin/metrics', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          total_users: 100,
+          blocked_users: 5,
+          total_groups: 10,
+          total_incidents: 20,
+          open_incidents: 3,
+          critical_incidents: 1,
+          active_sessions: 50,
+          audit_events_24h: 500,
+          uptime_seconds: 86400,
+        }),
+      });
+    });
+
+    await page.route('**/api/admin/backups', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      });
+    });
+
     await page.route('**/admin/templates*', async (route) => {
       const method = route.request().method();
       const url = new URL(route.request().url());
@@ -185,8 +211,15 @@ const templates: TemplateRecord[] = [];
   test('content admin can create, moderate and publish template', async ({ page }) => {
     await page.goto('/admin');
     await page.waitForSelector('.tab', { timeout: 60000 });
-    await page.locator('.tab').nth(1).click();
 
+    // Click on "Шаблоны" tab
+    await page.locator('button.tab:has-text("Шаблоны")').click();
+
+    // Wait for tab content to render
+    await page.waitForTimeout(1000);
+
+    // Wait for "Создать шаблон" button to appear
+    await page.waitForSelector('button:has-text("Создать шаблон")', { timeout: 15000 });
     await page.getByRole('button', { name: 'Создать шаблон' }).click();
     await page.locator('input[name="slug"]').fill('e2e-template');
     await page.locator('input[name="levelId"]').fill('507f1f77bcf86cd799439011');
