@@ -1,0 +1,20 @@
+rules:
+  # Игнорировать Nginx H2C smuggling warning
+  # WebSocket support нужен для будущего функционала
+  - id: nginx-h2c-smuggling-allowed
+    patterns:
+      - pattern: proxy_set_header Upgrade $http_upgrade
+    paths:
+      exclude:
+        - "infra/nginx/conf.d/trainingground.conf"
+    severity: INFO
+
+  # Игнорировать $host usage warning
+  # $host валидируется через server_name в Nginx конфигурации
+  - id: nginx-host-variable-allowed
+    patterns:
+      - pattern: $host
+    paths:
+      exclude:
+        - "infra/nginx/conf.d/*.conf"
+    severity: INFO

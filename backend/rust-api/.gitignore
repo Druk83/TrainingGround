@@ -1,4 +1,5 @@
 /target
-/Cargo.lock
+# Cargo.lock должен быть в git для binary/application проектов
+# /Cargo.lock - закомментировано для приложений
 .env
 *.log
