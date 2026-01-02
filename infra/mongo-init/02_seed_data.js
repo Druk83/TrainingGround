@@ -143,4 +143,133 @@ const exampleSentences = [
 db.example_sentences.insertMany(exampleSentences);
 print(`[SUCCESS] Inserted ${exampleSentences.length} example sentences`);
 
+// Feature flags seed data
+print('[INFO] Loading feature flags...');
+const now = new Date();
+const featureFlags = [
+  {
+    flag_key: 'hints_enabled',
+    description: 'Enable/disable hint system for students',
+    enabled: true,
+    scope: 'global',
+    target_ids: [],
+    config: { max_hints_per_task: 3, hint_penalty: 5 },
+    version: 1,
+    updated_at: now,
+    updated_by: 'system',
+    change_reason: 'Initial setup'
+  },
+  {
+    flag_key: 'explanation_api_enabled',
+    description: 'Enable/disable explanation API access',
+    enabled: true,
+    scope: 'global',
+    target_ids: [],
+    config: { max_requests_per_hour: 100 },
+    version: 1,
+    updated_at: now,
+    updated_by: 'system',
+    change_reason: 'Initial setup'
+  },
+  {
+    flag_key: 'explanation_yandexgpt_enabled',
+    description: 'Enable/disable YandexGPT for explanation generation',
+    enabled: false,
+    scope: 'global',
+    target_ids: [],
+    config: { model: 'yandexgpt-3', temperature: 0.7 },
+    version: 1,
+    updated_at: now,
+    updated_by: 'system',
+    change_reason: 'Initial setup - disabled for cost control'
+  },
+  {
+    flag_key: 'adaptive_templates_enabled',
+    description: 'Enable/disable adaptive template generation',
+    enabled: true,
+    scope: 'global',
+    target_ids: [],
+    config: { adaptation_level: 'medium' },
+    version: 1,
+    updated_at: now,
+    updated_by: 'system',
+    change_reason: 'Initial setup'
+  },
+  {
+    flag_key: 'sso_oauth2',
+    description: 'Enable/disable OAuth2 SSO integration',
+    enabled: false,
+    scope: 'global',
+    target_ids: [],
+    config: { providers: ['yandex', 'vk', 'gosuslugi'] },
+    version: 1,
+    updated_at: now,
+    updated_by: 'system',
+    change_reason: 'Initial setup - disabled for security review'
+  },
+  {
+    flag_key: 'scoring_bonus_v2',
+    description: 'Enable/disable new scoring bonus algorithm v2',
+    enabled: false,
+    scope: 'global',
+    target_ids: [],
+    config: { bonus_multiplier: 1.5, min_accuracy: 85 },
+    version: 1,
+    updated_at: now,
+    updated_by: 'system',
+    change_reason: 'Initial setup - disabled pending testing'
+  },
+  {
+    flag_key: 'anticheat_strict_mode',
+    description: 'Enable/disable strict anticheat mode',
+    enabled: true,
+    scope: 'global',
+    target_ids: [],
+    config: { tab_switch_threshold: 3, rapid_submit_ms: 500 },
+    version: 1,
+    updated_at: now,
+    updated_by: 'system',
+    change_reason: 'Initial setup'
+  },
+  {
+    flag_key: 'qdrant_fallback',
+    description: 'Enable/disable fallback to Qdrant when primary search fails',
+    enabled: true,
+    scope: 'global',
+    target_ids: [],
+    config: { timeout_ms: 5000, fallback_score_threshold: 0.5 },
+    version: 1,
+    updated_at: now,
+    updated_by: 'system',
+    change_reason: 'Initial setup'
+  },
+  {
+    flag_key: 'leaderboard_enabled',
+    description: 'Enable/disable leaderboard feature',
+    enabled: true,
+    scope: 'global',
+    target_ids: [],
+    config: { update_frequency_minutes: 60 },
+    version: 1,
+    updated_at: now,
+    updated_by: 'system',
+    change_reason: 'Initial setup'
+  },
+  {
+    flag_key: 'offline_sync_enabled',
+    description: 'Enable/disable offline synchronization',
+    enabled: false,
+    scope: 'global',
+    target_ids: [],
+    config: { max_offline_queue_size: 1000 },
+    version: 1,
+    updated_at: now,
+    updated_by: 'system',
+    change_reason: 'Initial setup - disabled pending PWA implementation'
+  }
+];
+
+db.feature_flags.insertMany(featureFlags);
+print(`[SUCCESS] Inserted ${featureFlags.length} feature flags`);
+
 print('[SUCCESS] Seed data loaded');

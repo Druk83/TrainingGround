@@ -73,8 +73,11 @@ db.incidents.createIndex({ user_id: 1, type: 1, timestamp: -1 });
 print('[OK] Incidents indexes created');
 
 // === FEATURE FLAGS ===
-db.feature_flags.createIndex({ flag_name: 1 }, { unique: true });
+db.feature_flags.createIndex({ flag_key: 1 }, { unique: true });
+db.feature_flags.createIndex({ scope: 1 });
 db.feature_flags.createIndex({ enabled: 1 });
+db.feature_flags.createIndex({ updated_at: -1 });
+db.feature_flags.createIndex({ scope: 1, target_ids: 1 });
 print('[OK] Feature flags indexes created');
 
 // === MATERIALIZED STATS ===

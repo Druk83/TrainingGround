@@ -1,0 +1,131 @@
+[
+  {
+    "flag_key": "hints_enabled",
+    "description": "Enable/disable hint system for students",
+    "enabled": true,
+    "scope": "global",
+    "target_ids": [],
+    "config": {
+      "max_hints_per_task": 3,
+      "hint_penalty": 5
+    },
+    "version": 1
+  },
+  {
+    "flag_key": "explanation_api_enabled",
+    "description": "Enable/disable explanation API access",
+    "enabled": true,
+    "scope": "global",
+    "target_ids": [],
+    "config": {
+      "max_requests_per_hour": 100
+    },
+    "version": 1
+  },
+  {
+    "flag_key": "explanation_yandexgpt_enabled",
+    "description": "Enable/disable YandexGPT for explanation generation",
+    "enabled": false,
+    "scope": "global",
+    "target_ids": [],
+    "config": {
+      "model": "yandexgpt-3",
+      "temperature": 0.7,
+      "max_tokens": 500
+    },
+    "version": 1
+  },
+  {
+    "flag_key": "adaptive_templates_enabled",
+    "description": "Enable/disable adaptive template generation",
+    "enabled": true,
+    "scope": "global",
+    "target_ids": [],
+    "config": {
+      "adaptation_level": "medium",
+      "min_accuracy_threshold": 60
+    },
+    "version": 1
+  },
+  {
+    "flag_key": "sso_oauth2",
+    "description": "Enable/disable OAuth2 SSO integration",
+    "enabled": false,
+    "scope": "global",
+    "target_ids": [],
+    "config": {
+      "providers": ["yandex", "vk", "gosuslugi"],
+      "fallback_to_email": true
+    },
+    "version": 1
+  },
+  {
+    "flag_key": "scoring_bonus_v2",
+    "description": "Enable/disable new scoring bonus algorithm v2",
+    "enabled": false,
+    "scope": "global",
+    "target_ids": [],
+    "config": {
+      "bonus_multiplier": 1.5,
+      "min_accuracy": 85,
+      "conditions": {
+        "no_hints_used": true,
+        "speed_bonus": true
+      }
+    },
+    "version": 1
+  },
+  {
+    "flag_key": "anticheat_strict_mode",
+    "description": "Enable/disable strict anticheat mode",
+    "enabled": true,
+    "scope": "global",
+    "target_ids": [],
+    "config": {
+      "tab_switch_threshold": 3,
+      "rapid_submit_ms": 500,
+      "impossible_time_threshold_ms": 1000,
+      "pattern_abuse_window": 10
+    },
+    "version": 1
+  },
+  {
+    "flag_key": "qdrant_fallback",
+    "description": "Enable/disable fallback to Qdrant when primary search fails",
+    "enabled": true,
+    "scope": "global",
+    "target_ids": [],
+    "config": {
+      "timeout_ms": 5000,
+      "fallback_score_threshold": 0.5,
+      "enable_hybrid_search": true
+    },
+    "version": 1
+  },
+  {
+    "flag_key": "leaderboard_enabled",
+    "description": "Enable/disable leaderboard feature",
+    "enabled": true,
+    "scope": "global",
+    "target_ids": [],
+    "config": {
+      "update_frequency_minutes": 60,
+      "top_n": 100,
+      "include_private_groups": false
+    },
+    "version": 1
+  },
+  {
+    "flag_key": "offline_sync_enabled",
+    "description": "Enable/disable offline synchronization",
+    "enabled": false,
+    "scope": "global",
+    "target_ids": [],
+    "config": {
+      "max_offline_queue_size": 1000,
+      "sync_interval_seconds": 30,
+      "compression": true
+    },
+    "version": 1
+  }
+]

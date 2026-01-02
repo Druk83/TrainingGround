@@ -85,6 +85,7 @@ pub mod backup_service;
 pub mod content_service;
 pub mod email_service;
 pub mod export_worker;
+pub mod feature_flag_service;
 pub mod group_service;
 pub mod hint_service;
 pub mod incidents_service;
