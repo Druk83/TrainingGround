@@ -21,7 +21,7 @@ db.createCollection('users', {
       properties: {
         email: { bsonType: 'string', pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$' },
         name: { bsonType: 'string', minLength: 1, maxLength: 200 },
-        role: { enum: ['student', 'teacher', 'admin'] },
+        role: { enum: ['student', 'teacher', 'content_admin', 'admin'] },
         sso_provider: { enum: ['yandex', 'vk', 'gosuslugi', null] },
         sso_id: { bsonType: ['string', 'null'] },
         groups: { bsonType: 'array', items: { bsonType: 'objectId' } },
@@ -55,12 +55,17 @@ db.createCollection('topics', {
   validator: {
     $jsonSchema: {
       bsonType: 'object',
-      required: ['slug', 'name', 'order'],
+      required: ['slug', 'name', 'sort_order', 'status', 'created_at', 'updated_at'],
       properties: {
+        _id: { bsonType: 'objectId' },
         slug: { bsonType: 'string', pattern: '^[a-z0-9-]+$' },
         name: { bsonType: 'string' },
         description: { bsonType: 'string' },
-        order: { bsonType: 'int', minimum: 0 }
+        icon_url: { bsonType: ['string', 'null'] },
+        sort_order: { bsonType: 'int', minimum: 0 },
+        status: { enum: ['active', 'deprecated'] },
+        created_at: { bsonType: 'date' },
+        updated_at: { bsonType: 'date' }
       }
     }
   }
@@ -312,7 +317,7 @@ db.groups.createIndex({ 'student_ids': 1 });
 
 // Topic indexes
 db.topics.createIndex({ slug: 1 }, { unique: true });
-db.topics.createIndex({ order: 1 });
+db.topics.createIndex({ sort_order: 1 });
 
 // Level indexes
 db.levels.createIndex({ topic_id: 1, order: 1 });

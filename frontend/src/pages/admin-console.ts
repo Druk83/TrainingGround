@@ -1,9 +1,6 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
-import { ApiClient } from '@/lib/api-client';
-import { authService } from '@/lib/auth-service';
-import type { BackupRecord, SystemMetrics } from '@/lib/api-types';
 import '@/components/app-header';
 import '@/components/content-quality';
 import '@/components/embeddings-monitor';
@@ -11,6 +8,9 @@ import '@/components/feature-flags-panel';
 import '@/components/rules-management';
 import '@/components/template-management';
 import '@/components/topics-management';
+import { ApiClient } from '@/lib/api-client';
+import type { BackupRecord, SystemMetrics } from '@/lib/api-types';
+import { authService } from '@/lib/auth-service';
 
 type AdminTab =
   | 'dashboard'
@@ -25,14 +25,50 @@ const TAB_DEFINITIONS: ReadonlyArray<{
   id: AdminTab;
   label: string;
   description: string;
+  roles: readonly string[];
 }> = [
-  { id: 'dashboard', label: 'Dashboard', description: 'Системные метрики и бэкапы' },
-  { id: 'templates', label: 'Шаблоны', description: 'Создание, ревью и версии' },
-  { id: 'topics', label: 'Темы и уровни', description: 'Маршруты обучения' },
-  { id: 'rules', label: 'Правила', description: 'Описания, примеры и покрытие' },
-  { id: 'quality', label: 'Качество', description: 'Метрики, валидатор и дубликаты' },
-  { id: 'embeddings', label: 'Эмбеддинги', description: 'Очередь и консистентность' },
-  { id: 'feature-flags', label: 'Feature Flags', description: 'Эксперименты и rollout' },
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    description: 'Системные метрики и бэкапы',
+    roles: ['admin'],
+  },
+  {
+    id: 'templates',
+    label: 'Шаблоны',
+    description: 'Создание, ревью и версии',
+    roles: ['admin', 'content_admin'],
+  },
+  {
+    id: 'topics',
+    label: 'Темы и уровни',
+    description: 'Маршруты обучения',
+    roles: ['admin', 'content_admin'],
+  },
+  {
+    id: 'rules',
+    label: 'Правила',
+    description: 'Описания, примеры и покрытие',
+    roles: ['admin', 'content_admin'],
+  },
+  {
+    id: 'quality',
+    label: 'Качество',
+    description: 'Метрики, валидатор и дубликаты',
+    roles: ['admin', 'content_admin'],
+  },
+  {
+    id: 'embeddings',
+    label: 'Эмбеддинги',
+    description: 'Очередь и консистентность',
+    roles: ['admin', 'content_admin'],
+  },
+  {
+    id: 'feature-flags',
+    label: 'Feature Flags',
+    description: 'Эксперименты и rollout',
+    roles: ['admin'],
+  },
 ];
 
 @customElement('admin-console')
@@ -290,20 +326,48 @@ export class AdminConsole extends LitElement {
   `;
 
   private readonly client: ApiClient;
-  @state() private systemMetrics?: SystemMetrics;
-  @state() private metricsUpdatedAt?: string;
-  @state() private backups: BackupRecord[] | null = null;
-  @state() private creatingBackup = false;
-  @state() private restoringBackupId: string | null = null;
-  @state() private loading = false;
-  @state() private error?: string;
-  @state() private notice?: { message: string; type: 'success' | 'error' };
-  @state() private activeTab: AdminTab = 'dashboard';
+  @state() declare private systemMetrics: SystemMetrics | undefined;
+  @state() declare private metricsUpdatedAt: string | undefined;
+  @state() declare private backups: BackupRecord[] | null;
+  @state() declare private creatingBackup: boolean;
+  @state() declare private restoringBackupId: string | null;
+  @state() declare private loading: boolean;
+  @state() declare private error: string | undefined;
+  @state() declare private notice:
+    | { message: string; type: 'success' | 'error' }
+    | undefined;
+  @state() declare private activeTab: AdminTab;
 
   constructor() {
     super();
     const token = authService.getToken();
     this.client = new ApiClient({ jwt: token ?? undefined });
+    this.backups = null;
+    this.creatingBackup = false;
+    this.restoringBackupId = null;
+    this.loading = false;
+
+    // Установить дефолтный таб в зависимости от роли
+    const user = authService.getUser();
+    const userRole = user?.role ?? 'student';
+    if (userRole === 'content_admin') {
+      this.activeTab = 'templates';
+    } else {
+      this.activeTab = 'dashboard';
+    }
+  }
+
+  private getAvailableTabs() {
+    const user = authService.getUser();
+    const userRole = user?.role ?? 'student';
+    const availableTabs = TAB_DEFINITIONS.filter((tab) => tab.roles.includes(userRole));
+    console.log(
+      '[admin-console] Available tabs for role',
+      userRole,
+      ':',
+      availableTabs.map((t) => t.label),
+    );
+    return availableTabs;
   }
 
   connectedCallback() {
@@ -335,7 +399,7 @@ export class AdminConsole extends LitElement {
           : null}
         ${this.error ? html`<div class="error">${this.error}</div>` : null}
         <div class="tabs">
-          ${TAB_DEFINITIONS.map(
+          ${this.getAvailableTabs().map(
             (tab) => html`
               <button
                 class=${`tab ${this.activeTab === tab.id ? 'active' : ''}`}
@@ -475,6 +539,13 @@ export class AdminConsole extends LitElement {
   }
 
   private async refreshData() {
+    // Только суперпользователь (admin) может загружать dashboard данные
+    const user = authService.getUser();
+    const userRole = user?.role ?? 'student';
+    if (userRole !== 'admin') {
+      return;
+    }
+
     this.loading = true;
     this.error = undefined;
     try {

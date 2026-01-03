@@ -1,14 +1,14 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
 import { ApiClient } from '@/lib/api-client';
-import { authService } from '@/lib/auth-service';
 import type {
   LevelCreatePayload,
   LevelSummary,
   TopicCreatePayload,
   TopicSummary,
 } from '@/lib/api-types';
+import { authService } from '@/lib/auth-service';
 
 type LevelDraft = {
   name: string;
@@ -164,14 +164,24 @@ export class TopicsManagement extends LitElement {
   `;
 
   private readonly client = new ApiClient({ jwt: authService.getToken() ?? undefined });
-  @state() private topics: TopicSummary[] = [];
-  @state() private levelsByTopic: Record<string, LevelSummary[]> = {};
-  @state() private newTopic: TopicCreatePayload = { slug: '', name: '' };
-  @state() private creatingTopic = false;
-  @state() private loadingTopics = false;
-  @state() private levelDrafts: Record<string, LevelDraft> = {};
-  @state() private errors?: string;
-  @state() private reorderingTopicId?: string;
+  @state() declare private topics: TopicSummary[];
+  @state() declare private levelsByTopic: Record<string, LevelSummary[]>;
+  @state() declare private newTopic: TopicCreatePayload;
+  @state() declare private creatingTopic: boolean;
+  @state() declare private loadingTopics: boolean;
+  @state() declare private levelDrafts: Record<string, LevelDraft>;
+  @state() declare private errors?: string;
+  @state() declare private reorderingTopicId?: string;
+
+  constructor() {
+    super();
+    this.topics = [];
+    this.levelsByTopic = {};
+    this.newTopic = { slug: '', name: '' };
+    this.creatingTopic = false;
+    this.loadingTopics = false;
+    this.levelDrafts = {};
+  }
 
   connectedCallback() {
     super.connectedCallback();
@@ -374,6 +384,11 @@ export class TopicsManagement extends LitElement {
     this.errors = undefined;
     try {
       this.topics = await this.client.listTopics();
+      console.log('[topics-management] Loaded topics:', this.topics);
+      if (this.topics.length > 0) {
+        console.log('[topics-management] First topic:', this.topics[0]);
+        console.log('[topics-management] First topic ID:', this.topics[0].id);
+      }
     } catch (error) {
       this.errors = error instanceof Error ? error.message : 'Не удалось загрузить темы';
     } finally {
@@ -383,8 +398,19 @@ export class TopicsManagement extends LitElement {
 
   private async handleCreateTopic() {
     if (!this.newTopic.slug || !this.newTopic.name) {
+      this.errors = 'Заполните обязательные поля: Slug и Название';
       return;
     }
+
+    // Валидация slug: только латиница, цифры, дефисы и подчеркивания
+    const slugPattern = /^[a-z0-9_-]+$/;
+    if (!slugPattern.test(this.newTopic.slug)) {
+      this.errors =
+        'Slug может содержать только строчные латинские буквы (a-z), цифры (0-9), дефисы (-) и подчеркивания (_). Пример: orthography или of-1';
+      return;
+    }
+
+    this.errors = undefined;
     this.creatingTopic = true;
     try {
       await this.client.createTopic(this.newTopic);

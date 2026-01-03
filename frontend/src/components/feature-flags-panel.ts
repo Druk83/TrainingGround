@@ -1,9 +1,9 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
 import { ApiClient } from '@/lib/api-client';
-import { authService } from '@/lib/auth-service';
 import type { FeatureFlagRecord } from '@/lib/api-types';
+import { authService } from '@/lib/auth-service';
 
 @customElement('feature-flags-panel')
 export class FeatureFlagsPanel extends LitElement {
@@ -72,10 +72,16 @@ export class FeatureFlagsPanel extends LitElement {
   private readonly client = new ApiClient({
     jwt: authService.getToken() ?? undefined,
   });
-  @state() private flags: FeatureFlagRecord[] = [];
-  @state() private loading = false;
-  @state() private updatingFlag?: string;
-  @state() private error?: string;
+  @state() declare private flags: FeatureFlagRecord[];
+  @state() declare private loading: boolean;
+  @state() declare private updatingFlag?: string;
+  @state() declare private error?: string;
+
+  constructor() {
+    super();
+    this.flags = [];
+    this.loading = false;
+  }
 
   connectedCallback() {
     super.connectedCallback();

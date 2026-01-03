@@ -1,10 +1,10 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
-import { ApiClient } from '@/lib/api-client';
-import { authService } from '@/lib/auth-service';
-import type { GroupResponse, TeacherStudentSummary } from '@/lib/api-types';
 import '@/components/app-header';
+import { ApiClient } from '@/lib/api-client';
+import type { GroupResponse, TeacherStudentSummary } from '@/lib/api-types';
+import { authService } from '@/lib/auth-service';
 
 @customElement('teacher-students')
 export class TeacherStudentsPage extends LitElement {
@@ -134,13 +134,13 @@ export class TeacherStudentsPage extends LitElement {
     }
   `;
 
-  @state() private groups: GroupResponse[] = [];
-  @state() private students: TeacherStudentSummary[] = [];
-  @state() private selectedGroupId: string | null = null;
-  @state() private loading = false;
-  @state() private groupLoading = false;
-  @state() private error?: string;
-  @state() private searchTerm = '';
+  @state() declare private groups: GroupResponse[];
+  @state() declare private students: TeacherStudentSummary[];
+  @state() declare private selectedGroupId: string | null;
+  @state() declare private loading: boolean;
+  @state() declare private groupLoading: boolean;
+  @state() declare private error?: string;
+  @state() declare private searchTerm: string;
 
   private client: ApiClient;
 
@@ -148,6 +148,12 @@ export class TeacherStudentsPage extends LitElement {
     super();
     const token = authService.getToken();
     this.client = new ApiClient({ jwt: token ?? undefined });
+    this.groups = [];
+    this.students = [];
+    this.selectedGroupId = null;
+    this.loading = false;
+    this.groupLoading = false;
+    this.searchTerm = '';
   }
 
   connectedCallback() {

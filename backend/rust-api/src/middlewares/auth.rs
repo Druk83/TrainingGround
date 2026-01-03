@@ -76,11 +76,14 @@ impl JwtService {
         match decode::<JwtClaims>(token, &self.decoding_key, &validation) {
             Ok(data) => Ok(data.claims),
             Err(e) => {
-                if e.to_string().contains("ExpiredSignature") {
+                let error_str = e.to_string();
+                tracing::error!("JWT decode error details: {:?}", error_str);
+
+                if error_str.contains("ExpiredSignature") {
                     return Err(AuthError::ExpiredToken);
                 }
 
-                if e.to_string().contains("InvalidSignature") {
+                if error_str.contains("InvalidSignature") {
                     for key in &self.fallback_decoding_keys {
                         if let Ok(data) = decode::<JwtClaims>(token, key, &validation) {
                             tracing::info!("JWT validated using fallback secret (rotation window)");

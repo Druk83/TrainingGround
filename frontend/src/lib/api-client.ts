@@ -1,77 +1,77 @@
 ﻿import { nanoid } from 'nanoid';
 import type {
-  AuditLogEntry,
-  AuditLogQueryParams,
+  ActivityEntry,
+  AdminTemplateCreatePayload,
   AdminTemplateDetail,
   AdminTemplateSummary,
   AdminTemplateUpdatePayload,
-  AdminTemplateCreatePayload,
   AnticheatSettings,
+  AuditLogEntry,
+  AuditLogQueryParams,
+  BackupCreateRequest,
+  BackupCreateResponse,
+  BackupRecord,
+  BackupRestoreResponse,
+  BlockUserRequest,
   BulkUserActionRequest,
   BulkUserActionResult,
-  ResetPasswordResponse,
-  BlockUserRequest,
   CreateGroupRequest,
+  CreateNotificationTemplatePayload,
   CreateSessionPayload,
   CreateSessionResponse,
   CreateUserRequest,
+  EmailSettings,
+  EmbeddingConsistencyReport,
+  EmbeddingJobSummary,
+  EmbeddingRebuildPayload,
   ExportRequestPayload,
   ExportResponsePayload,
   ExportStatusPayload,
-  EmailSettings,
   FeatureFlagRecord,
   FeatureFlagUpdatePayload,
   GroupResponse,
   GroupStatsResponse,
-  NotificationHistoryEntry,
-  NotificationTemplate,
-  CreateNotificationTemplatePayload,
-  SendNotificationPayload,
-  SendNotificationResponse,
-  TeacherStudentDetail,
-  TeacherStudentSummary,
-  TopicAnalyticsEntry,
-  ActivityEntry,
-  RecommendationEntry,
   IncidentWithUser,
-  ListIncidentsQuery,
-  ListGroupsQuery,
-  ListUsersQuery,
-  QueueStatus,
-  RequestHintPayload,
-  RequestHintResponse,
-  SessionResponse,
-  SubmitAnswerResponse,
-  SubmitAnswerPayload,
-  TemplateFilterParams,
-  TemplateRevertPayload,
-  TemplateValidationIssue,
-  TemplateVersionSummary,
-  TopicCreatePayload,
-  TopicSummary,
-  TopicUpdatePayload,
   LevelCreatePayload,
   LevelReorderPayload,
   LevelSummary,
   LevelUpdatePayload,
+  ListGroupsQuery,
+  ListIncidentsQuery,
+  ListUsersQuery,
+  NotificationHistoryEntry,
+  NotificationTemplate,
+  QueueStatus,
+  RecommendationEntry,
+  RequestHintPayload,
+  RequestHintResponse,
+  ResetPasswordResponse,
+  RuleCoverage,
   RuleCreatePayload,
   RuleSummary,
   RuleUpdatePayload,
-  RuleCoverage,
-  TemplateDuplicate,
-  EmbeddingConsistencyReport,
-  EmbeddingJobSummary,
-  EmbeddingRebuildPayload,
+  SendNotificationPayload,
+  SendNotificationResponse,
+  SessionResponse,
   SettingsTestResponse,
   SsoSettings,
+  SubmitAnswerPayload,
+  SubmitAnswerResponse,
   SystemMetrics,
   SystemSettingsResponse,
-  BackupRecord,
-  BackupCreateRequest,
-  BackupCreateResponse,
-  BackupRestoreResponse,
-  UpdateIncidentRequest,
+  TeacherStudentDetail,
+  TeacherStudentSummary,
+  TemplateDuplicate,
+  TemplateFilterParams,
+  TemplateRevertPayload,
+  TemplateValidationIssue,
+  TemplateVersionSummary,
+  TopicAnalyticsEntry,
+  TopicCreatePayload,
+  TopicSummary,
+  TopicUpdatePayload,
   UpdateGroupRequest,
+  UpdateIncidentRequest,
   UpdateUserRequest,
   UserDetailResponse,
   YandexGptSettings,
@@ -222,7 +222,22 @@ export class ApiClient {
 
     if (!response.ok) {
       const detail = await safeParseJson(response);
-      throw new Error(detail?.message ?? `Request failed with ${response.status}`);
+
+      // Try to get more info from response
+      let errorMessage = detail?.message ?? detail?.detail ?? detail?.error;
+      if (!errorMessage) {
+        // If no JSON error, try to get text
+        try {
+          const text = await response.text();
+          if (text && text.length > 0 && text.length < 500) {
+            errorMessage = text;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      throw new Error(errorMessage ?? `Request failed with ${response.status}`);
     }
 
     if (response.status === 204) {
@@ -242,10 +257,17 @@ export class ApiClient {
       headers.set('Authorization', `Bearer ${this.jwt}`);
     }
 
-    // Add CSRF token for state-changing operations
+    // Add CSRF token and nonce for state-changing operations
     const method = init.method?.toUpperCase() || 'GET';
-    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && this.csrfToken) {
-      headers.set('X-CSRF-Token', this.csrfToken);
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+      if (this.csrfToken) {
+        headers.set('X-CSRF-Token', this.csrfToken);
+      }
+      // Add nonce and timestamp for CSRF validation
+      const nonce = crypto.randomUUID();
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      headers.set('X-Request-Nonce', nonce);
+      headers.set('X-Request-Timestamp', timestamp);
     }
 
     const response = await fetch(url, {

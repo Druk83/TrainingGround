@@ -1,14 +1,14 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
 import { ApiClient } from '@/lib/api-client';
-import { authService } from '@/lib/auth-service';
 import type {
   AdminTemplateSummary,
   EmbeddingConsistencyReport,
   EmbeddingJobSummary,
   QueueStatus,
 } from '@/lib/api-types';
+import { authService } from '@/lib/auth-service';
 
 type RebuildMode = 'all' | 'changed' | 'new' | 'selected';
 
@@ -157,24 +157,35 @@ export class EmbeddingsMonitor extends LitElement {
   private readonly client = new ApiClient({
     jwt: authService.getToken() ?? undefined,
   });
-  @state() private queue?: QueueStatus;
-  @state() private loading = false;
-  @state() private rebuildRunning = false;
-  @state() private job?: EmbeddingJobSummary;
-  @state() private consistency?: EmbeddingConsistencyReport;
-  @state() private error?: string;
-  @state() private rebuildMessage = '';
-  @state() private templates: AdminTemplateSummary[] = [];
-  @state() private selectedTemplateIds: string[] = [];
-  @state() private templateLoading = false;
-  @state() private templateError?: string;
+  @state() declare private queue?: QueueStatus;
+  @state() declare private loading: boolean;
+  @state() declare private rebuildRunning: boolean;
+  @state() declare private job?: EmbeddingJobSummary;
+  @state() declare private consistency?: EmbeddingConsistencyReport;
+  @state() declare private error?: string;
+  @state() declare private rebuildMessage: string;
+  @state() declare private templates: AdminTemplateSummary[];
+  @state() declare private selectedTemplateIds: string[];
+  @state() declare private templateLoading: boolean;
+  @state() declare private templateError?: string;
+
+  constructor() {
+    super();
+    this.loading = false;
+    this.rebuildRunning = false;
+    this.rebuildMessage = '';
+    this.templates = [];
+    this.selectedTemplateIds = [];
+    this.templateLoading = false;
+  }
 
   connectedCallback() {
     super.connectedCallback();
     this.loadQueue();
-    this.loadProgress();
-    this.loadConsistency();
-    this.loadTemplateOptions();
+    // Load other data with delays to avoid rate limiting
+    setTimeout(() => this.loadProgress(), 100);
+    setTimeout(() => this.loadConsistency(), 200);
+    setTimeout(() => this.loadTemplateOptions(), 300);
   }
 
   render() {

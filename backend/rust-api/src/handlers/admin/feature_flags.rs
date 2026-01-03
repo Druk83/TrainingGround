@@ -11,7 +11,9 @@ use serde_json::json;
 use std::sync::Arc;
 use tracing::{info, warn};
 
-use crate::{models::feature_flag::FeatureFlagCreateRequest, services::AppState};
+use crate::{
+    extractors::AppJson, models::feature_flag::FeatureFlagCreateRequest, services::AppState,
+};
 
 /// Dependencies between feature flags
 /// If a flag requires another flag to be enabled
@@ -73,7 +75,7 @@ pub async fn get_feature_flag(
 /// POST /admin/feature-flags - Create new flag
 pub async fn create_feature_flag(
     State(state): State<Arc<AppState>>,
-    Json(req): Json<FeatureFlagCreateRequest>,
+    AppJson(req): AppJson<FeatureFlagCreateRequest>,
 ) -> impl IntoResponse {
     // Validate flag_key format
     if !req
@@ -147,7 +149,7 @@ pub async fn create_feature_flag(
 pub async fn update_feature_flag(
     State(state): State<Arc<AppState>>,
     Path(flag_key): Path<String>,
-    Json(req): Json<FeatureFlagCreateRequest>,
+    AppJson(req): AppJson<FeatureFlagCreateRequest>,
 ) -> impl IntoResponse {
     // Validate scope
     if !["global", "group", "user"].contains(&req.scope.as_str()) {

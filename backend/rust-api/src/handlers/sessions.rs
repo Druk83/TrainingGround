@@ -7,6 +7,7 @@ use axum::{
 use std::sync::Arc;
 
 use crate::{
+    extractors::AppJson,
     models::{answer::SubmitAnswerRequest, hint::RequestHintRequest, *},
     services::{
         answer_service::AnswerService, hint_service::HintService, session_service::SessionService,
@@ -16,7 +17,7 @@ use crate::{
 
 pub async fn create_session(
     State(state): State<Arc<AppState>>,
-    Json(req): Json<CreateSessionRequest>,
+    AppJson(req): AppJson<CreateSessionRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     tracing::info!(
         "Creating session for user_id={}, task_id={}",
@@ -87,7 +88,7 @@ pub async fn complete_session(
 pub async fn submit_answer(
     State(state): State<Arc<AppState>>,
     Path(session_id): Path<String>,
-    Json(req): Json<SubmitAnswerRequest>,
+    AppJson(req): AppJson<SubmitAnswerRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     tracing::info!("Submitting answer for session: {}", session_id);
 
@@ -120,7 +121,7 @@ pub async fn submit_answer(
 pub async fn request_hint(
     State(state): State<Arc<AppState>>,
     Path(session_id): Path<String>,
-    Json(req): Json<RequestHintRequest>,
+    AppJson(req): AppJson<RequestHintRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     tracing::info!("Requesting hint for session: {}", session_id);
 

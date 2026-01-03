@@ -11,6 +11,7 @@ use mongodb::bson::{doc, oid::ObjectId};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    extractors::AppJson,
     middlewares::auth::JwtClaims,
     models::{
         reporting::{
@@ -89,7 +90,7 @@ pub(crate) async fn request_group_export(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<JwtClaims>,
     Path(group_id): Path<String>,
-    Json(payload): Json<ExportRequest>,
+    AppJson(payload): AppJson<ExportRequest>,
 ) -> Result<Json<ExportResponse>, ApiError> {
     let group_obj = parse_object_id(&group_id, "group_id")?;
     let teacher_id = parse_object_id(&claims.sub, "teacher_id")?;

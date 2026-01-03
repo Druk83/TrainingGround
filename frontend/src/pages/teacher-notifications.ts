@@ -1,15 +1,15 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
+import '@/components/app-header';
 import { ApiClient } from '@/lib/api-client';
-import { authService } from '@/lib/auth-service';
 import type {
   CreateNotificationTemplatePayload,
   GroupResponse,
   NotificationHistoryEntry,
   NotificationTemplate,
 } from '@/lib/api-types';
-import '@/components/app-header';
+import { authService } from '@/lib/auth-service';
 
 @customElement('teacher-notifications')
 export class TeacherNotificationsPage extends LitElement {
@@ -169,21 +169,17 @@ export class TeacherNotificationsPage extends LitElement {
     }
   `;
 
-  @state() private groups: GroupResponse[] = [];
-  @state() private templates: NotificationTemplate[] = [];
-  @state() private history: NotificationHistoryEntry[] = [];
-  @state() private selectedGroupId: string | null = null;
-  @state() private selectedTemplateId: string | null = null;
-  @state() private loading = true;
-  @state() private sending = false;
-  @state() private creating = false;
-  @state() private statusMessage?: string;
-  @state() private templateForm: CreateNotificationTemplatePayload = {
-    name: '',
-    subject: '',
-    body: '',
-  };
-  @state() private error?: string;
+  @state() declare private groups: GroupResponse[];
+  @state() declare private templates: NotificationTemplate[];
+  @state() declare private history: NotificationHistoryEntry[];
+  @state() declare private selectedGroupId: string | null;
+  @state() declare private selectedTemplateId: string | null;
+  @state() declare private loading: boolean;
+  @state() declare private sending: boolean;
+  @state() declare private creating: boolean;
+  @state() declare private statusMessage?: string;
+  @state() declare private templateForm: CreateNotificationTemplatePayload;
+  @state() declare private error?: string;
 
   private client: ApiClient;
 
@@ -191,6 +187,19 @@ export class TeacherNotificationsPage extends LitElement {
     super();
     const token = authService.getToken();
     this.client = new ApiClient({ jwt: token ?? undefined });
+    this.groups = [];
+    this.templates = [];
+    this.history = [];
+    this.selectedGroupId = null;
+    this.selectedTemplateId = null;
+    this.loading = true;
+    this.sending = false;
+    this.creating = false;
+    this.templateForm = {
+      name: '',
+      subject: '',
+      body: '',
+    };
   }
 
   connectedCallback() {

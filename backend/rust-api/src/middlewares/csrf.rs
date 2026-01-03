@@ -24,8 +24,9 @@ const MAX_CLOCK_SKEW_SECONDS: i64 = 60;
 
 lazy_static! {
     static ref ALLOWED_ORIGINS: Vec<String> = {
-        let raw = std::env::var("CSRF_ALLOWED_ORIGINS")
-            .unwrap_or_else(|_| "http://localhost:8081,http://localhost:4173".to_string());
+        let raw = std::env::var("CSRF_ALLOWED_ORIGINS").unwrap_or_else(|_| {
+            "http://localhost:8081,http://localhost:4173,http://localhost:5173".to_string()
+        });
         raw.split(',')
             .filter_map(|origin| normalize_origin(origin.trim()))
             .collect()

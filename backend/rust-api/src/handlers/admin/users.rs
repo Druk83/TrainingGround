@@ -8,10 +8,11 @@ use std::sync::Arc;
 use validator::Validate;
 
 use crate::{
+    extractors::AppJson,
     middlewares::auth::JwtClaims,
     models::user::{
         BlockUserRequest, BulkUserActionRequest, CreateUserRequest, ListUsersQuery,
-        UpdateUserRequest,
+        UpdateUserRequest, UserDetailResponse,
     },
     services::{
         audit_service::AuditService, email_service::EmailService,
@@ -20,22 +21,65 @@ use crate::{
 };
 use rand::{distr::Alphanumeric, Rng};
 
+#[derive(Debug)]
+pub enum ApiError {
+    BadRequest(String),
+    Unauthorized(String),
+    Forbidden(String),
+    NotFound(String),
+    Internal(String),
+}
+
+impl ApiError {
+    fn bad_request(message: impl Into<String>) -> Self {
+        ApiError::BadRequest(message.into())
+    }
+
+    fn not_found(message: impl Into<String>) -> Self {
+        ApiError::NotFound(message.into())
+    }
+}
+
+impl From<anyhow::Error> for ApiError {
+    fn from(err: anyhow::Error) -> Self {
+        ApiError::Internal(err.to_string())
+    }
+}
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> axum::response::Response {
+        let (status, message) = match self {
+            ApiError::BadRequest(message) => (StatusCode::BAD_REQUEST, message),
+            ApiError::Unauthorized(message) => (StatusCode::UNAUTHORIZED, message),
+            ApiError::Forbidden(message) => (StatusCode::FORBIDDEN, message),
+            ApiError::NotFound(message) => (StatusCode::NOT_FOUND, message),
+            ApiError::Internal(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
+        };
+        let json_response = serde_json::json!({
+            "message": message,
+            "status": status.as_u16()
+        });
+        (status, Json(json_response)).into_response()
+    }
+}
+
+/// POST /admin/users - Создать пользователя (Admin)
 /// POST /admin/users - Создать пользователя (Admin)
 pub async fn create_user(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<JwtClaims>,
-    Json(req): Json<CreateUserRequest>,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+    AppJson(req): AppJson<CreateUserRequest>,
+) -> Result<impl IntoResponse, ApiError> {
     // Валидация
     req.validate()
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+        .map_err(|e| ApiError::bad_request(format!("Validation error: {}", e)))?;
 
     // Создание пользователя
     let user_service = UserManagementService::new(state.mongo.clone(), state.redis.clone());
-    let created_user = user_service
-        .create_user(req.clone())
-        .await
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+    let created_user = user_service.create_user(req.clone()).await.map_err(|e| {
+        tracing::error!("Failed to create user: {:?}", e);
+        ApiError::bad_request(e.to_string())
+    })?;
 
     // Audit log
     let audit_service = AuditService::new(state.mongo.clone());
@@ -57,13 +101,13 @@ pub async fn create_user(
 pub async fn list_users(
     State(state): State<Arc<AppState>>,
     Query(query): Query<ListUsersQuery>,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+) -> Result<Json<Vec<UserDetailResponse>>, ApiError> {
     let user_service = UserManagementService::new(state.mongo.clone(), state.redis.clone());
 
     let users = user_service
         .list_users(query)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     Ok(Json(users))
 }
@@ -72,14 +116,14 @@ pub async fn list_users(
 pub async fn get_user(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<String>,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+) -> Result<Json<UserDetailResponse>, ApiError> {
     let user_service = UserManagementService::new(state.mongo.clone(), state.redis.clone());
 
     let user = user_service.get_user(&user_id).await.map_err(|e| {
         if e.to_string().contains("not found") {
-            (StatusCode::NOT_FOUND, e.to_string())
+            ApiError::not_found(e.to_string())
         } else {
-            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            ApiError::Internal(e.to_string())
         }
     })?;
 
@@ -91,11 +135,11 @@ pub async fn update_user(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<JwtClaims>,
     Path(user_id): Path<String>,
-    Json(req): Json<UpdateUserRequest>,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+    AppJson(req): AppJson<UpdateUserRequest>,
+) -> Result<impl IntoResponse, ApiError> {
     // Валидация
     req.validate()
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+        .map_err(|e| ApiError::bad_request(e.to_string()))?;
 
     // Обновление пользователя
     let user_service = UserManagementService::new(state.mongo.clone(), state.redis.clone());
@@ -104,9 +148,9 @@ pub async fn update_user(
         .await
         .map_err(|e| {
             if e.to_string().contains("not found") {
-                (StatusCode::NOT_FOUND, e.to_string())
+                ApiError::not_found(e.to_string())
             } else {
-                (StatusCode::BAD_REQUEST, e.to_string())
+                ApiError::bad_request(e.to_string())
             }
         })?;
 
@@ -138,13 +182,13 @@ pub async fn delete_user(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<JwtClaims>,
     Path(user_id): Path<String>,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+) -> Result<impl IntoResponse, ApiError> {
     // Получение email для audit log (до удаления)
     let user_service = UserManagementService::new(state.mongo.clone(), state.redis.clone());
     let user = user_service
         .get_user(&user_id)
         .await
-        .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))?;
+        .map_err(|e| ApiError::not_found(e.to_string()))?;
 
     let email = user.email.clone();
 
@@ -152,7 +196,7 @@ pub async fn delete_user(
     user_service
         .delete_user(&user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     // Audit log
     let audit_service = AuditService::new(state.mongo.clone());
@@ -168,11 +212,11 @@ pub async fn block_user(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<JwtClaims>,
     Path(user_id): Path<String>,
-    Json(req): Json<BlockUserRequest>,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+    AppJson(req): AppJson<BlockUserRequest>,
+) -> Result<impl IntoResponse, ApiError> {
     // Валидация
     req.validate()
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+        .map_err(|e| ApiError::bad_request(e.to_string()))?;
 
     // Блокировка пользователя
     let user_service = UserManagementService::new(state.mongo.clone(), state.redis.clone());
@@ -181,9 +225,9 @@ pub async fn block_user(
         .await
         .map_err(|e| {
             if e.to_string().contains("not found") {
-                (StatusCode::NOT_FOUND, e.to_string())
+                ApiError::not_found(e.to_string())
             } else {
-                (StatusCode::BAD_REQUEST, e.to_string())
+                ApiError::bad_request(e.to_string())
             }
         })?;
 
@@ -208,14 +252,14 @@ pub async fn unblock_user(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<JwtClaims>,
     Path(user_id): Path<String>,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+) -> Result<impl IntoResponse, ApiError> {
     // Разблокировка пользователя
     let user_service = UserManagementService::new(state.mongo.clone(), state.redis.clone());
     let unblocked_user = user_service.unblock_user(&user_id).await.map_err(|e| {
         if e.to_string().contains("not found") {
-            (StatusCode::NOT_FOUND, e.to_string())
+            ApiError::not_found(e.to_string())
         } else {
-            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            ApiError::Internal(e.to_string())
         }
     })?;
 
@@ -233,7 +277,7 @@ pub async fn reset_user_password(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<JwtClaims>,
     Path(user_id): Path<String>,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+) -> Result<impl IntoResponse, ApiError> {
     let temp_password = generate_temp_password();
     let user_service = UserManagementService::new(state.mongo.clone(), state.redis.clone());
     let updated_user = user_service
@@ -241,9 +285,9 @@ pub async fn reset_user_password(
         .await
         .map_err(|e| {
             if e.to_string().contains("not found") {
-                (StatusCode::NOT_FOUND, e.to_string())
+                ApiError::not_found(e.to_string())
             } else {
-                (StatusCode::BAD_REQUEST, e.to_string())
+                ApiError::bad_request(e.to_string())
             }
         })?;
 
@@ -254,7 +298,7 @@ pub async fn reset_user_password(
         email_service
             .send_password_reset_email(&updated_user.email, &updated_user.name, &temp_password)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
     } else {
         tracing::warn!(
             "Email sending disabled, temporary password returned in response for {}",
@@ -286,17 +330,17 @@ fn generate_temp_password() -> String {
 /// POST /admin/users/bulk - Массовые операции (блокировка, разблокировка, смена групп)
 pub async fn bulk_user_action(
     State(state): State<Arc<AppState>>,
-    Json(req): Json<BulkUserActionRequest>,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+    AppJson(req): AppJson<BulkUserActionRequest>,
+) -> Result<impl IntoResponse, ApiError> {
     if req.user_ids.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "user_ids cannot be empty".into()));
+        return Err(ApiError::bad_request("user_ids cannot be empty"));
     }
 
     let user_service = UserManagementService::new(state.mongo.clone(), state.redis.clone());
     let result = user_service
         .bulk_user_action(req)
         .await
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+        .map_err(|e| ApiError::bad_request(e.to_string()))?;
 
     Ok(Json(result))
 }

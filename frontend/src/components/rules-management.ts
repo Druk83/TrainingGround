@@ -1,13 +1,13 @@
-import { LitElement, html, css } from 'lit';
-import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 
 import DOMPurify from 'dompurify';
 import { marked } from 'marked';
 
 import { ApiClient } from '@/lib/api-client';
-import { authService } from '@/lib/auth-service';
 import type { RuleCoverage, RuleCreatePayload, RuleSummary } from '@/lib/api-types';
+import { authService } from '@/lib/auth-service';
 
 @customElement('rules-management')
 export class RulesManagement extends LitElement {
@@ -177,16 +177,25 @@ export class RulesManagement extends LitElement {
   `;
 
   private readonly client = new ApiClient({ jwt: authService.getToken() ?? undefined });
-  @state() private rules: RuleSummary[] = [];
-  @state() private coverage: RuleCoverage[] = [];
-  @state() private creating = false;
-  @state() private errors?: string;
-  @state() private newRule: RuleCreatePayload = {
-    name: '',
-    category: '',
-    description: '',
-  };
-  @state() private previewHtml = '';
+  @state() declare private rules: RuleSummary[];
+  @state() declare private coverage: RuleCoverage[];
+  @state() declare private creating: boolean;
+  @state() declare private errors?: string;
+  @state() declare private newRule: RuleCreatePayload;
+  @state() declare private previewHtml: string;
+
+  constructor() {
+    super();
+    this.rules = [];
+    this.coverage = [];
+    this.creating = false;
+    this.newRule = {
+      name: '',
+      category: '',
+      description: '',
+    };
+    this.previewHtml = '';
+  }
 
   connectedCallback() {
     super.connectedCallback();

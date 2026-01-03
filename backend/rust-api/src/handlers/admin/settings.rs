@@ -6,6 +6,7 @@ use axum::{
 use std::sync::Arc;
 
 use crate::{
+    extractors::AppJson,
     middlewares::auth::JwtClaims,
     models::system_settings::{
         AnticheatSettings, EmailSettings, SettingsTestResponse, SsoSettings,
@@ -27,7 +28,7 @@ pub async fn get_system_settings(
 pub async fn update_yandexgpt_settings(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<JwtClaims>,
-    Json(payload): Json<YandexGptSettings>,
+    AppJson(payload): AppJson<YandexGptSettings>,
 ) -> Result<Json<YandexGptSettings>, ApiError> {
     let service = SystemSettingsService::new(state.mongo.clone());
     let updated = service
@@ -40,7 +41,7 @@ pub async fn update_yandexgpt_settings(
 pub async fn update_sso_settings(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<JwtClaims>,
-    Json(payload): Json<SsoSettings>,
+    AppJson(payload): AppJson<SsoSettings>,
 ) -> Result<Json<SsoSettings>, ApiError> {
     let service = SystemSettingsService::new(state.mongo.clone());
     let updated = service
@@ -53,7 +54,7 @@ pub async fn update_sso_settings(
 pub async fn update_email_settings(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<JwtClaims>,
-    Json(payload): Json<EmailSettings>,
+    AppJson(payload): AppJson<EmailSettings>,
 ) -> Result<Json<EmailSettings>, ApiError> {
     let service = SystemSettingsService::new(state.mongo.clone());
     let updated = service
@@ -66,7 +67,7 @@ pub async fn update_email_settings(
 pub async fn update_anticheat_settings(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<JwtClaims>,
-    Json(payload): Json<AnticheatSettings>,
+    AppJson(payload): AppJson<AnticheatSettings>,
 ) -> Result<Json<AnticheatSettings>, ApiError> {
     let service = SystemSettingsService::new(state.mongo.clone());
     let updated = service

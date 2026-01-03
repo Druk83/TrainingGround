@@ -1,19 +1,19 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
-import { ApiClient } from '@/lib/api-client';
-import { authService } from '@/lib/auth-service';
-import type {
-  UserDetailResponse,
-  CreateUserRequest,
-  UpdateUserRequest,
-  BlockUserRequest,
-  ListUsersQuery,
-  UserRole,
-  GroupResponse,
-} from '@/lib/api-types';
-import { sanitizeDisplayName } from '@/lib/sanitization';
 import '@/components/app-header';
+import { ApiClient } from '@/lib/api-client';
+import type {
+  BlockUserRequest,
+  CreateUserRequest,
+  GroupResponse,
+  ListUsersQuery,
+  UpdateUserRequest,
+  UserDetailResponse,
+  UserRole,
+} from '@/lib/api-types';
+import { authService } from '@/lib/auth-service';
+import { sanitizeDisplayName } from '@/lib/sanitization';
 
 @customElement('users-management')
 export class UsersManagement extends LitElement {
@@ -280,7 +280,8 @@ export class UsersManagement extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     this.loadUsers();
-    this.loadGroupOptions();
+    // Load groups after a small delay to avoid rate limiting
+    setTimeout(() => this.loadGroupOptions(), 100);
   }
 
   private async loadUsers() {
@@ -494,20 +495,40 @@ export class UsersManagement extends LitElement {
     const form = e.target as HTMLFormElement;
     const formData = new FormData(form);
 
+    const email = (formData.get('email') as string)?.trim() || '';
+    const password = (formData.get('password') as string)?.trim() || '';
+    const name = sanitizeDisplayName(formData.get('name') as string);
+    const role = formData.get('role') as UserRole;
+
+    // Validate required fields
+    if (!email || !password || !name || !role) {
+      this.error =
+        'Пожалуйста, заполните все обязательные поля (email, пароль, имя, роль)';
+      return;
+    }
+
+    // Basic email validation
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      this.error = 'Введите корректный email адрес';
+      return;
+    }
+
     const payload: CreateUserRequest = {
-      email: formData.get('email') as string,
-      password: formData.get('password') as string,
-      name: sanitizeDisplayName(formData.get('name') as string),
-      role: formData.get('role') as UserRole,
-      group_ids: [],
+      email,
+      password,
+      name,
+      role,
     };
 
     try {
+      console.log('[CreateUser] Sending payload:', payload);
       await this.client.createUser(payload);
       this.closeModal();
       this.loadUsers();
     } catch (err) {
-      this.error = err instanceof Error ? err.message : 'Failed to create user';
+      const errorMsg = err instanceof Error ? err.message : 'Failed to create user';
+      console.error('[CreateUser] Error:', errorMsg);
+      this.error = errorMsg;
     }
   }
 

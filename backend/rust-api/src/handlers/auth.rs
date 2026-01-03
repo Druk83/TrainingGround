@@ -9,6 +9,7 @@ use std::sync::Arc;
 use validator::Validate;
 
 use crate::{
+    extractors::AppJson,
     middlewares::auth::{JwtClaims, JwtService},
     models::{
         refresh_token::RefreshTokenResponse,
@@ -24,7 +25,7 @@ use crate::{
 pub async fn register(
     State(state): State<Arc<AppState>>,
     jar: CookieJar,
-    Json(req): Json<RegisterRequest>,
+    AppJson(req): AppJson<RegisterRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     // Validate request
     if let Err(e) = req.validate() {
@@ -387,7 +388,7 @@ pub async fn revoke_other_sessions(
 pub async fn change_password(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<JwtClaims>,
-    Json(req): Json<ChangePasswordRequest>,
+    AppJson(req): AppJson<ChangePasswordRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     // Validate request
     if let Err(e) = req.validate() {
@@ -557,7 +558,7 @@ pub async fn get_user_by_id_admin(
 pub async fn update_user(
     State(state): State<Arc<AppState>>,
     axum::extract::Path(user_id): axum::extract::Path<String>,
-    Json(req): Json<UpdateUserRequest>,
+    AppJson(req): AppJson<UpdateUserRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     // Validate request
     if let Err(e) = req.validate() {

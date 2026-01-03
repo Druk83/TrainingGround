@@ -1,19 +1,16 @@
-import { LitElement, css, html, nothing } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
 import { authService } from '@/lib/auth-service';
 import { isFeatureEnabled } from '@/lib/feature-flags';
+import { LitElement, css, html, nothing } from 'lit';
+import { customElement, state } from 'lit/decorators.js';
 
 @customElement('login-page')
 export class LoginPage extends LitElement {
-  protected createRenderRoot() {
-    return this;
-  }
   static styles = css`
     :host {
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: 100vh;
+      height: 100vh;
       background: linear-gradient(135deg, #0b1521 0%, #111d2d 100%);
       color: #f8fafc;
       font-family: 'Inter', system-ui, sans-serif;

@@ -180,12 +180,12 @@ export class TeacherAnalyticsPage extends LitElement {
     }
   `;
 
-  @state() private groupId: string | null = null;
-  @state() private topics: TopicAnalyticsEntry[] = [];
-  @state() private loading = false;
-  @state() private error?: string;
-  @state() private sortBy: keyof TopicAnalyticsEntry = 'topic_name';
-  @state() private sortDesc = false;
+  @state() declare private groupId: string | null;
+  @state() declare private topics: TopicAnalyticsEntry[];
+  @state() declare private loading: boolean;
+  @state() declare private error?: string;
+  @state() declare private sortBy: keyof TopicAnalyticsEntry;
+  @state() declare private sortDesc: boolean;
 
   private client: ApiClient;
 
@@ -195,6 +195,10 @@ export class TeacherAnalyticsPage extends LitElement {
     this.groupId = params.get('groupId');
     const token = authService.getToken();
     this.client = new ApiClient({ jwt: token ?? undefined });
+    this.topics = [];
+    this.loading = false;
+    this.sortBy = 'topic_name';
+    this.sortDesc = false;
   }
 
   connectedCallback() {

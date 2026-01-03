@@ -248,20 +248,20 @@ export class TeacherReportsPage extends LitElement {
     }
   `;
 
-  @state() private groupId: string | null = null;
-  @state() private reportType: string = 'group_summary';
-  @state() private period: ReportPeriod = 'month';
-  @state() private format: ReportFormat = 'pdf';
-  @state() private includeGraphs = true;
-  @state() private includeDetails = true;
-  @state() private startDate: string = '';
-  @state() private endDate: string = '';
-  @state() private generating = false;
-  @state() private statusMessage: string = '';
-  @state() private reports: Report[] = [];
-  @state() private loading = false;
-  @state() private currentExportId?: string;
-  @state() private exportProgress = 0;
+  @state() declare private groupId: string | null;
+  @state() declare private reportType: string;
+  @state() declare private period: ReportPeriod;
+  @state() declare private format: ReportFormat;
+  @state() declare private includeGraphs: boolean;
+  @state() declare private includeDetails: boolean;
+  @state() declare private startDate: string;
+  @state() declare private endDate: string;
+  @state() declare private generating: boolean;
+  @state() declare private statusMessage: string;
+  @state() declare private reports: Report[];
+  @state() declare private loading: boolean;
+  @state() declare private currentExportId?: string;
+  @state() declare private exportProgress: number;
 
   private client: ApiClient;
   private pollingTimer?: number;
@@ -272,6 +272,18 @@ export class TeacherReportsPage extends LitElement {
     this.groupId = params.get('groupId');
     const token = authService.getToken();
     this.client = new ApiClient({ jwt: token ?? undefined });
+    this.reportType = 'group_summary';
+    this.period = 'month';
+    this.format = 'pdf';
+    this.includeGraphs = true;
+    this.includeDetails = true;
+    this.startDate = '';
+    this.endDate = '';
+    this.generating = false;
+    this.statusMessage = '';
+    this.reports = [];
+    this.loading = false;
+    this.exportProgress = 0;
     this.initDateDefaults();
   }
 

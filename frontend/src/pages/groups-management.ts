@@ -1,15 +1,15 @@
-import { LitElement, html, css } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
 import { ApiClient } from '@/lib/api-client';
-import { authService } from '@/lib/auth-service';
 import type {
-  GroupResponse,
   CreateGroupRequest,
-  UpdateGroupRequest,
+  GroupResponse,
   ListGroupsQuery,
+  UpdateGroupRequest,
   UserDetailResponse,
 } from '@/lib/api-types';
+import { authService } from '@/lib/auth-service';
 import { sanitizeDisplayName, sanitizeHTML } from '@/lib/sanitization';
+import { LitElement, css, html } from 'lit';
+import { customElement, state } from 'lit/decorators.js';
 
 import '../components/app-header';
 
@@ -275,7 +275,8 @@ export class GroupsManagement extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     this.loadGroups();
-    this.loadCurators();
+    // Load curators after a small delay to avoid rate limiting
+    setTimeout(() => this.loadCurators(), 100);
   }
 
   private async loadGroups() {

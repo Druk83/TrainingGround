@@ -948,7 +948,7 @@ impl ContentService {
         while let Some(level) = cursor.try_next().await.context("Cursor failed")? {
             levels.push(level);
         }
-        levels.sort_by_key(|level| level.sort_order);
+        levels.sort_by_key(|level| level.order);
         Ok(levels)
     }
 
@@ -965,12 +965,11 @@ impl ContentService {
         let now = now_bson_datetime();
         let record = doc! {
             "topic_id": topic_obj,
-            "order": 1,
+            "order": payload.order.unwrap_or(0),
             "name": payload.name,
             "difficulty": payload.difficulty.as_str(),
             "description": payload.description,
             "min_pass_percent": payload.min_pass_percent.unwrap_or(80),
-            "sort_order": payload.sort_order.unwrap_or(0),
             "status": LevelStatus::Active.as_str(),
             "created_at": now,
             "updated_at": now,

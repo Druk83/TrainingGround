@@ -14,8 +14,8 @@ const RATE_LIMIT_PER_USER: u32 = 100; // requests per minute
 const RATE_LIMIT_PER_IP: u32 = 200; // requests per minute
 const RATE_WINDOW_SECONDS: u64 = 60; // 1 minute
 
-const ADMIN_RATE_LIMIT_PER_USER: u32 = 10;
-const ADMIN_RATE_LIMIT_PER_IP: u32 = 10;
+const ADMIN_RATE_LIMIT_PER_USER: u32 = 200;
+const ADMIN_RATE_LIMIT_PER_IP: u32 = 300;
 const ADMIN_RATE_WINDOW_SECONDS: u64 = 60;
 
 // Auth-specific rate limits

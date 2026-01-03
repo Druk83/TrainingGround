@@ -266,7 +266,7 @@ pub struct TopicSummary {
 }
 
 impl TopicSummary {
-    fn from_topic(topic: &TopicRecord) -> Self {
+    pub fn from_topic(topic: &TopicRecord) -> Self {
         Self {
             id: topic.id.to_hex(),
             slug: topic.slug.clone(),
@@ -325,7 +325,6 @@ pub struct LevelRecord {
     pub difficulty: LevelDifficulty,
     pub description: String,
     pub min_pass_percent: i32,
-    pub sort_order: i32,
     pub status: LevelStatus,
     pub created_at: mongodb::bson::DateTime,
     pub updated_at: mongodb::bson::DateTime,
@@ -426,7 +425,7 @@ pub struct TemplateDuplicate {
 }
 
 impl LevelSummary {
-    fn from_level(level: &LevelRecord) -> Self {
+    pub fn from_level(level: &LevelRecord) -> Self {
         Self {
             id: level.id.to_hex(),
             name: level.name.clone(),
@@ -528,7 +527,7 @@ pub struct LevelCreateRequest {
     #[serde(default)]
     pub min_pass_percent: Option<i32>,
     #[serde(default)]
-    pub sort_order: Option<i32>,
+    pub order: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]

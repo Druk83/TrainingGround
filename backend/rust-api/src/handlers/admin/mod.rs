@@ -26,14 +26,15 @@ use mongodb::bson::oid::ObjectId;
 use std::sync::Arc;
 
 use crate::{
+    extractors::AppJson,
     middlewares::auth::JwtClaims,
     models::content::{
         EmbeddingConsistencyReport, EmbeddingJobSummary, EmbeddingRebuildRequest,
-        LevelCreateRequest, LevelRecord, LevelReorderRequest, LevelUpdateRequest, QueueStatus,
-        RuleCoverage, RuleCreateRequest, RuleRecord, RuleUpdateRequest, TemplateCreateRequest,
-        TemplateDetail, TemplateDuplicate, TemplateListQuery, TemplateRevertRequest,
-        TemplateSummary, TemplateUpdateRequest, TemplateValidationIssue, TemplateVersionSummary,
-        TopicCreateRequest, TopicRecord, TopicUpdateRequest,
+        LevelCreateRequest, LevelRecord, LevelReorderRequest, LevelSummary, LevelUpdateRequest,
+        QueueStatus, RuleCoverage, RuleCreateRequest, RuleRecord, RuleUpdateRequest,
+        TemplateCreateRequest, TemplateDetail, TemplateDuplicate, TemplateListQuery,
+        TemplateRevertRequest, TemplateSummary, TemplateUpdateRequest, TemplateValidationIssue,
+        TemplateVersionSummary, TopicCreateRequest, TopicRecord, TopicSummary, TopicUpdateRequest,
     },
     services::{content_service::ContentService, AppState},
 };
@@ -63,7 +64,7 @@ pub async fn get_template(
 pub async fn create_template(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<JwtClaims>,
-    Json(payload): Json<TemplateCreateRequest>,
+    AppJson(payload): AppJson<TemplateCreateRequest>,
 ) -> Result<Json<TemplateSummary>, ApiError> {
     let service = ContentService::new(&state);
     let summary = service.create_template(payload, &claims).await?;
@@ -74,7 +75,7 @@ pub async fn update_template(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<JwtClaims>,
     Path(template_id): Path<String>,
-    Json(payload): Json<TemplateUpdateRequest>,
+    AppJson(payload): AppJson<TemplateUpdateRequest>,
 ) -> Result<Json<TemplateSummary>, ApiError> {
     let service = ContentService::new(&state);
     let template_obj = parse_object_id(&template_id, "template_id")?;
@@ -86,10 +87,11 @@ pub async fn update_template(
 
 pub async fn list_topics(
     State(state): State<Arc<AppState>>,
-) -> Result<Json<Vec<TopicRecord>>, ApiError> {
+) -> Result<Json<Vec<TopicSummary>>, ApiError> {
     let service = ContentService::new(&state);
     let topics = service.list_topics().await?;
-    Ok(Json(topics))
+    let summaries: Vec<TopicSummary> = topics.iter().map(TopicSummary::from_topic).collect();
+    Ok(Json(summaries))
 }
 
 pub async fn create_topic(
@@ -128,11 +130,12 @@ pub async fn delete_topic(
 pub async fn list_levels(
     State(state): State<Arc<AppState>>,
     Path(topic_id): Path<String>,
-) -> Result<Json<Vec<LevelRecord>>, ApiError> {
+) -> Result<Json<Vec<LevelSummary>>, ApiError> {
     let service = ContentService::new(&state);
     let topic_obj = parse_object_id(&topic_id, "topic_id")?;
     let levels = service.list_levels_for_topic(&topic_obj).await?;
-    Ok(Json(levels))
+    let summaries: Vec<LevelSummary> = levels.iter().map(LevelSummary::from_level).collect();
+    Ok(Json(summaries))
 }
 
 pub async fn create_level(

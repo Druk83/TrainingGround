@@ -89,7 +89,11 @@ const isAdminConsole = pathname.startsWith('/admin-console') || pathname === '/a
   }
 
   if (skipLink) {
-    skipLink.style.display = '';
+    if (isStudentHome) {
+      skipLink.style.display = '';
+    } else {
+      skipLink.style.display = 'none';
+    }
   }
 
   // Public pages (no auth required)

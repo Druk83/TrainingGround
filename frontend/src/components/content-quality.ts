@@ -1,9 +1,9 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
 import { ApiClient } from '@/lib/api-client';
-import { authService } from '@/lib/auth-service';
 import type { AdminTemplateSummary } from '@/lib/api-types';
+import { authService } from '@/lib/auth-service';
 
 interface QualityIssue {
   id: string;
@@ -135,12 +135,21 @@ export class ContentQuality extends LitElement {
   private readonly client = new ApiClient({
     jwt: authService.getToken() ?? undefined,
   });
-  @state() private templates: AdminTemplateSummary[] = [];
-  @state() private issues: QualityIssue[] = [];
-  @state() private duplicates: DuplicateEntry[] = [];
-  @state() private loading = false;
-  @state() private validating = false;
-  @state() private error?: string;
+  @state() declare private templates: AdminTemplateSummary[];
+  @state() declare private issues: QualityIssue[];
+  @state() declare private duplicates: DuplicateEntry[];
+  @state() declare private loading: boolean;
+  @state() declare private validating: boolean;
+  @state() declare private error?: string;
+
+  constructor() {
+    super();
+    this.templates = [];
+    this.issues = [];
+    this.duplicates = [];
+    this.loading = false;
+    this.validating = false;
+  }
 
   connectedCallback() {
     super.connectedCallback();

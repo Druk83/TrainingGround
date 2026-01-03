@@ -1,8 +1,8 @@
-import { LitElement, html, css } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
+import '@/components/app-header';
 import { authService } from '@/lib/auth-service';
 import { lessonStore, type ScoreState } from '@/lib/session-store';
-import '@/components/app-header';
+import { LitElement, css, html } from 'lit';
+import { customElement, state } from 'lit/decorators.js';
 
 interface ActiveSession {
   id: string;
@@ -16,16 +16,29 @@ interface ActiveSession {
 @customElement('user-profile')
 export class UserProfile extends LitElement {
   @state()
-  private scoreboard: ScoreState = {
-    totalScore: 0,
-    attempts: 0,
-    correct: 0,
-    accuracy: 0,
-    currentStreak: 0,
-    longestStreak: 0,
-    hintsUsed: 0,
-  };
+  declare private scoreboard: ScoreState;
   private unsubscribe?: () => void;
+
+  constructor() {
+    super();
+    this.scoreboard = {
+      totalScore: 0,
+      attempts: 0,
+      correct: 0,
+      accuracy: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+      hintsUsed: 0,
+    };
+    this.loading = false;
+    this.error = '';
+    this.success = '';
+    this.showPasswordModal = false;
+    this.sessions = [];
+    this.oldPassword = '';
+    this.newPassword = '';
+    this.confirmPassword = '';
+  }
 
   static styles = css`
     :host {
@@ -345,18 +358,6 @@ export class UserProfile extends LitElement {
   @state() declare private oldPassword: string;
   @state() declare private newPassword: string;
   @state() declare private confirmPassword: string;
-
-  constructor() {
-    super();
-    this.loading = false;
-    this.error = '';
-    this.success = '';
-    this.showPasswordModal = false;
-    this.sessions = [];
-    this.oldPassword = '';
-    this.newPassword = '';
-    this.confirmPassword = '';
-  }
 
   connectedCallback() {
     super.connectedCallback();

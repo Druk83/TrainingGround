@@ -1,10 +1,10 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
-import { ApiClient } from '@/lib/api-client';
-import { authService } from '@/lib/auth-service';
-import type { TeacherStudentDetail } from '@/lib/api-types';
 import '@/components/app-header';
+import { ApiClient } from '@/lib/api-client';
+import type { TeacherStudentDetail } from '@/lib/api-types';
+import { authService } from '@/lib/auth-service';
 
 @customElement('teacher-student-detail')
 export class TeacherStudentDetailPage extends LitElement {
@@ -94,9 +94,9 @@ export class TeacherStudentDetailPage extends LitElement {
     }
   `;
 
-  @state() private detail?: TeacherStudentDetail;
-  @state() private loading = true;
-  @state() private error?: string;
+  @state() declare private detail?: TeacherStudentDetail;
+  @state() declare private loading: boolean;
+  @state() declare private error?: string;
 
   private client: ApiClient;
 
@@ -104,6 +104,7 @@ export class TeacherStudentDetailPage extends LitElement {
     super();
     const token = authService.getToken();
     this.client = new ApiClient({ jwt: token ?? undefined });
+    this.loading = true;
   }
 
   connectedCallback() {

@@ -18,6 +18,7 @@ use mongodb::{options::FindOptions, Database};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    extractors::AppJson,
     middlewares::auth::JwtClaims,
     models::{notification::NotificationTemplate, notification::SentNotification, ProgressSummary},
     services::{
@@ -392,7 +393,7 @@ pub async fn list_notification_templates(
 pub async fn create_notification_template(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<JwtClaims>,
-    Json(payload): Json<CreateTemplateRequest>,
+    AppJson(payload): AppJson<CreateTemplateRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     ensure_teacher_role(&claims)?;
     if payload.name.trim().is_empty()
@@ -478,10 +479,10 @@ pub async fn list_notification_history(
     Ok(Json(payload))
 }
 
-pub async fn send_group_notification(
+pub async fn send_notifications(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<JwtClaims>,
-    Json(payload): Json<SendNotificationRequest>,
+    AppJson(payload): AppJson<SendNotificationRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     ensure_teacher_role(&claims)?;
     let teacher_id = parse_object_id(&claims.sub, "teacher_id")?;

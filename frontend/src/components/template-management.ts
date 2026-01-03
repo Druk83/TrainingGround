@@ -1,18 +1,18 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
+import '@/components/template-form';
+import type { TemplateFormValues, TemplatePIIFlag } from '@/components/template-form';
+import '@/components/template-version-history';
+import type { TemplateVersionHistoryEntry } from '@/components/template-version-history';
 import { ApiClient } from '@/lib/api-client';
-import { authService } from '@/lib/auth-service';
 import type {
   AdminTemplateDetail,
   AdminTemplateSummary,
   TemplateFilterParams,
   TemplateVersionSummary,
 } from '@/lib/api-types';
-import '@/components/template-form';
-import '@/components/template-version-history';
-import type { TemplateFormValues, TemplatePIIFlag } from '@/components/template-form';
-import type { TemplateVersionHistoryEntry } from '@/components/template-version-history';
+import { authService } from '@/lib/auth-service';
 
 const ALLOWED_DIFFICULTIES = ['A1', 'A2', 'B1', 'B2'] as const;
 
@@ -201,19 +201,30 @@ export class TemplateManagement extends LitElement {
   private readonly client = new ApiClient({
     jwt: authService.getToken() ?? undefined,
   });
-  @state() private templates: AdminTemplateSummary[] = [];
-  @state() private filter: TemplateFilterParams = {};
-  @state() private loading = false;
-  @state() private error?: string;
-  @state() private notice?: { message: string; type: 'success' | 'error' };
-  @state() private showForm = false;
-  @state() private formMode: 'create' | 'edit' = 'create';
-  @state() private formLoading = false;
-  @state() private editingTemplate?: AdminTemplateDetail;
-  @state() private formValues?: TemplateFormValues;
-  @state() private showHistoryFor?: AdminTemplateSummary;
-  @state() private versionHistory: TemplateVersionSummary[] = [];
-  @state() private moderationLoadingId?: string;
+  @state() declare private templates: AdminTemplateSummary[];
+  @state() declare private filter: TemplateFilterParams;
+  @state() declare private loading: boolean;
+  @state() declare private error?: string;
+  @state() declare private notice?: { message: string; type: 'success' | 'error' };
+  @state() declare private showForm: boolean;
+  @state() declare private formMode: 'create' | 'edit';
+  @state() declare private formLoading: boolean;
+  @state() declare private editingTemplate?: AdminTemplateDetail;
+  @state() declare private formValues?: TemplateFormValues;
+  @state() declare private showHistoryFor?: AdminTemplateSummary;
+  @state() declare private versionHistory: TemplateVersionSummary[];
+  @state() declare private moderationLoadingId?: string;
+
+  constructor() {
+    super();
+    this.templates = [];
+    this.filter = {};
+    this.loading = false;
+    this.showForm = false;
+    this.formMode = 'create';
+    this.formLoading = false;
+    this.versionHistory = [];
+  }
 
   connectedCallback() {
     super.connectedCallback();

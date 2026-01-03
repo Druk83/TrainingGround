@@ -239,7 +239,7 @@ async fn test_create_level_with_valid_data() -> Result<()> {
                 difficulty: LevelDifficulty::A1,
                 description: "Basic level for beginners".to_string(),
                 min_pass_percent: Some(75),
-                sort_order: None,
+                order: None,
             },
             &claims,
         )
@@ -277,7 +277,7 @@ async fn test_list_levels_for_topic() -> Result<()> {
                 difficulty: LevelDifficulty::A1,
                 description: String::new(),
                 min_pass_percent: None,
-                sort_order: None,
+                order: None,
             },
             &claims,
         )
@@ -291,7 +291,7 @@ async fn test_list_levels_for_topic() -> Result<()> {
                 difficulty: LevelDifficulty::A2,
                 description: String::new(),
                 min_pass_percent: None,
-                sort_order: None,
+                order: None,
             },
             &claims,
         )
@@ -329,7 +329,7 @@ async fn test_update_level() -> Result<()> {
                 difficulty: LevelDifficulty::A1,
                 description: "Original".to_string(),
                 min_pass_percent: Some(80),
-                sort_order: None,
+                order: None,
             },
             &claims,
         )
@@ -380,7 +380,7 @@ async fn test_delete_level() -> Result<()> {
                 difficulty: LevelDifficulty::A1,
                 description: String::new(),
                 min_pass_percent: None,
-                sort_order: None,
+                order: None,
             },
             &claims,
         )
@@ -417,7 +417,7 @@ async fn test_reorder_levels() -> Result<()> {
                 difficulty: LevelDifficulty::A1,
                 description: String::new(),
                 min_pass_percent: None,
-                sort_order: None,
+                order: None,
             },
             &claims,
         )
@@ -431,7 +431,7 @@ async fn test_reorder_levels() -> Result<()> {
                 difficulty: LevelDifficulty::A2,
                 description: String::new(),
                 min_pass_percent: None,
-                sort_order: None,
+                order: None,
             },
             &claims,
         )
@@ -445,7 +445,7 @@ async fn test_reorder_levels() -> Result<()> {
                 difficulty: LevelDifficulty::B1,
                 description: String::new(),
                 min_pass_percent: None,
-                sort_order: None,
+                order: None,
             },
             &claims,
         )
@@ -497,7 +497,7 @@ async fn test_level_default_min_pass_percent() -> Result<()> {
                 difficulty: LevelDifficulty::A1,
                 description: String::new(),
                 min_pass_percent: None,
-                sort_order: None,
+                order: None,
             },
             &claims,
         )
@@ -541,7 +541,7 @@ async fn test_create_multiple_difficulty_levels() -> Result<()> {
                     difficulty: *difficulty,
                     description: String::new(),
                     min_pass_percent: None,
-                    sort_order: None,
+                    order: None,
                 },
                 &claims,
             )

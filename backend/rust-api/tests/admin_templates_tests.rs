@@ -62,7 +62,7 @@ async fn test_create_template_with_valid_data() -> Result<()> {
                 difficulty: LevelDifficulty::A1,
                 description: "Beginner level".to_string(),
                 min_pass_percent: Some(70),
-                sort_order: Some(1),
+                order: Some(1),
             },
             &claims,
         )
@@ -133,7 +133,7 @@ async fn test_list_templates() -> Result<()> {
                 difficulty: LevelDifficulty::A1,
                 description: "Test".to_string(),
                 min_pass_percent: None,
-                sort_order: Some(1),
+                order: Some(1),
             },
             &claims,
         )
@@ -214,7 +214,7 @@ async fn test_update_template() -> Result<()> {
                 difficulty: LevelDifficulty::A2,
                 description: "Test".to_string(),
                 min_pass_percent: None,
-                sort_order: Some(1),
+                order: Some(1),
             },
             &claims,
         )
@@ -305,7 +305,7 @@ async fn test_delete_template() -> Result<()> {
                 difficulty: LevelDifficulty::B1,
                 description: "Test".to_string(),
                 min_pass_percent: None,
-                sort_order: Some(1),
+                order: Some(1),
             },
             &claims,
         )
@@ -479,7 +479,7 @@ async fn test_template_with_rule_references() -> Result<()> {
                 difficulty: LevelDifficulty::B2,
                 description: "Test".to_string(),
                 min_pass_percent: None,
-                sort_order: Some(1),
+                order: Some(1),
             },
             &claims,
         )
@@ -539,7 +539,21 @@ async fn test_template_with_params() -> Result<()> {
                 difficulty: LevelDifficulty::A1,
                 description: "Test".to_string(),
                 min_pass_percent: None,
-                sort_order: Some(1),
+                order: Some(1),
+            },
+            &claims,
+        )
+        .await?;
+
+    let _level2 = service
+        .create_level(
+            LevelCreateRequest {
+                topic_id: topic.id.to_string(),
+                name: "Level 2".to_string(),
+                difficulty: LevelDifficulty::A2,
+                description: "Test".to_string(),
+                min_pass_percent: None,
+                order: Some(2),
             },
             &claims,
         )
@@ -622,7 +636,7 @@ async fn test_template_with_metadata() -> Result<()> {
                 difficulty: LevelDifficulty::A2,
                 description: "Test".to_string(),
                 min_pass_percent: None,
-                sort_order: Some(1),
+                order: Some(1),
             },
             &claims,
         )
@@ -705,7 +719,7 @@ async fn test_template_status_transitions() -> Result<()> {
                 difficulty: LevelDifficulty::B1,
                 description: "Test".to_string(),
                 min_pass_percent: None,
-                sort_order: Some(1),
+                order: Some(1),
             },
             &claims,
         )
@@ -809,7 +823,7 @@ async fn test_template_with_difficulty_levels() -> Result<()> {
                     difficulty: LevelDifficulty::A1, // just a placeholder
                     description: "Test".to_string(),
                     min_pass_percent: None,
-                    sort_order: Some((idx + 1) as i32),
+                    order: Some((idx + 1) as i32),
                 },
                 &claims,
             )
@@ -863,7 +877,7 @@ async fn test_template_with_source_references() -> Result<()> {
                 difficulty: LevelDifficulty::B2,
                 description: "Test".to_string(),
                 min_pass_percent: None,
-                sort_order: Some(1),
+                order: Some(1),
             },
             &claims,
         )
@@ -936,7 +950,7 @@ async fn test_template_content_preservation() -> Result<()> {
                 difficulty: LevelDifficulty::A1,
                 description: "Test".to_string(),
                 min_pass_percent: None,
-                sort_order: Some(1),
+                order: Some(1),
             },
             &claims,
         )

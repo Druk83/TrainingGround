@@ -127,9 +127,27 @@ jobs:
 
       - name: Check services health
         run: |
-          curl --retry 5 --retry-delay 5 --retry-connrefused http://localhost:8081/health
+          echo "Checking Rust API health..."
+          for i in {1..30}; do
+            if curl -f --max-time 5 http://localhost:8081/health >/dev/null 2>&1; then
+              echo "API is healthy"
+              exit 0
+            fi
+            echo "Attempt $i: Waiting for API..."
+            docker compose logs rust-api | tail -20 || true
+            sleep 2
+          done
+          echo "API failed to start. Full logs:"
+          docker compose logs rust-api
+          exit 1
 
-      - name: OWASP ZAP Baseline Scan
+      - name: Show services status
+        if: failure()
+        run: |
+          echo "=== Docker Compose PS ==="
+          docker compose ps
+          echo "=== All Services Logs ==="
+          docker compose logs
         uses: zaproxy/action-baseline@v0.10.0
         with:
           target: 'http://localhost:8081'

@@ -61,7 +61,7 @@ async fn integration_template_workflow_approval() -> Result<()> {
                 difficulty: LevelDifficulty::A1,
                 description: "Level used in integration test".to_string(),
                 min_pass_percent: Some(70),
-                sort_order: None,
+                order: None,
             },
             &claims,
         )
@@ -164,7 +164,7 @@ async fn integration_embeddings_rebuild_selected_templates() -> Result<()> {
                 difficulty: LevelDifficulty::A2,
                 description: "Level for embeddings test".to_string(),
                 min_pass_percent: Some(75),
-                sort_order: None,
+                order: None,
             },
             &claims,
         )

@@ -14,6 +14,7 @@ use tracing::{field, Span};
 use uuid::Uuid;
 
 pub mod config;
+pub mod extractors;
 pub mod handlers;
 pub mod metrics;
 pub mod middlewares;
@@ -199,7 +200,7 @@ fn teacher_routes() -> Router<std::sync::Arc<services::AppState>> {
         )
         .route(
             "/notifications/send",
-            post(handlers::teacher::send_group_notification),
+            post(handlers::teacher::send_notifications),
         )
         .route(
             "/notifications/history",
