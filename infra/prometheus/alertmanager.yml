@@ -29,5 +29,5 @@ receivers:
           labels: {{ range $k, $v := .CommonLabels }}{{ $k }}={{ $v }} {{ end }}
   - name: webhook-forwarder
     webhook_configs:
-      - url: '{{ getenv "ALERTMANAGER_WEBHOOK_URL" | default "" }}'
+      - url: '{{ getenv "ALERTMANAGER_WEBHOOK_URL" | default "http://localhost:8999/alertmanager/webhook" }}'
         send_resolved: true

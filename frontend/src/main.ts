@@ -59,10 +59,9 @@ const isAdminConsole = pathname.startsWith('/admin-console') || pathname === '/a
 
 // Router logic
 (function initializeRouter() {
-  // app-shell and skip-link are only needed for student-home (lessons page)
-  // Hide them on all other pages (login, register, forbidden, profile, admin, teacher-dashboard)
+  // app-shell is only needed for student-home (lessons page)
+  // Hide it on all other pages (login, register, forbidden, profile, admin, teacher-dashboard)
   const appShell = document.querySelector('app-shell') as HTMLElement | null;
-  const skipLink = document.querySelector('.skip-link') as HTMLElement | null;
   const isStudentHome =
     !isLogin &&
     !isRegister &&
@@ -85,14 +84,6 @@ const isAdminConsole = pathname.startsWith('/admin-console') || pathname === '/a
       appShell.style.display = 'block';
     } else {
       appShell.style.display = 'none';
-    }
-  }
-
-  if (skipLink) {
-    if (isStudentHome) {
-      skipLink.style.display = '';
-    } else {
-      skipLink.style.display = 'none';
     }
   }
 

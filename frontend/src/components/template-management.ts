@@ -214,6 +214,7 @@ export class TemplateManagement extends LitElement {
   @state() declare private showHistoryFor?: AdminTemplateSummary;
   @state() declare private versionHistory: TemplateVersionSummary[];
   @state() declare private moderationLoadingId?: string;
+  @state() declare private publishLoadingId?: string;
 
   constructor() {
     super();
@@ -372,12 +373,7 @@ export class TemplateManagement extends LitElement {
                   </td>
                   <td>
                     <div class="actions">
-                      <button
-                        class="primary"
-                        @click=${() => this.publishTemplate(template)}
-                      >
-                        Publish
-                      </button>
+                      ${this.renderPublishButton(template)}
                       <button
                         class="secondary"
                         @click=${() => this.openEditForm(template)}
@@ -405,6 +401,29 @@ export class TemplateManagement extends LitElement {
           </tbody>
         </table>
       </div>
+    `;
+  }
+
+  private renderPublishButton(template: AdminTemplateSummary) {
+    const status = this.normalizeStatus(template.status);
+    const isReady = status === 'ready';
+    const isPublished = status === 'published';
+    const busy = this.publishLoadingId === template.id;
+    const disabled = isPublished || !isReady || busy;
+    const label = isPublished ? 'Published' : busy ? 'Publishing…' : 'Publish';
+    const title =
+      disabled && !isPublished && !isReady
+        ? 'Публикация доступна только после модерации (статус ready)'
+        : '';
+    return html`
+      <button
+        class="primary"
+        ?disabled=${disabled}
+        title=${title}
+        @click=${() => this.publishTemplate(template)}
+      >
+        ${label}
+      </button>
     `;
   }
 
@@ -620,9 +639,9 @@ export class TemplateManagement extends LitElement {
   }
 
   private renderModerationActions(template: AdminTemplateSummary) {
-    const isDraft = template.status === 'draft';
-    const needsApproval =
-      template.status === 'pending_review' || template.status === 'reviewed_once';
+    const status = this.normalizeStatus(template.status);
+    const isDraft = status === 'draft';
+    const needsApproval = status === 'pendingreview' || status === 'reviewedonce';
     const busy = this.moderationLoadingId === template.id;
     return html`
       ${isDraft
@@ -745,13 +764,33 @@ export class TemplateManagement extends LitElement {
     }, 4000);
   }
 
+  private normalizeStatus(status?: string) {
+    return (status ?? '').replace(/_/g, '').toLowerCase();
+  }
+
   private async publishTemplate(template: AdminTemplateSummary) {
+    const status = this.normalizeStatus(template.status);
+    if (status === 'published') {
+      return;
+    }
+    if (status !== 'ready') {
+      this.error =
+        'Сначала доведите шаблон до статуса ready (Submit → Approve), затем публикуйте.';
+      return;
+    }
+    if (this.publishLoadingId === template.id) {
+      return;
+    }
+    this.publishLoadingId = template.id;
     try {
       await this.client.updateAdminTemplate(template.id, { status: 'published' });
       this.showNotice('Шаблон опубликован', 'success');
       await this.refreshTemplates();
     } catch (error) {
-      this.error = error instanceof Error ? error.message : 'Не удалось опубликовать';
+      this.error =
+        error instanceof Error ? error.message : 'Не удалось опубликовать шаблон';
+    } finally {
+      this.publishLoadingId = undefined;
     }
   }
 

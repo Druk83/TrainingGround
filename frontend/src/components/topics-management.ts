@@ -106,6 +106,16 @@ export class TopicsManagement extends LitElement {
       color: var(--text-muted);
     }
 
+    code {
+      font-family: 'Courier New', monospace;
+      font-size: 0.75rem;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+      user-select: all;
+      cursor: text;
+    }
+
     .actions {
       display: flex;
       gap: 0.5rem;
@@ -271,6 +281,9 @@ export class TopicsManagement extends LitElement {
                 <div class="actions">
                   <button @click=${() => this.toggleTopicStatus(topic)}>Статус</button>
                   <button @click=${() => this.reloadLevels(topic.id)}>Уровни</button>
+                  <button class="danger" @click=${() => this.handleDeleteTopic(topic.id)}>
+                    Удалить тему
+                  </button>
                 </div>
               </div>
               <p>${topic.description}</p>
@@ -284,6 +297,7 @@ export class TopicsManagement extends LitElement {
                         return html`
                           <div class="level-card">
                             <strong>${level.name}</strong>
+                            <span class="row-meta">ID: <code>${level.id}</code></span>
                             <span class="row-meta">Сложность: ${level.difficulty}</span>
                             <span class="row-meta">Порядок: ${level.order}</span>
                             <span class="row-meta">Статус: ${level.status}</span>
@@ -303,6 +317,14 @@ export class TopicsManagement extends LitElement {
                                 @click=${() => this.moveLevel(topic.id, index, 'down')}
                               >
                                 ↓
+                              </button>
+                              <button
+                                class="danger"
+                                ?disabled=${isReordering}
+                                title="Удалить уровень"
+                                @click=${() => this.handleDeleteLevel(level.id, topic.id)}
+                              >
+                                Удалить
                               </button>
                               ${isReordering
                                 ? html`<span class="row-meta">Сохраняем порядок...</span>`
@@ -342,7 +364,7 @@ export class TopicsManagement extends LitElement {
         <label>
           Сложность
           <select
-            .value=${draft?.difficulty ?? 'A1'}
+            .value=${draft?.difficulty ?? 'a1'}
             @change=${(event: Event) =>
               this.updateLevelDraft(
                 topicId,
@@ -351,10 +373,10 @@ export class TopicsManagement extends LitElement {
                   .value as LevelSummary['difficulty'],
               )}
           >
-            <option value="A1">A1</option>
-            <option value="A2">A2</option>
-            <option value="B1">B1</option>
-            <option value="B2">B2</option>
+            <option value="a1">A1</option>
+            <option value="a2">A2</option>
+            <option value="b1">B1</option>
+            <option value="b2">B2</option>
           </select>
         </label>
         <label>
@@ -434,6 +456,23 @@ export class TopicsManagement extends LitElement {
     }
   }
 
+  private async handleDeleteTopic(topicId: string) {
+    if (
+      !confirm(
+        'Вы уверены, что хотите удалить эту тему? Все уровни темы также будут удалены.',
+      )
+    ) {
+      return;
+    }
+    try {
+      await this.client.deleteTopic(topicId);
+      await this.loadTopics();
+      delete this.levelsByTopic[topicId];
+    } catch (error) {
+      this.errors = error instanceof Error ? error.message : 'Не удалось удалить тему';
+    }
+  }
+
   private async reloadLevels(topicId: string) {
     try {
       const levels = await this.client.listLevels(topicId);
@@ -451,7 +490,7 @@ export class TopicsManagement extends LitElement {
   ) {
     const existing = this.levelDrafts[topicId] ?? {
       name: '',
-      difficulty: 'A1',
+      difficulty: 'a1',
       min_pass_percent: 80,
     };
     this.levelDrafts = {
@@ -477,6 +516,18 @@ export class TopicsManagement extends LitElement {
       await this.reloadLevels(topicId);
     } catch (error) {
       this.errors = error instanceof Error ? error.message : 'Не удалось создать уровень';
+    }
+  }
+
+  private async handleDeleteLevel(levelId: string, topicId: string) {
+    if (!confirm('Вы уверены, что хотите удалить этот уровень?')) {
+      return;
+    }
+    try {
+      await this.client.deleteLevel(levelId);
+      await this.reloadLevels(topicId);
+    } catch (error) {
+      this.errors = error instanceof Error ? error.message : 'Не удалось удалить уровень';
     }
   }
 

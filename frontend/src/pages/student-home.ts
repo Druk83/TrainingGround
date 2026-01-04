@@ -345,78 +345,8 @@ export class StudentHome extends LitElement {
     this.loading = true;
 
     // TODO: Replace with actual API call to GET /api/v1/student/courses
-    // For now, using mock data
-    await new Promise((resolve) => setTimeout(resolve, 500)); // Simulate network delay
-
-    this.courses = [
-      {
-        id: '1',
-        title: 'Основы Python',
-        description:
-          'Изучите основы программирования на Python: переменные, циклы, функции и ООП.',
-        difficulty: 'easy',
-        progress: 75,
-        total_tasks: 20,
-        completed_tasks: 15,
-        status: 'in_progress',
-        last_session_id: 'session_123',
-      },
-      {
-        id: '2',
-        title: 'Алгоритмы и структуры данных',
-        description:
-          'Освойте основные алгоритмы сортировки, поиска и работы с деревьями.',
-        difficulty: 'medium',
-        progress: 30,
-        total_tasks: 25,
-        completed_tasks: 7,
-        status: 'in_progress',
-        last_session_id: 'session_456',
-      },
-      {
-        id: '3',
-        title: 'Веб-разработка с JavaScript',
-        description:
-          'Создавайте интерактивные веб-приложения с использованием современного JavaScript.',
-        difficulty: 'medium',
-        progress: 0,
-        total_tasks: 30,
-        completed_tasks: 0,
-        status: 'new',
-      },
-      {
-        id: '4',
-        title: 'Введение в машинное обучение',
-        description:
-          'Познакомьтесь с основами ML: регрессия, классификация, нейронные сети.',
-        difficulty: 'hard',
-        progress: 0,
-        total_tasks: 40,
-        completed_tasks: 0,
-        status: 'new',
-      },
-      {
-        id: '5',
-        title: 'Git и контроль версий',
-        description:
-          'Научитесь работать с Git: коммиты, ветки, слияния и работа в команде.',
-        difficulty: 'easy',
-        progress: 100,
-        total_tasks: 10,
-        completed_tasks: 10,
-        status: 'completed',
-      },
-      {
-        id: '6',
-        title: 'SQL и базы данных',
-        description: 'Освойте SQL для работы с реляционными базами данных.',
-        difficulty: 'medium',
-        progress: 50,
-        total_tasks: 18,
-        completed_tasks: 9,
-        status: 'in_progress',
-      },
-    ];
+    // Пока API не реализован, показываем пустой список
+    this.courses = [];
 
     this.loading = false;
   }

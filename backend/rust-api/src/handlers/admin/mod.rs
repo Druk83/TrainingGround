@@ -31,7 +31,7 @@ use crate::{
     models::content::{
         EmbeddingConsistencyReport, EmbeddingJobSummary, EmbeddingRebuildRequest,
         LevelCreateRequest, LevelRecord, LevelReorderRequest, LevelSummary, LevelUpdateRequest,
-        QueueStatus, RuleCoverage, RuleCreateRequest, RuleRecord, RuleUpdateRequest,
+        QueueStatus, RuleCoverage, RuleCreateRequest, RuleRecord, RuleSummary, RuleUpdateRequest,
         TemplateCreateRequest, TemplateDetail, TemplateDuplicate, TemplateListQuery,
         TemplateRevertRequest, TemplateSummary, TemplateUpdateRequest, TemplateValidationIssue,
         TemplateVersionSummary, TopicCreateRequest, TopicRecord, TopicSummary, TopicUpdateRequest,
@@ -67,8 +67,13 @@ pub async fn create_template(
     AppJson(payload): AppJson<TemplateCreateRequest>,
 ) -> Result<Json<TemplateSummary>, ApiError> {
     let service = ContentService::new(&state);
-    let summary = service.create_template(payload, &claims).await?;
-    Ok(Json(summary))
+    match service.create_template(payload, &claims).await {
+        Ok(summary) => Ok(Json(summary)),
+        Err(e) => {
+            tracing::error!("Failed to create template: {:?}", e);
+            Err(ApiError::Internal(e.to_string()))
+        }
+    }
 }
 
 pub async fn update_template(
@@ -141,7 +146,7 @@ pub async fn list_levels(
 pub async fn create_level(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<JwtClaims>,
-    Json(payload): Json<LevelCreateRequest>,
+    AppJson(payload): AppJson<LevelCreateRequest>,
 ) -> Result<Json<LevelRecord>, ApiError> {
     let service = ContentService::new(&state);
     let level = service.create_level(payload, &claims).await?;
@@ -182,16 +187,17 @@ pub async fn reorder_levels(
 
 pub async fn list_rules(
     State(state): State<Arc<AppState>>,
-) -> Result<Json<Vec<RuleRecord>>, ApiError> {
+) -> Result<Json<Vec<RuleSummary>>, ApiError> {
     let service = ContentService::new(&state);
     let rules = service.list_rules().await?;
-    Ok(Json(rules))
+    let summaries: Vec<RuleSummary> = rules.iter().map(RuleSummary::from_rule).collect();
+    Ok(Json(summaries))
 }
 
 pub async fn create_rule(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<JwtClaims>,
-    Json(payload): Json<RuleCreateRequest>,
+    AppJson(payload): AppJson<RuleCreateRequest>,
 ) -> Result<Json<RuleRecord>, ApiError> {
     let service = ContentService::new(&state);
     let rule = service.create_rule(payload, &claims).await?;

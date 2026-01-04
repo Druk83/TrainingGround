@@ -174,6 +174,16 @@ export class RulesManagement extends LitElement {
       font-size: 0.8rem;
       color: var(--text-muted);
     }
+
+    code {
+      font-family: 'Courier New', monospace;
+      font-size: 0.75rem;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+      user-select: all;
+      cursor: text;
+    }
   `;
 
   private readonly client = new ApiClient({ jwt: authService.getToken() ?? undefined });
@@ -190,6 +200,7 @@ export class RulesManagement extends LitElement {
     this.coverage = [];
     this.creating = false;
     this.newRule = {
+      slug: '',
       name: '',
       category: '',
       description: '',
@@ -214,6 +225,19 @@ export class RulesManagement extends LitElement {
           <button class="primary" @click=${this.loadRules}>Обновить</button>
         </header>
         <div class="form-grid">
+          <label>
+            Slug
+            <input
+              type="text"
+              .value=${this.newRule.slug}
+              @input=${(event: Event) =>
+                (this.newRule = {
+                  ...this.newRule,
+                  slug: (event.currentTarget as HTMLInputElement).value,
+                })}
+              placeholder="vowel-o-a"
+            />
+          </label>
           <label>
             Название
             <input
@@ -290,6 +314,7 @@ export class RulesManagement extends LitElement {
                 <strong>${rule.name}</strong>
                 <span class="row-meta">${rule.category} • ${rule.status}</span>
               </div>
+              <p class="row-meta">ID: <code>${rule.id}</code></p>
               <p>${rule.description}</p>
               <p class="row-meta">Примеры: ${rule.examples.join('; ') || '—'}</p>
               <p class="row-meta">
@@ -342,13 +367,18 @@ export class RulesManagement extends LitElement {
   }
 
   private async handleCreateRule() {
-    if (!this.newRule.name || !this.newRule.category || !this.newRule.description) {
+    if (
+      !this.newRule.slug ||
+      !this.newRule.name ||
+      !this.newRule.category ||
+      !this.newRule.description
+    ) {
       return;
     }
     this.creating = true;
     try {
       await this.client.createRule(this.newRule);
-      this.newRule = { name: '', category: '', description: '' };
+      this.newRule = { slug: '', name: '', category: '', description: '' };
       this.previewHtml = '';
       await Promise.all([this.loadRules(), this.loadCoverage()]);
     } catch (error) {

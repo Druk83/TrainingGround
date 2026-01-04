@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 export type TemplatePIIFlag = 'email' | 'phone' | 'name';
@@ -116,13 +116,21 @@ export class TemplateForm extends LitElement {
     }
   `;
 
-  @property({ type: String }) mode: 'create' | 'edit' = 'create';
-  @property({ type: Object }) initialValues?: TemplateFormValues;
-  @property({ type: Boolean }) submitting = false;
-  @property({ type: Boolean }) disabled = false;
+  @property({ type: String }) declare mode: 'create' | 'edit';
+  @property({ type: Object }) declare initialValues?: TemplateFormValues;
+  @property({ type: Boolean }) declare submitting: boolean;
+  @property({ type: Boolean }) declare disabled: boolean;
 
-  @state() private values: TemplateFormValues = { ...DEFAULT_FORM_VALUES };
-  @state() private error?: string;
+  @state() declare private values: TemplateFormValues;
+  @state() declare private error?: string;
+
+  constructor() {
+    super();
+    this.mode = 'create';
+    this.submitting = false;
+    this.disabled = false;
+    this.values = { ...DEFAULT_FORM_VALUES };
+  }
 
   updated(changed: Map<string, unknown>) {
     if (changed.has('initialValues') && this.initialValues) {
@@ -145,7 +153,7 @@ export class TemplateForm extends LitElement {
               @input=${(event: Event) =>
                 this.updateValue('slug', (event.currentTarget as HTMLInputElement).value)}
               required
-              pattern="[a-z0-9-]+"
+              pattern="[a-z0-9\\-]+"
             />
           </label>
           <label>
@@ -373,6 +381,14 @@ export class TemplateForm extends LitElement {
       return { valid: false, message: 'Укажите уровень (ObjectId).' };
     }
 
+    if (!this.isValidObjectId(this.values.levelId)) {
+      return {
+        valid: false,
+        message:
+          'Некорректный формат ObjectId для уровня (должен быть 24-символный hex-код).',
+      };
+    }
+
     if (!this.values.questionText.trim()) {
       return { valid: false, message: 'Текст задания не может быть пустым.' };
     }
@@ -385,11 +401,25 @@ export class TemplateForm extends LitElement {
       return { valid: false, message: 'Добавьте хотя бы одно правило.' };
     }
 
+    for (const ruleId of this.values.ruleIds) {
+      if (!this.isValidObjectId(ruleId)) {
+        return {
+          valid: false,
+          message: `Некорректный формат ObjectId для правила "${ruleId}" (должен быть 24-символный hex-код).`,
+        };
+      }
+    }
+
     if (this.values.type === 'mcq' && this.values.options.length < 2) {
       return { valid: false, message: 'MCQ требует минимум два варианта.' };
     }
 
     return { valid: true };
+  }
+
+  private isValidObjectId(value: string): boolean {
+    // MongoDB ObjectId должен быть 24-символным hex-кодом
+    return /^[0-9a-f]{24}$/i.test(value.trim());
   }
 
   private updateValue<K extends keyof TemplateFormValues>(

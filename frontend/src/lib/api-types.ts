@@ -210,7 +210,7 @@ export interface TopicUpdatePayload {
 export interface LevelSummary {
   id: string;
   name: string;
-  difficulty: 'A1' | 'A2' | 'B1' | 'B2';
+  difficulty: 'a1' | 'a2' | 'b1' | 'b2';
   order: number;
   status: 'active' | 'deprecated';
   topic_id: string;
@@ -219,16 +219,16 @@ export interface LevelSummary {
 export interface LevelCreatePayload {
   topic_id: string;
   name: string;
-  difficulty: 'A1' | 'A2' | 'B1' | 'B2';
+  difficulty: 'a1' | 'a2' | 'b1' | 'b2';
   description?: string;
   min_pass_percent?: number;
-  sort_order?: number;
+  order?: number;
 }
 
 export interface LevelUpdatePayload {
   name?: string;
   description?: string;
-  difficulty?: 'A1' | 'A2' | 'B1' | 'B2';
+  difficulty?: 'a1' | 'a2' | 'b1' | 'b2';
   min_pass_percent?: number;
   status?: 'active' | 'deprecated';
 }
@@ -239,6 +239,7 @@ export interface LevelReorderPayload {
 
 export interface RuleSummary {
   id: string;
+  slug: string;
   name: string;
   category: string;
   description: string;
@@ -249,6 +250,7 @@ export interface RuleSummary {
 }
 
 export interface RuleCreatePayload {
+  slug: string;
   name: string;
   category: string;
   description: string;

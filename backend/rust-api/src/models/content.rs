@@ -85,7 +85,9 @@ pub struct TemplateDocument {
     pub created_by: Option<String>,
     #[serde(default)]
     pub published_at: Option<mongodb::bson::DateTime>,
+    #[serde(rename = "createdAt", alias = "created_at")]
     pub created_at: mongodb::bson::DateTime,
+    #[serde(rename = "updatedAt", alias = "updated_at")]
     pub updated_at: mongodb::bson::DateTime,
 }
 
@@ -101,6 +103,7 @@ pub struct TemplateSummary {
     pub pii_flags: Vec<String>,
     pub source_refs: Vec<String>,
     pub reviewers: Vec<String>,
+    #[serde(rename = "updatedAt")]
     pub updated_at: String,
 }
 
@@ -250,7 +253,9 @@ pub struct TopicRecord {
     pub icon_url: Option<String>,
     pub sort_order: i32,
     pub status: TopicStatus,
+    #[serde(rename = "createdAt", alias = "created_at")]
     pub created_at: mongodb::bson::DateTime,
+    #[serde(rename = "updatedAt", alias = "updated_at")]
     pub updated_at: mongodb::bson::DateTime,
 }
 
@@ -326,7 +331,9 @@ pub struct LevelRecord {
     pub description: String,
     pub min_pass_percent: i32,
     pub status: LevelStatus,
+    #[serde(rename = "createdAt", alias = "created_at")]
     pub created_at: mongodb::bson::DateTime,
+    #[serde(rename = "updatedAt", alias = "updated_at")]
     pub updated_at: mongodb::bson::DateTime,
 }
 
@@ -360,6 +367,7 @@ impl RuleStatus {
 pub struct RuleRecord {
     #[serde(rename = "_id")]
     pub id: ObjectId,
+    pub slug: String,
     pub name: String,
     pub category: String,
     pub description: String,
@@ -370,7 +378,9 @@ pub struct RuleRecord {
     #[serde(default)]
     pub sources: Vec<String>,
     pub status: RuleStatus,
+    #[serde(rename = "createdAt", alias = "created_at")]
     pub created_at: mongodb::bson::DateTime,
+    #[serde(rename = "updatedAt", alias = "updated_at")]
     pub updated_at: mongodb::bson::DateTime,
 }
 
@@ -378,6 +388,35 @@ pub struct RuleRecord {
 pub struct RuleCoverage {
     pub rule_id: String,
     pub linked_templates: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RuleSummary {
+    pub id: String,
+    pub slug: String,
+    pub name: String,
+    pub category: String,
+    pub description: String,
+    pub examples: Vec<String>,
+    pub exceptions: Vec<String>,
+    pub sources: Vec<String>,
+    pub status: String,
+}
+
+impl RuleSummary {
+    pub fn from_rule(rule: &RuleRecord) -> Self {
+        Self {
+            id: rule.id.to_hex(),
+            slug: rule.slug.clone(),
+            name: rule.name.clone(),
+            category: rule.category.clone(),
+            description: rule.description.clone(),
+            examples: rule.examples.clone(),
+            exceptions: rule.exceptions.clone(),
+            sources: rule.sources.clone(),
+            status: rule.status.as_str().to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -551,6 +590,7 @@ pub struct LevelReorderRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct RuleCreateRequest {
+    pub slug: String,
     pub name: String,
     pub category: String,
     pub description: String,
@@ -625,7 +665,11 @@ fn bson_to_iso(dt: &mongodb::bson::DateTime) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{TemplateStatus, TopicStatus};
+    use super::{
+        LevelDifficulty, LevelRecord, RuleRecord, TemplateDocument, TemplateStatus, TopicRecord,
+        TopicStatus,
+    };
+    use mongodb::bson::{doc, oid::ObjectId, DateTime as BsonDateTime};
 
     #[test]
     fn template_status_transitions() {
@@ -639,6 +683,103 @@ mod tests {
     fn topic_status_names() {
         assert_eq!(TopicStatus::Active.as_str(), "active");
         assert_eq!(TopicStatus::Deprecated.as_str(), "deprecated");
+    }
+
+    #[test]
+    fn template_document_accepts_snake_case_timestamps() {
+        let template_id = ObjectId::new();
+        let level_id = ObjectId::new();
+        let now = BsonDateTime::now();
+        let doc = doc! {
+            "_id": template_id,
+            "slug": "demo",
+            "level_id": level_id,
+            "status": "draft",
+            "created_at": now,
+            "updated_at": now,
+        };
+
+        let parsed: TemplateDocument =
+            mongodb::bson::from_document(doc).expect("document should deserialize");
+        assert_eq!(parsed.slug, "demo");
+        assert_eq!(parsed.status, TemplateStatus::Draft);
+        assert_eq!(parsed.updated_at, now);
+        assert_eq!(parsed.created_at, now);
+    }
+
+    #[test]
+    fn topic_record_accepts_snake_case_timestamps() {
+        let topic_id = ObjectId::new();
+        let now = BsonDateTime::now();
+        let doc = doc! {
+            "_id": topic_id,
+            "slug": "test-topic",
+            "name": "Test Topic",
+            "description": "desc",
+            "icon_url": BsonDateTime::now().to_string(),
+            "sort_order": 1,
+            "status": "active",
+            "created_at": now,
+            "updated_at": now,
+        };
+
+        let parsed: TopicRecord =
+            mongodb::bson::from_document(doc).expect("topic should deserialize");
+        assert_eq!(parsed.id, topic_id);
+        assert_eq!(parsed.created_at, now);
+        assert_eq!(parsed.updated_at, now);
+    }
+
+    #[test]
+    fn level_record_accepts_snake_case_timestamps() {
+        let level_id = ObjectId::new();
+        let topic_id = ObjectId::new();
+        let now = BsonDateTime::now();
+        let doc = doc! {
+            "_id": level_id,
+            "topic_id": topic_id,
+            "order": 0,
+            "name": "Level",
+            "difficulty": "a1",
+            "description": "",
+            "min_pass_percent": 75,
+            "status": "active",
+            "created_at": now,
+            "updated_at": now,
+        };
+
+        let parsed: LevelRecord =
+            mongodb::bson::from_document(doc).expect("level should deserialize");
+        assert_eq!(parsed.id, level_id);
+        assert_eq!(parsed.topic_id, topic_id);
+        assert_eq!(parsed.difficulty, LevelDifficulty::A1);
+        assert_eq!(parsed.created_at, now);
+        assert_eq!(parsed.updated_at, now);
+    }
+
+    #[test]
+    fn rule_record_accepts_snake_case_timestamps() {
+        let rule_id = ObjectId::new();
+        let now = BsonDateTime::now();
+        let doc = doc! {
+            "_id": rule_id,
+            "slug": "rule-1",
+            "name": "Rule",
+            "category": "cat",
+            "description": "desc",
+            "examples": [],
+            "exceptions": [],
+            "sources": [],
+            "status": "active",
+            "created_at": now,
+            "updated_at": now,
+        };
+
+        let parsed: RuleRecord =
+            mongodb::bson::from_document(doc).expect("rule should deserialize");
+        assert_eq!(parsed.id, rule_id);
+        assert_eq!(parsed.created_at, now);
+        assert_eq!(parsed.updated_at, now);
     }
 }
 

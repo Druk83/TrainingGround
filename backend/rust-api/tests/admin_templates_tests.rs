@@ -72,6 +72,8 @@ async fn test_create_template_with_valid_data() -> Result<()> {
     let rule = service
         .create_rule(
             RuleCreateRequest {
+                slug: format!("rule-{}", Uuid::new_v4()),
+
                 name: "Test Rule".to_string(),
                 category: "orthography".to_string(),
                 description: "Rule for testing".to_string(),
@@ -143,6 +145,8 @@ async fn test_list_templates() -> Result<()> {
     let rule = service
         .create_rule(
             RuleCreateRequest {
+                slug: format!("rule-{}", Uuid::new_v4()),
+
                 name: "Test Rule".to_string(),
                 category: "orthography".to_string(),
                 description: "Rule for testing".to_string(),
@@ -223,6 +227,8 @@ async fn test_update_template() -> Result<()> {
     let rule = service
         .create_rule(
             RuleCreateRequest {
+                slug: format!("rule-{}", Uuid::new_v4()),
+
                 name: "Test Rule".to_string(),
                 category: "orthography".to_string(),
                 description: "Rule for testing".to_string(),
@@ -314,6 +320,8 @@ async fn test_delete_template() -> Result<()> {
     let rule = service
         .create_rule(
             RuleCreateRequest {
+                slug: format!("rule-{}", Uuid::new_v4()),
+
                 name: "Test Rule".to_string(),
                 category: "orthography".to_string(),
                 description: "Rule for testing".to_string(),
@@ -430,6 +438,8 @@ async fn test_template_with_rule_references() -> Result<()> {
     let rule1 = service
         .create_rule(
             RuleCreateRequest {
+                slug: format!("rule-{}", Uuid::new_v4()),
+
                 name: "Rule 1".to_string(),
                 category: "orthography".to_string(),
                 description: "Test".to_string(),
@@ -445,6 +455,8 @@ async fn test_template_with_rule_references() -> Result<()> {
     let rule2 = service
         .create_rule(
             RuleCreateRequest {
+                slug: format!("rule-{}", Uuid::new_v4()),
+
                 name: "Rule 2".to_string(),
                 category: "punctuation".to_string(),
                 description: "Test".to_string(),
@@ -562,6 +574,8 @@ async fn test_template_with_params() -> Result<()> {
     let rule = service
         .create_rule(
             RuleCreateRequest {
+                slug: format!("rule-{}", Uuid::new_v4()),
+
                 name: "Test Rule".to_string(),
                 category: "orthography".to_string(),
                 description: "Rule for testing".to_string(),
@@ -645,6 +659,8 @@ async fn test_template_with_metadata() -> Result<()> {
     let rule = service
         .create_rule(
             RuleCreateRequest {
+                slug: format!("rule-{}", Uuid::new_v4()),
+
                 name: "Test Rule".to_string(),
                 category: "orthography".to_string(),
                 description: "Rule for testing".to_string(),
@@ -728,6 +744,8 @@ async fn test_template_status_transitions() -> Result<()> {
     let rule = service
         .create_rule(
             RuleCreateRequest {
+                slug: format!("rule-{}", Uuid::new_v4()),
+
                 name: "Test Rule".to_string(),
                 category: "orthography".to_string(),
                 description: "Rule for testing".to_string(),
@@ -800,6 +818,8 @@ async fn test_template_with_difficulty_levels() -> Result<()> {
     let rule = service
         .create_rule(
             RuleCreateRequest {
+                slug: format!("rule-{}", Uuid::new_v4()),
+
                 name: "Test Rule".to_string(),
                 category: "orthography".to_string(),
                 description: "Rule for testing".to_string(),
@@ -886,6 +906,8 @@ async fn test_template_with_source_references() -> Result<()> {
     let rule = service
         .create_rule(
             RuleCreateRequest {
+                slug: format!("rule-{}", Uuid::new_v4()),
+
                 name: "Test Rule".to_string(),
                 category: "orthography".to_string(),
                 description: "Rule for testing".to_string(),
@@ -959,6 +981,8 @@ async fn test_template_content_preservation() -> Result<()> {
     let rule = service
         .create_rule(
             RuleCreateRequest {
+                slug: format!("rule-{}", Uuid::new_v4()),
+
                 name: "Test Rule".to_string(),
                 category: "orthography".to_string(),
                 description: "Rule for testing".to_string(),

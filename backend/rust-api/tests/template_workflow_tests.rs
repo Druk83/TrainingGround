@@ -70,6 +70,8 @@ async fn integration_template_workflow_approval() -> Result<()> {
     let rule = service
         .create_rule(
             RuleCreateRequest {
+                slug: format!("rule-{}", Uuid::new_v4()),
+
                 name: "Integration Rule".to_string(),
                 category: "Integration".to_string(),
                 description: "Rule for template workflow test".to_string(),
@@ -173,6 +175,8 @@ async fn integration_embeddings_rebuild_selected_templates() -> Result<()> {
     let rule = service
         .create_rule(
             RuleCreateRequest {
+                slug: format!("rule-{}", Uuid::new_v4()),
+
                 name: "Embedding Rule".to_string(),
                 category: "Embedding".to_string(),
                 description: "Rule for embedding test".to_string(),

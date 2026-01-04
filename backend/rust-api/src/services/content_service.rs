@@ -54,6 +54,10 @@ impl ContentService {
     }
 
     pub async fn list_templates(&self, query: TemplateListQuery) -> Result<Vec<TemplateSummary>> {
+        if let Err(err) = self.normalize_template_timestamp_fields().await {
+            tracing::warn!("Failed to normalize template timestamps: {:?}", err);
+        }
+
         let mut filter = Document::new();
 
         if let Some(status) = query.status {
@@ -103,7 +107,7 @@ impl ContentService {
         }
 
         let find_options = FindOptions::builder()
-            .sort(doc! { "updated_at": -1 })
+            .sort(doc! { "updatedAt": -1 })
             .limit(
                 query
                     .limit
@@ -144,6 +148,10 @@ impl ContentService {
     }
 
     pub async fn get_template(&self, template_id: &ObjectId) -> Result<Option<TemplateDetail>> {
+        if let Err(err) = self.normalize_template_timestamp_fields().await {
+            tracing::warn!("Failed to normalize template timestamps: {:?}", err);
+        }
+
         let collection: Collection<TemplateDocument> = self.mongo.collection("templates");
         let doc = collection
             .find_one(doc! { "_id": template_id })
@@ -173,21 +181,72 @@ impl ContentService {
         payload: TemplateCreateRequest,
         claims: &JwtClaims,
     ) -> Result<TemplateSummary> {
-        let level_obj =
-            ObjectId::parse_str(&payload.level_id).context("Invalid level_id in request")?;
-        let rule_ids = parse_object_id_list(&payload.rule_ids)?;
+        tracing::info!(
+            "Creating template: slug={}, level_id={}",
+            payload.slug,
+            payload.level_id
+        );
+
+        let level_obj = match ObjectId::parse_str(&payload.level_id) {
+            Ok(id) => id,
+            Err(e) => {
+                tracing::error!("Failed to parse level_id: {}", e);
+                return Err(anyhow!("Invalid level_id in request: {}", e));
+            }
+        };
+        tracing::info!("Parsed level_id: {}", level_obj.to_hex());
+
+        let rule_ids = match parse_object_id_list(&payload.rule_ids) {
+            Ok(ids) => ids,
+            Err(e) => {
+                tracing::error!("Failed to parse rule_ids: {}", e);
+                return Err(e);
+            }
+        };
+        tracing::info!("Parsed {} rule IDs", rule_ids.len());
+
         self.ensure_level_exists(&level_obj).await?;
+        tracing::info!("Level exists");
+
         self.ensure_rules_exist(&rule_ids).await?;
+        tracing::info!("Rules exist");
+
         self.validate_slug(&payload.slug)?;
+        tracing::info!("Slug validated");
+
         self.ensure_unique_slug(&payload.slug, &level_obj, None)
             .await?;
+        tracing::info!("Slug is unique");
+
         self.validate_content(&payload.content)?;
+        tracing::info!("Content validated");
 
-        let params = json_to_document(Some(payload.params))?;
-        let metadata = json_to_document(Some(payload.metadata))?;
+        tracing::info!("Converting params to document");
+        let params = match json_to_document(Some(payload.params)) {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::error!("Failed to convert params: {:?}", e);
+                return Err(e);
+            }
+        };
+        tracing::info!("Params converted successfully");
+
+        tracing::info!("Converting metadata to document");
+        let metadata = match json_to_document(Some(payload.metadata)) {
+            Ok(m) => m,
+            Err(e) => {
+                tracing::error!("Failed to convert metadata: {:?}", e);
+                return Err(e);
+            }
+        };
+        tracing::info!("Metadata converted successfully");
+
         let now = now_bson_datetime();
+        tracing::info!("Scanning PII flags");
         let pii_flags = self.scan_pii(&payload.content);
+        tracing::info!("PII scan complete, flags: {:?}", pii_flags);
 
+        tracing::info!("Building template document");
         let template_doc = doc! {
             "slug": payload.slug,
             "level_id": level_obj,
@@ -202,15 +261,23 @@ impl ContentService {
             "pii_flags": pii_flags,
             "reviewers": Vec::<String>::new(),
             "created_by": claims.sub.clone(),
-            "created_at": now,
-            "updated_at": now,
+            "createdAt": now,
+            "updatedAt": now,
         };
+        tracing::info!("Template document built successfully");
 
+        tracing::info!("Inserting template into MongoDB");
         let collection: Collection<Document> = self.mongo.collection("templates");
-        let result = collection
-            .insert_one(template_doc)
-            .await
-            .context("Failed to insert template")?;
+        let result = match collection.insert_one(template_doc).await {
+            Ok(r) => {
+                tracing::info!("Template inserted successfully");
+                r
+            }
+            Err(e) => {
+                tracing::error!("MongoDB insert error: {:?}", e);
+                return Err(anyhow!("Failed to insert template into MongoDB: {}", e));
+            }
+        };
 
         let id = result
             .inserted_id
@@ -299,12 +366,19 @@ impl ContentService {
         if !update.is_empty() {
             let snapshot = update.clone();
             let mut update_with_meta = update.clone();
-            update_with_meta.insert("updated_at", now_bson_datetime());
+            let now = now_bson_datetime();
+            update_with_meta.insert("updatedAt", now);
+            update_with_meta.insert("createdAt", current.created_at);
+            let mut update_command = doc! { "$set": update_with_meta };
+            update_command.insert(
+                "$unset",
+                doc! {
+                    "updated_at": "",
+                    "created_at": "",
+                },
+            );
             collection
-                .update_one(
-                    doc! { "_id": template_id },
-                    doc! { "$set": update_with_meta },
-                )
+                .update_one(doc! { "_id": template_id }, update_command)
                 .await
                 .context("Failed to update template")?;
 
@@ -346,14 +420,20 @@ impl ContentService {
             .ok_or_else(|| anyhow!("Template not found"))?;
 
         let new_version = template.version + 1;
+        let now = now_bson_datetime();
         collection
             .update_one(
                 doc! { "_id": template_id },
                 doc! {
                     "$set": {
                         "status": TemplateStatus::Draft.as_str(),
-                        "updated_at": now_bson_datetime(),
+                        "updatedAt": now,
+                        "createdAt": template.created_at,
                         "version": new_version
+                    },
+                    "$unset": {
+                        "updated_at": "",
+                        "created_at": "",
                     }
                 },
             )
@@ -413,7 +493,7 @@ impl ContentService {
             "version": version,
             "changes": changes,
             "created_by": claims.sub.clone(),
-            "created_at": now_bson_datetime(),
+            "createdAt": now_bson_datetime(),
         };
         collection
             .insert_one(record)
@@ -440,14 +520,20 @@ impl ContentService {
             ));
         }
 
+        let now = now_bson_datetime();
         collection
             .update_one(
                 doc! { "_id": template_id },
                 doc! {
                     "$set": {
                         "status": TemplateStatus::PendingReview.as_str(),
-                        "updated_at": now_bson_datetime(),
-                    }
+                        "updatedAt": now,
+                        "createdAt": template.created_at,
+                    },
+                    "$unset": {
+                        "updated_at": "",
+                        "created_at": "",
+                    },
                 },
             )
             .await
@@ -484,16 +570,22 @@ impl ContentService {
             _ => return Err(anyhow!("Template is not awaiting approval")),
         };
 
+        let now = now_bson_datetime();
         collection
             .update_one(
                 doc! { "_id": template_id },
                 doc! {
                     "$set": {
                         "status": next_status.as_str(),
-                        "updated_at": now_bson_datetime(),
+                        "updatedAt": now,
+                        "createdAt": template.created_at,
                     },
                     "$addToSet": {
                         "reviewers": claims.sub.clone()
+                    },
+                    "$unset": {
+                        "updated_at": "",
+                        "created_at": "",
                     }
                 },
             )
@@ -527,15 +619,21 @@ impl ContentService {
             .ok_or_else(|| anyhow!("Template not found"))?;
 
         let new_version = template.version + 1;
+        let now = now_bson_datetime();
         collection
             .update_one(
                 doc! { "_id": template_id },
                 doc! {
                     "$set": {
                         "status": TemplateStatus::Draft.as_str(),
-                        "updated_at": now_bson_datetime(),
+                        "updatedAt": now,
+                        "createdAt": template.created_at,
                         "version": new_version
                     },
+                    "$unset": {
+                        "updated_at": "",
+                        "created_at": "",
+                    }
                 },
             )
             .await
@@ -665,8 +763,8 @@ impl ContentService {
             "status": "running",
             "total": total,
             "processed": 0,
-            "created_at": now,
-            "updated_at": now,
+            "createdAt": now,
+            "updatedAt": now,
         };
         if let Some(ids) = explicit_ids.as_ref() {
             let bson_ids = ids.iter().map(|id| Bson::ObjectId(*id)).collect::<Vec<_>>();
@@ -694,7 +792,7 @@ impl ContentService {
     pub async fn get_embedding_progress(&self) -> Result<EmbeddingJobSummary> {
         let collection: Collection<Document> = self.mongo.collection("embedding_jobs");
         let find_options = FindOptions::builder()
-            .sort(doc! { "created_at": -1 })
+            .sort(doc! { "createdAt": -1 })
             .limit(1)
             .build();
         let mut cursor = collection
@@ -710,7 +808,7 @@ impl ContentService {
             let mut summary = self.embedding_job_from_doc(&job_doc)?;
             let now = Utc::now();
             let updated_at = job_doc
-                .get_datetime("updated_at")
+                .get_datetime("updatedAt")
                 .cloned()
                 .unwrap_or_else(|_| now_bson_datetime());
             let elapsed = (now.timestamp_millis() - updated_at.timestamp_millis()) / 1000;
@@ -781,7 +879,7 @@ impl ContentService {
         let total = doc.get_i64("total").unwrap_or(0);
         let processed = doc.get_i64("processed").unwrap_or(0);
         let created_at = doc
-            .get_datetime("created_at")
+            .get_datetime("createdAt")
             .map(bson_to_iso)
             .unwrap_or_else(|_| Utc::now().to_rfc3339());
         let id = doc
@@ -828,8 +926,8 @@ impl ContentService {
             "icon_url": payload.icon_url,
             "sort_order": 0,
             "status": payload.status.unwrap_or(TopicStatus::Active).as_str(),
-            "created_at": now,
-            "updated_at": now,
+            "createdAt": now,
+            "updatedAt": now,
         };
 
         let insert_collection: Collection<Document> = self.mongo.collection("topics");
@@ -911,26 +1009,26 @@ impl ContentService {
     }
 
     pub async fn delete_topic(&self, topic_id: &ObjectId, claims: &JwtClaims) -> Result<()> {
+        // Удалить все уровни темы
+        let levels_collection: Collection<LevelRecord> = self.mongo.collection("levels");
+        levels_collection
+            .delete_many(doc! { "topic_id": topic_id })
+            .await
+            .context("Failed to delete levels")?;
+
+        // Удалить саму тему
         let collection: Collection<TopicRecord> = self.mongo.collection("topics");
         collection
-            .update_one(
-                doc! { "_id": topic_id },
-                doc! {
-                    "$set": {
-                        "status": TopicStatus::Deprecated.as_str(),
-                        "updated_at": now_bson_datetime(),
-                    }
-                },
-            )
+            .delete_one(doc! { "_id": topic_id })
             .await
-            .context("Failed to update topic status")?;
+            .context("Failed to delete topic")?;
 
         self.log_audit(
             claims,
             "topic.delete",
             "topics",
             &topic_id.to_hex(),
-            Some(doc! { "status": TopicStatus::Deprecated.as_str() }),
+            None,
             None,
         )
         .await?;
@@ -1059,24 +1157,16 @@ impl ContentService {
     pub async fn delete_level(&self, level_id: &ObjectId, claims: &JwtClaims) -> Result<()> {
         let collection: Collection<LevelRecord> = self.mongo.collection("levels");
         collection
-            .update_one(
-                doc! { "_id": level_id },
-                doc! {
-                    "$set": {
-                        "status": LevelStatus::Deprecated.as_str(),
-                        "updated_at": now_bson_datetime(),
-                    }
-                },
-            )
+            .delete_one(doc! { "_id": level_id })
             .await
-            .context("Failed to depublish level")?;
+            .context("Failed to delete level")?;
 
         self.log_audit(
             claims,
             "level.delete",
             "levels",
             &level_id.to_hex(),
-            Some(doc! { "status": LevelStatus::Deprecated.as_str() }),
+            None,
             None,
         )
         .await?;
@@ -1117,30 +1207,50 @@ impl ContentService {
         payload: RuleCreateRequest,
         claims: &JwtClaims,
     ) -> Result<RuleRecord> {
+        tracing::info!(
+            "Creating rule: name={}, category={}",
+            payload.name,
+            payload.category
+        );
         let collection: Collection<RuleRecord> = self.mongo.collection("rules");
+        tracing::info!("Got collection reference");
         let now = now_bson_datetime();
+        tracing::info!("Got current time");
+
         let record = doc! {
-            "name": payload.name,
-            "category": payload.category,
-            "description": payload.description,
-            "examples": payload.examples,
-            "exceptions": payload.exceptions,
-            "sources": payload.sources,
+            "slug": &payload.slug,
+            "name": &payload.name,
+            "category": &payload.category,
+            "description": &payload.description,
+            "examples": &payload.examples,
+            "exceptions": &payload.exceptions,
+            "sources": &payload.sources,
             "status": payload.status.unwrap_or(RuleStatus::Active).as_str(),
-            "created_at": now,
-            "updated_at": now,
+            "createdAt": now,
+            "updatedAt": now,
+        };
+        tracing::info!("Built document for rule");
+
+        tracing::info!("Inserting rule document into MongoDB");
+        let insert_collection: Collection<Document> = self.mongo.collection("rules");
+        let result = match insert_collection.insert_one(record).await {
+            Ok(r) => {
+                tracing::info!("Successfully inserted rule into MongoDB");
+                r
+            }
+            Err(e) => {
+                tracing::error!("MongoDB insert error: {:?}", e);
+                return Err(anyhow!("Failed to insert rule into MongoDB: {}", e));
+            }
         };
 
-        let insert_collection: Collection<Document> = self.mongo.collection("rules");
-        let result = insert_collection
-            .insert_one(record)
-            .await
-            .context("Failed to insert rule")?;
         let id = result
             .inserted_id
             .as_object_id()
             .ok_or_else(|| anyhow!("Rule insertion did not return ObjectId"))?;
+        tracing::info!("Got inserted rule ID: {}", id.to_hex());
 
+        tracing::info!("Logging audit event");
         self.log_audit(
             claims,
             "rule.create",
@@ -1150,12 +1260,17 @@ impl ContentService {
             None,
         )
         .await?;
+        tracing::info!("Audit logged successfully");
 
-        collection
+        tracing::info!("Reloading rule from MongoDB");
+        let rule = collection
             .find_one(doc! { "_id": id })
             .await
-            .context("Failed to reload rule")
-            .and_then(|opt| opt.ok_or_else(|| anyhow!("Rule missing after insert")))
+            .context("Failed to reload rule")?
+            .ok_or_else(|| anyhow!("Rule missing after insert"))?;
+        tracing::info!("Rule reloaded successfully");
+
+        Ok(rule)
     }
 
     pub async fn update_rule(
@@ -1196,7 +1311,7 @@ impl ContentService {
                 .ok_or_else(|| anyhow!("Rule not found"));
         }
 
-        update.insert("updated_at", now_bson_datetime());
+        update.insert("updatedAt", now_bson_datetime());
         collection
             .update_one(doc! { "_id": rule_id }, doc! { "$set": update })
             .await
@@ -1579,6 +1694,55 @@ impl ContentService {
             .context("Failed to write audit log")?;
         Ok(())
     }
+    async fn normalize_template_timestamp_fields(&self) -> Result<()> {
+        let collection: Collection<Document> = self.mongo.collection("templates");
+
+        collection
+            .update_many(
+                doc! {
+                    "updated_at": { "$exists": true },
+                    "updatedAt": { "$exists": false }
+                },
+                doc! { "$rename": { "updated_at": "updatedAt" } },
+            )
+            .await
+            .context("Failed to rename legacy updated_at field")?;
+
+        collection
+            .update_many(
+                doc! {
+                    "updated_at": { "$exists": true },
+                    "updatedAt": { "$exists": true }
+                },
+                doc! { "$unset": { "updated_at": "" } },
+            )
+            .await
+            .context("Failed to remove duplicate updated_at field")?;
+
+        collection
+            .update_many(
+                doc! {
+                    "created_at": { "$exists": true },
+                    "createdAt": { "$exists": false }
+                },
+                doc! { "$rename": { "created_at": "createdAt" } },
+            )
+            .await
+            .context("Failed to rename legacy created_at field")?;
+
+        collection
+            .update_many(
+                doc! {
+                    "created_at": { "$exists": true },
+                    "createdAt": { "$exists": true }
+                },
+                doc! { "$unset": { "created_at": "" } },
+            )
+            .await
+            .context("Failed to remove duplicate created_at field")?;
+
+        Ok(())
+    }
 }
 
 fn json_to_document(value: Option<Value>) -> Result<Document> {
@@ -1597,7 +1761,12 @@ fn parse_object_id_list(values: &[String]) -> Result<Vec<ObjectId>> {
     values
         .iter()
         .map(|value| {
-            ObjectId::parse_str(value).with_context(|| format!("Invalid object id {}", value))
+            ObjectId::parse_str(value).with_context(|| {
+                format!(
+                    "Invalid ObjectId '{}' - must be a 24-character hexadecimal string",
+                    value
+                )
+            })
         })
         .collect()
 }

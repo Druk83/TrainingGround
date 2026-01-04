@@ -274,32 +274,6 @@ select:disabled {
   border: 0;
 }
 
-/* Skip to main content link - visible on focus */
-.skip-link {
-  position: absolute;
-  top: -40px;
-  left: 0;
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 var(--spacing-md);
-  background: #0b1120;
-  color: #f8fafc;
-  text-decoration: none;
-  border: 2px solid var(--focus-ring);
-  border-radius: var(--radius-md);
-  z-index: 9999;
-  transition: top 0.2s ease;
-}
-
-.skip-link:focus {
-  top: var(--spacing-sm);
-  background: #f8fafc;
-  color: #0b1120;
-  outline: var(--focus-ring-width) solid var(--focus-ring);
-  outline-offset: var(--focus-ring-offset);
-}
-
 /* Focus visible styles - high contrast */
 *:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring);
