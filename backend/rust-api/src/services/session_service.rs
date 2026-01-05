@@ -1,6 +1,7 @@
 use crate::metrics::{track_cache_operation, SESSIONS_ACTIVE, SESSIONS_TOTAL};
 use crate::models::{
-    CreateSessionRequest, CreateSessionResponse, Session, SessionStatus, TaskInfo,
+    content::LevelRecord, CreateSessionRequest, CreateSessionResponse, Session, SessionStatus,
+    TaskInfo,
 };
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
@@ -77,12 +78,13 @@ impl SessionService {
         };
 
         let now = Utc::now();
-        let session_ttl = std::env::var("SESSION_DURATION_SECONDS")
+        let default_ttl = std::env::var("SESSION_DURATION_SECONDS")
             .ok()
             .and_then(|v| v.parse::<i64>().ok())
             .filter(|v| *v > 0)
             .unwrap_or(3600);
-        let expires_at = now + chrono::Duration::seconds(session_ttl);
+        let enforced_ttl = req.session_duration_seconds.unwrap_or(default_ttl);
+        let expires_at = now + chrono::Duration::seconds(enforced_ttl);
 
         let session = Session {
             id: session_id.clone(),
@@ -121,13 +123,18 @@ impl SessionService {
 
         tracing::info!("Session created: {} for user: {}", session_id, req.user_id);
 
+        let response_time_limit = req
+            .session_duration_seconds
+            .map(|value| value.max(60) as u32)
+            .unwrap_or(task.time_limit_seconds);
+
         Ok(CreateSessionResponse {
             session_id,
             task: TaskInfo {
                 id: task.id,
                 title: task.title,
                 description: task.description,
-                time_limit_seconds: task.time_limit_seconds,
+                time_limit_seconds: response_time_limit,
             },
             expires_at,
         })
@@ -300,11 +307,26 @@ impl SessionService {
 
         tracing::info!("Stored generated task in MongoDB: {}", inserted_id);
 
+        let level_label = self
+            .load_level_label(level_id)
+            .await
+            .unwrap_or_else(|| format!("Уровень {}", level_id.chars().take(6).collect::<String>()));
+
+        let task_title = format!("{} — задание", level_label);
+        let task_description = instance
+            .metadata
+            .get("description")
+            .and_then(|value| value.as_str())
+            .map(|value| value.to_string())
+            // Если шаблон не вернул отдельного описания, показываем сам текст задания,
+            // чтобы студент сразу видел, на что нужно отвечать.
+            .unwrap_or_else(|| instance.text.clone());
+
         // Возвращаем задание в формате FetchedTask
         Ok(FetchedTask {
             id: inserted_id,
-            title: format!("Generated task from level {}", level_id),
-            description: instance.text.clone(),
+            title: task_title,
+            description: task_description,
             time_limit_seconds: 300, // 5 минут по умолчанию
         })
     }
@@ -374,4 +396,19 @@ struct FetchedTask {
     title: String,
     description: String,
     time_limit_seconds: u32,
+}
+
+impl SessionService {
+    async fn load_level_label(&self, level_id: &str) -> Option<String> {
+        let object_id = ObjectId::parse_str(level_id).ok()?;
+        let collection = self.mongo.collection::<LevelRecord>("levels");
+        match collection.find_one(doc! { "_id": object_id }).await {
+            Ok(Some(level)) => Some(level.name),
+            Ok(None) => None,
+            Err(err) => {
+                tracing::warn!("Failed to load level {}: {}", level_id, err);
+                None
+            }
+        }
+    }
 }

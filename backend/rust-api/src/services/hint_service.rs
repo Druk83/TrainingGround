@@ -159,14 +159,6 @@ impl HintService {
             .await
             .context("Failed to deduct hint cost")?;
 
-        // Set TTL if needed
-        let _: Result<(), redis::RedisError> = redis::cmd("EXPIRE")
-            .arg(&score_key)
-            .arg(86400) // 24 hours
-            .query_async(&mut conn)
-            .await;
-        // Ignore TTL errors
-
         Ok(new_score)
     }
 

@@ -155,10 +155,11 @@ impl AnswerService {
             .await?;
         }
 
+        let score_delta = score_awarded + combo_bonus;
+
         // Update total score in Redis
         let total_score = retry_async_with_config(aggressive_cfg.clone(), || async {
-            self.update_total_score(user_id, score_awarded + combo_bonus)
-                .await
+            self.update_total_score(user_id, score_delta).await
         })
         .await?;
 
@@ -166,8 +167,14 @@ impl AnswerService {
 
         // Update progress summary for S5 rule (80% threshold)
         retry_async_with_config(aggressive_cfg.clone(), || async {
-            self.update_progress_summary(user_id, session_level_id.as_deref(), task_id, is_correct)
-                .await
+            self.update_progress_summary(
+                user_id,
+                session_level_id.as_deref(),
+                task_id,
+                is_correct,
+                score_delta,
+            )
+            .await
         })
         .await?;
 
@@ -304,13 +311,6 @@ impl AnswerService {
             .await
             .context("Failed to update total score")?;
 
-        // Set TTL
-        redis::cmd("EXPIRE")
-            .arg(&score_key)
-            .arg(86400) // 24 hours
-            .query_async::<()>(&mut conn)
-            .await?;
-
         Ok(total)
     }
 
@@ -415,6 +415,7 @@ impl AnswerService {
         level_id: Option<&str>,
         fallback_task_id: &str,
         is_correct: bool,
+        score_delta: i32,
     ) -> Result<()> {
         // Используем реальный level_id, если он был указан при создании сессии
         let level_key = level_id
@@ -440,6 +441,7 @@ impl AnswerService {
             summary.percentage =
                 (summary.correct_count as f64 / summary.attempts_total as f64) * 100.0;
             summary.updated_at = Utc::now();
+            summary.score = summary.score.saturating_add(score_delta);
             summary
         } else {
             // Create new
@@ -450,7 +452,7 @@ impl AnswerService {
                 attempts_total: 1,
                 correct_count: if is_correct { 1 } else { 0 },
                 percentage: if is_correct { 100.0 } else { 0.0 },
-                score: 0, // Updated separately via total_score
+                score: score_delta,
                 updated_at: Utc::now(),
             }
         };

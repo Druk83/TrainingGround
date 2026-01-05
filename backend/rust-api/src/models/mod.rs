@@ -32,6 +32,8 @@ pub struct CreateSessionRequest {
     pub group_id: Option<String>,
     /// Опциональный level_id для генерации заданий через Template Generator
     pub level_id: Option<String>,
+    /// Дополнительное ограничение по времени для всей сессии в секундах
+    pub session_duration_seconds: Option<i64>,
 }
 
 #[derive(Debug, Serialize)]

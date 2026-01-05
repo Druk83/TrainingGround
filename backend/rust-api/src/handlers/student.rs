@@ -15,6 +15,7 @@ use mongodb::{
     options::FindOptions,
     Database,
 };
+use redis::aio::ConnectionManager;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -32,6 +33,16 @@ const DEFAULT_TASKS_PER_COURSE: i32 = 10;
 #[derive(Debug, Serialize)]
 pub struct StudentCoursesResponse {
     pub courses: Vec<StudentCourseSummary>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct StudentStatsResponse {
+    pub total_score: i64,
+    pub accuracy: f64,
+    pub attempts_total: i64,
+    pub correct_total: i64,
+    pub current_streak: i64,
+    pub hints_used: i64,
 }
 
 #[derive(Debug, Serialize)]
@@ -143,6 +154,46 @@ pub async fn list_courses(
     Ok(Json(StudentCoursesResponse { courses }))
 }
 
+pub async fn get_stats(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<JwtClaims>,
+) -> Result<Json<StudentStatsResponse>, StudentApiError> {
+    ensure_student_role(&claims)?;
+    let user_id = &claims.sub;
+
+    let (attempts_total, correct_total) =
+        aggregate_progress(&state.mongo, user_id)
+            .await
+            .map_err(|err| {
+                StudentApiError::internal(format!("Failed to aggregate progress: {}", err))
+            })?;
+
+    let total_score = fetch_user_score(&state.redis, user_id)
+        .await
+        .map_err(|err| StudentApiError::internal(format!("Failed to load total score: {}", err)))?;
+    let current_streak = fetch_user_streak(&state.redis, user_id)
+        .await
+        .map_err(|err| StudentApiError::internal(format!("Failed to load streak: {}", err)))?;
+    let hints_used = count_user_hints(&state.mongo, user_id)
+        .await
+        .map_err(|err| StudentApiError::internal(format!("Failed to count hints: {}", err)))?;
+
+    let accuracy = if attempts_total > 0 {
+        (correct_total as f64 / attempts_total as f64 * 100.0).clamp(0.0, 100.0)
+    } else {
+        0.0
+    };
+
+    Ok(Json(StudentStatsResponse {
+        total_score,
+        accuracy,
+        attempts_total,
+        correct_total,
+        current_streak,
+        hints_used,
+    }))
+}
+
 pub async fn start_session(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<JwtClaims>,
@@ -170,11 +221,16 @@ pub async fn start_session(
     );
 
     let group_id = claims.group_ids.first().cloned();
+    let total_tasks = metadata_number(&template.metadata, &["total_tasks", "lessons_count"])
+        .unwrap_or(DEFAULT_TASKS_PER_COURSE);
+    let duration_seconds = (total_tasks.max(1) * 3 * 60) as i64;
+
     let request = CreateSessionRequest {
         user_id: claims.sub.clone(),
         task_id: template.slug.clone(),
         group_id,
         level_id: Some(template.level_id.to_hex()),
+        session_duration_seconds: Some(duration_seconds as i64),
     };
 
     let response = session_service
@@ -327,6 +383,60 @@ async fn load_progress(
     }
 
     Ok(rows)
+}
+
+async fn aggregate_progress(
+    mongo: &Database,
+    user_id: &str,
+) -> Result<(i64, i64), mongodb::error::Error> {
+    let collection = mongo.collection::<Document>("progress_summary_v2");
+    let pipeline = vec![
+        doc! { "$match": { "user_id": user_id } },
+        doc! {
+            "$group": {
+                "_id": null,
+                "attempts_total": { "$sum": "$attempts_total" },
+                "correct_total": { "$sum": "$correct_count" },
+            }
+        },
+    ];
+
+    let mut cursor = collection.aggregate(pipeline).await?;
+    if let Some(doc) = cursor.try_next().await? {
+        let attempts = doc.get_i64("attempts_total").unwrap_or(0);
+        let correct = doc.get_i64("correct_total").unwrap_or(0);
+        Ok((attempts, correct))
+    } else {
+        Ok((0, 0))
+    }
+}
+
+async fn count_user_hints(mongo: &Database, user_id: &str) -> Result<i64, mongodb::error::Error> {
+    let collection = mongo.collection::<Document>("hint_records");
+    let count = collection
+        .count_documents(doc! { "user_id": user_id })
+        .await?;
+    Ok(count as i64)
+}
+
+async fn fetch_user_score(
+    redis: &ConnectionManager,
+    user_id: &str,
+) -> Result<i64, redis::RedisError> {
+    let mut conn = redis.clone();
+    let key = format!("user:score:{}", user_id);
+    let value: Option<i64> = redis::cmd("GET").arg(&key).query_async(&mut conn).await?;
+    Ok(value.unwrap_or(0))
+}
+
+async fn fetch_user_streak(
+    redis: &ConnectionManager,
+    user_id: &str,
+) -> Result<i64, redis::RedisError> {
+    let mut conn = redis.clone();
+    let key = format!("score:series:{}", user_id);
+    let value: Option<i64> = redis::cmd("GET").arg(&key).query_async(&mut conn).await?;
+    Ok(value.unwrap_or(0))
 }
 
 fn ensure_student_role(claims: &JwtClaims) -> Result<(), StudentApiError> {

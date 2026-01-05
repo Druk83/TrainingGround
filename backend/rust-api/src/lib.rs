@@ -221,6 +221,7 @@ fn student_routes() -> Router<std::sync::Arc<services::AppState>> {
     Router::new()
         .route("/courses", get(handlers::student::list_courses))
         .route("/sessions", post(handlers::student::start_session))
+        .route("/stats", get(handlers::student::get_stats))
 }
 
 fn admin_routes(

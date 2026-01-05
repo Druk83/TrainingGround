@@ -18,6 +18,7 @@
   --text-disabled: #78849e; /* Updated - 3.2:1 on surface-1 (acceptable for disabled) */
   --border-color: #1e293b;
   --border-hover: #334155;
+  --viewport-scale: 1;
 
   /* Focus indicator (high contrast) */
   --focus-ring: #60a5fa;
@@ -34,32 +35,50 @@
     sans-serif;
 
   /* Layout tokens - responsive */
-  --layout-max-width: 1920px;
-  --layout-padding-x: var(--spacing-md);
-  --layout-padding-y: var(--spacing-md);
-  --layout-gap: var(--spacing-lg);
-  --layout-sidebar: 280px;
-  --layout-insights: 320px;
-  --panel-radius: var(--radius-lg);
-  --panel-padding: var(--spacing-lg);
-  --panel-gap: var(--spacing-md);
+  --layout-max-width: 1480px;
+  --layout-padding-x: var(--spacing-sm);
+  --layout-padding-y: var(--spacing-sm);
+  --layout-gap: var(--spacing-md);
+  --layout-sidebar: 220px;
+  --layout-insights: 240px;
+  --panel-radius: var(--radius-md);
+  --panel-padding: var(--spacing-md);
+  --panel-gap: var(--spacing-sm);
 }
 
 /* XL: ≥1200px */
 @media (min-width: 1200px) {
   :root {
-    --layout-max-width: 1760px;
-    --layout-padding-x: var(--spacing-xl);
-    --layout-padding-y: var(--spacing-xl);
+    --layout-max-width: 1400px;
+    --layout-padding-x: var(--spacing-md);
+    --layout-padding-y: var(--spacing-md);
   }
 }
 
+/* Laptop viewport - gently downscale to improve information density without making elements too small */
+@media (min-width: 1024px) and (max-width: 1440px) {
+  :root {
+    --viewport-scale: 0.9;
+  }
+}
+
+@media (min-width: 1441px) and (max-width: 1919px) {
+  :root {
+    --viewport-scale: 0.95;
+  }
+}
+
+@media (min-width: 1920px) {
+  :root {
+    --viewport-scale: 1;
+  }
+}
 /* LG: 1025-1199px */
 @media (min-width: 1025px) and (max-width: 1199px) {
   :root {
-    --layout-max-width: 1320px;
-    --layout-insights: 300px;
-    --layout-padding-x: var(--spacing-lg);
+    --layout-max-width: 1240px;
+    --layout-insights: 220px;
+    --layout-padding-x: var(--spacing-sm);
   }
 }
 
@@ -67,10 +86,10 @@
 @media (min-width: 769px) and (max-width: 1024px) {
   :root {
     --layout-max-width: 960px;
-    --layout-sidebar: 250px;
-    --layout-insights: 280px;
-    --layout-padding-x: var(--spacing-lg);
-    --layout-gap: var(--spacing-md);
+    --layout-sidebar: 200px;
+    --layout-insights: 220px;
+    --layout-padding-x: var(--spacing-sm);
+    --layout-gap: var(--spacing-sm);
   }
 }
 
@@ -80,9 +99,9 @@
     --layout-max-width: 100%;
     --layout-sidebar: 100%;
     --layout-insights: 100%;
-    --layout-padding-x: var(--spacing-md);
-    --layout-gap: var(--spacing-md);
-    --panel-padding: var(--spacing-md);
+    --layout-padding-x: var(--spacing-sm);
+    --layout-gap: var(--spacing-sm);
+    --panel-padding: var(--spacing-sm);
   }
 }
 
@@ -92,9 +111,9 @@
     --layout-max-width: 100%;
     --layout-sidebar: 100%;
     --layout-insights: 100%;
-    --layout-padding-x: var(--spacing-sm);
-    --layout-gap: var(--spacing-sm);
-    --panel-padding: var(--spacing-md);
+    --layout-padding-x: var(--spacing-xs);
+    --layout-gap: var(--spacing-xs);
+    --panel-padding: var(--spacing-sm);
     --panel-radius: var(--radius-md);
   }
 }
@@ -105,11 +124,11 @@
     --layout-max-width: 100%;
     --layout-sidebar: 100%;
     --layout-insights: 100%;
-    --layout-padding-x: var(--spacing-sm);
-    --layout-padding-y: var(--spacing-sm);
-    --layout-gap: var(--spacing-sm);
+    --layout-padding-x: var(--spacing-xs);
+    --layout-padding-y: var(--spacing-xs);
+    --layout-gap: var(--spacing-xs);
     --panel-radius: var(--radius-sm);
-    --panel-padding: var(--spacing-sm);
+    --panel-padding: var(--spacing-xs);
   }
 }
 
@@ -138,8 +157,10 @@ body {
 app-shell {
   display: block;
   min-height: 100vh;
-  max-width: var(--layout-max-width);
+  max-width: min(100%, calc(var(--layout-max-width) / var(--viewport-scale)));
   margin: 0 auto;
+  transform: scale(var(--viewport-scale));
+  transform-origin: top center;
 }
 
 /* Typography */
@@ -303,13 +324,13 @@ select:disabled {
 
 /* Text scalability - ensure relative units */
 html {
-  font-size: 16px; /* Base size, users can scale to 200% */
+  font-size: 12.5px;
   scroll-behavior: smooth;
 }
 
 @supports (font-size: clamp(1rem, 1vw, 2rem)) {
   html {
-    font-size: clamp(14px, 1vw, 20px); /* Fluid but respects user zoom */
+    font-size: clamp(11px, 0.65vw, 15px);
   }
 }
 
