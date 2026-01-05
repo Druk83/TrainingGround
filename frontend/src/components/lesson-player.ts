@@ -1,4 +1,9 @@
-import type { LessonStoreSnapshot, ScoreState, TimerState } from '@/lib/session-store';
+import type {
+  LessonStoreSnapshot,
+  ScoreState,
+  SessionProgress,
+  TimerState,
+} from '@/lib/session-store';
 import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import './question-renderer';
@@ -17,6 +22,9 @@ export class LessonPlayer extends LitElement {
     question: { type: Object },
     answer: { type: String },
     hotkeysEnabled: { type: Boolean },
+    submitting: { type: Boolean },
+    notification: { type: String },
+    progress: { type: Object },
   };
 
   declare session?: ActiveSession;
@@ -25,6 +33,9 @@ export class LessonPlayer extends LitElement {
   declare question?: Question;
   declare answer: string;
   declare hotkeysEnabled: boolean;
+  declare submitting: boolean;
+  declare notification?: string;
+  declare progress?: SessionProgress;
 
   @state()
   declare private answerError?: string;
@@ -35,6 +46,8 @@ export class LessonPlayer extends LitElement {
     super();
     this.answer = '';
     this.hotkeysEnabled = false;
+    this.submitting = false;
+    this.notification = undefined;
     this.setupDocumentListeners();
   }
 
@@ -96,9 +109,22 @@ export class LessonPlayer extends LitElement {
       border: 1px solid #111b2a;
     }
 
+    .player-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      align-items: flex-start;
+    }
+
     h1 {
       margin: 0 0 0.25rem;
-      font-size: clamp(1.25rem, 1rem + 0.8vw, 1.75rem);
+      font-size: clamp(1.25rem, 1rem + 0.8vw, 1.65rem);
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 0.95rem;
     }
 
     textarea {
@@ -139,6 +165,40 @@ export class LessonPlayer extends LitElement {
       margin: 0.4rem 0 0;
     }
 
+    .step {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .feedback {
+      margin: 0;
+      padding: 0.5rem 0.75rem;
+      background: var(--surface-3);
+      border-radius: 0.65rem;
+      font-size: 0.9rem;
+    }
+
+    .ghost-button {
+      border: 1px solid #1f2937;
+      background: transparent;
+      color: var(--text-muted);
+      border-radius: 999px;
+      padding: 0.4rem 0.9rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.2s ease;
+    }
+
+    .ghost-button:hover,
+    .ghost-button:focus-visible {
+      border-color: var(--primary);
+      color: #fff;
+    }
+
     .hotkey-badge {
       display: inline-flex;
       align-items: center;
@@ -166,6 +226,16 @@ export class LessonPlayer extends LitElement {
     }
 
     @media (max-width: 767px) {
+      .player-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .ghost-button {
+        width: 100%;
+        text-align: center;
+      }
+
       textarea {
         min-height: 130px;
         font-size: 0.95rem;
@@ -191,18 +261,28 @@ export class LessonPlayer extends LitElement {
       return html`<p>Выберите урок в каталоге, чтобы начать тренировку.</p>`;
     }
 
+    const stepLabel = this.composeStepLabel();
     return html`
-      <div>
-        <h1>${this.session.title}</h1>
-        <p>${this.session.description}</p>
+      <div class="player-header">
+        <div>
+          <p class="step">${stepLabel}</p>
+          <h1>${this.session.title}</h1>
+        </div>
+        <button class="ghost-button" @click=${this.onShowCatalog}>Каталог курсов</button>
       </div>
       <timer-display .data=${this.timer}></timer-display>
-      <score-board .data=${this.scoreboard}></score-board>
+      <score-board .data=${this.scoreboard} .progress=${this.progress}></score-board>
+      ${this.notification
+        ? html`<p class="feedback" role="status" aria-live="polite">
+            ${this.notification}
+          </p>`
+        : null}
       ${this.question
         ? html`
             <question-renderer
               .question=${this.question}
               .answer=${this.answer}
+              .submitDisabled=${this.submitting}
               .hotkeysEnabled=${this.hotkeysEnabled}
               @answer-submit=${this.onAnswerSubmit}
               @answer-error=${this.onAnswerError}
@@ -236,6 +316,24 @@ export class LessonPlayer extends LitElement {
   private onAnswerTyping = (_event: CustomEvent) => {
     this.dispatchEvent(
       new CustomEvent('answer-typing', {
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  };
+
+  private composeStepLabel() {
+    const total = this.progress?.totalSteps ?? 0;
+    const current = this.progress?.currentStep ?? 1;
+    if (total > 0) {
+      return `Задание ${Math.min(current, total)} из ${total}`;
+    }
+    return `Задание ${Math.max(current, 1)}`;
+  }
+
+  private onShowCatalog = () => {
+    this.dispatchEvent(
+      new CustomEvent('show-catalog', {
         bubbles: true,
         composed: true,
       }),

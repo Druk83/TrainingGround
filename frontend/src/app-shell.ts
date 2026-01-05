@@ -55,9 +55,11 @@ export class AppShell extends LitElement {
   @state()
   declare private activePanel: PanelId;
   @state()
-  declare private userFormError?: string;
-  @state()
   declare private showConflictsPanel: boolean;
+  @state()
+  declare private answerPending: boolean;
+  @state()
+  declare private latestMessage?: string;
   private readonly hotkeysEnabled = isFeatureEnabled('hotkeys');
   private mediaSubscriptions: Array<{
     list: MediaQueryList;
@@ -71,7 +73,9 @@ export class AppShell extends LitElement {
     this.isUltraNarrow = false;
     this.isCompactHeight = false;
     this.activePanel = 'player';
-    this.showConflictsPanel = true;
+    this.showConflictsPanel = false;
+    this.answerPending = false;
+    this.latestMessage = undefined;
   }
 
   static styles = css`
@@ -191,36 +195,6 @@ export class AppShell extends LitElement {
       cursor: pointer;
     }
 
-    details.user-form {
-      border-radius: var(--panel-radius);
-      border: 1px solid #111b2a;
-      background: var(--surface-2);
-    }
-
-    details.user-form summary {
-      list-style: none;
-      cursor: pointer;
-      padding: 0.65rem var(--panel-padding);
-      font-weight: 600;
-    }
-
-    details.user-form summary::-webkit-details-marker {
-      display: none;
-    }
-
-    details.user-form[open] summary {
-      border-bottom: 1px solid #111b2a;
-    }
-
-    details.user-form form {
-      background: transparent;
-      border: none;
-      margin: 0;
-      border-radius: 0 0 var(--panel-radius) var(--panel-radius);
-      padding: var(--panel-padding);
-      padding-top: 0;
-    }
-
     label {
       display: flex;
       flex-direction: column;
@@ -245,19 +219,6 @@ export class AppShell extends LitElement {
       border: none;
       font-weight: 600;
       cursor: pointer;
-    }
-
-    .toast {
-      position: fixed;
-      bottom: 1rem;
-      right: 1rem;
-      background: var(--surface-3);
-      border-radius: 0.75rem;
-      padding: 0.75rem 1rem;
-      border: 1px solid #1f2937;
-      box-shadow: 0 10px 30px #0006;
-      max-width: min(320px, 90vw);
-      z-index: 6;
     }
 
     .sw-banner {
@@ -321,19 +282,9 @@ export class AppShell extends LitElement {
         display: flex;
         margin-bottom: 0.75rem;
       }
-
-      .toast {
-        right: 0.75rem;
-        left: 0.75rem;
-        bottom: 0.75rem;
-      }
     }
 
     @media (max-width: 767px) {
-      form {
-        padding: calc(var(--panel-padding) - 0.25rem);
-      }
-
       .sw-banner {
         flex-direction: column;
       }
@@ -344,20 +295,6 @@ export class AppShell extends LitElement {
         font-size: 0.9rem;
         padding-inline: 0.5rem;
       }
-
-      button[type='submit'] {
-        width: 100%;
-        text-align: center;
-      }
-
-      .toast {
-        right: 0.5rem;
-        left: 0.5rem;
-      }
-    }
-
-    :host([vh-compact]) .toast {
-      bottom: 0.25rem;
     }
 
     :host([vh-compact]) .sw-banner {
@@ -369,6 +306,10 @@ export class AppShell extends LitElement {
     super.connectedCallback();
     this.unsubscribe = lessonStore.subscribe((snapshot) => {
       this.snapshot = snapshot;
+      if (snapshot.notifications.length) {
+        this.latestMessage = snapshot.notifications.at(-1)?.text ?? undefined;
+        lessonStore.clearNotifications();
+      }
     });
     window.addEventListener('sw-update-available', this.handleSwUpdate as EventListener);
     window.addEventListener('sw-offline-ready', this.offlineReadyHandler);
@@ -399,7 +340,7 @@ export class AppShell extends LitElement {
           ${this.renderStackedTabs()} ${this.renderSidebarSection()}
           ${this.renderPlayerSection()} ${this.renderInsightsSection()}
         </div>
-        ${this.renderNotifications()}${this.renderSwBanner()}${this.renderOnboarding()}
+        ${this.renderSwBanner()}${this.renderOnboarding()}
       </main>
     `;
   }
@@ -416,7 +357,6 @@ export class AppShell extends LitElement {
         ?hidden=${hidden}
       >
         <h2 id="sidebar-title" class="sr-only">Каталог уроков и подключение</h2>
-        ${this.renderUserForm()}
         <connection-indicator
           .online=${this.snapshot.connection.online}
           .queueSize=${this.snapshot.connection.queueSize}
@@ -427,6 +367,7 @@ export class AppShell extends LitElement {
         ></connection-indicator>
         <lesson-catalog
           .lessons=${this.snapshot.lessons}
+          .activeLessonId=${this.snapshot.activeSession?.lessonId ?? ''}
           @lesson-selected=${this.handleLessonSelect}
         ></lesson-catalog>
       </aside>
@@ -450,13 +391,18 @@ export class AppShell extends LitElement {
           .timer=${this.snapshot.timer as TimerState}
           .scoreboard=${this.snapshot.scoreboard as ScoreState}
           .question=${this.getCurrentQuestion()}
+          .progress=${this.snapshot.sessionProgress}
+          .submitting=${this.answerPending}
+          .notification=${this.latestMessage ?? ''}
           .hotkeysEnabled=${this.hotkeysEnabled}
           @answer-submit=${this.forwardAnswer}
           @answer-typing=${this.handleTyping}
+          @show-catalog=${this.handleReturnToCatalog}
         ></lesson-player>
         <lesson-results
           .scoreboard=${this.snapshot.scoreboard}
-          .lessonTitle=${this.snapshot.activeSession?.title}
+          .lessonTitle=${this.snapshot.activeSession?.title ??
+          this.snapshot.lastCompletedLessonTitle}
           .visible=${this.shouldShowResults()}
           @retry-lesson=${this.handleRetryLesson}
           @return-to-catalog=${this.handleReturnToCatalog}
@@ -507,13 +453,7 @@ export class AppShell extends LitElement {
   private renderConflictResolver() {
     const conflictCount = this.snapshot.conflicts.length;
     if (!conflictCount) {
-      return html`
-        <conflict-resolver
-          .conflicts=${this.snapshot.conflicts}
-          @resolve-conflict=${this.handleConflictResolve}
-          @clear-conflicts=${this.handleConflictClear}
-        ></conflict-resolver>
-      `;
+      return null;
     }
 
     if (!this.showConflictsPanel) {
@@ -578,55 +518,8 @@ export class AppShell extends LitElement {
     if (changed.has('isCompactHeight')) {
       this.toggleAttribute('vh-compact', this.isCompactHeight);
     }
-    if (
-      changed.has('snapshot') &&
-      !this.snapshot.conflicts.length &&
-      !this.showConflictsPanel
-    ) {
-      this.showConflictsPanel = true;
-    }
   }
 
-  private renderUserForm() {
-    const errorId = 'user-form-error';
-    const formTemplate = html`
-      <form @submit=${this.handleUserSubmit} aria-describedby=${errorId} novalidate>
-        <label>
-          ID ученика
-          <input
-            name="userId"
-            .value=${this.snapshot.user.id ?? ''}
-            required
-            aria-describedby=${errorId}
-            aria-invalid=${this.userFormError ? 'true' : 'false'}
-          />
-        </label>
-        <label>
-          ID группы
-          <input name="groupId" .value=${this.snapshot.user.groupId ?? ''} />
-        </label>
-        <label>
-          JWT (необязательно)
-          <input name="token" .value=${this.snapshot.user.token ?? ''} />
-        </label>
-        <button type="submit">Сохранить</button>
-        <p id=${errorId} class="form-error" role="alert" aria-live="polite">
-          ${this.userFormError ?? ''}
-        </p>
-      </form>
-    `;
-
-    if (!this.isUltraNarrow) {
-      return formTemplate;
-    }
-
-    return html`
-      <details class="user-form">
-        <summary>Профиль доступа</summary>
-        ${formTemplate}
-      </details>
-    `;
-  }
   private setActivePanel(panel: PanelId) {
     if (this.activePanel !== panel) {
       this.activePanel = panel;
@@ -768,18 +661,6 @@ export class AppShell extends LitElement {
     this.mediaSubscriptions = [];
   }
 
-  private renderNotifications() {
-    if (!this.snapshot.notifications.length && !this.swReadyMessage) {
-      return null;
-    }
-    return html`
-      <div class="toast" aria-live="polite">
-        ${this.snapshot.notifications.map((note) => html`<p>${note.text}</p>`)}
-        ${this.swReadyMessage ? html`<p>${this.swReadyMessage}</p>` : null}
-      </div>
-    `;
-  }
-
   private renderSwBanner() {
     if (!this.swUpdateHandler) {
       return null;
@@ -829,8 +710,18 @@ export class AppShell extends LitElement {
     });
   };
 
-  private forwardAnswer = (event: CustomEvent<{ answer: string }>) => {
-    lessonStore.submitAnswer(event.detail.answer);
+  private forwardAnswer = async (event: CustomEvent<{ answer: string }>) => {
+    if (this.answerPending) {
+      return;
+    }
+    this.answerPending = true;
+    try {
+      await lessonStore.submitAnswer(event.detail.answer);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      this.answerPending = false;
+    }
   };
 
   private handleTyping = () => {
@@ -870,11 +761,10 @@ export class AppShell extends LitElement {
   };
 
   private shouldShowResults() {
-    return (
-      this.snapshot.timer.status === 'expired' &&
-      this.snapshot.scoreboard.attempts > 0 &&
-      Boolean(this.snapshot.activeSession)
-    );
+    const hasAttempts = this.snapshot.scoreboard.attempts > 0;
+    const timerExpired = this.snapshot.timer.status === 'expired';
+    const sessionInactive = !this.snapshot.activeSession;
+    return hasAttempts && (timerExpired || sessionInactive);
   }
 
   private handleRetryLesson = () => {
@@ -888,19 +778,45 @@ export class AppShell extends LitElement {
 
   private handleReturnToCatalog = () => {
     this.activePanel = 'sidebar';
+    window.location.href = '/';
   };
 
-  private handleNextLevel = () => {
-    const currentId = this.snapshot.activeSession?.lessonId;
+  private handleNextLevel = async () => {
+    const referenceId =
+      this.snapshot.activeSession?.lessonId ?? this.snapshot.lastCompletedLessonId;
     const lessons = this.snapshot.lessons;
-    const currentIndex = lessons.findIndex((lesson) => lesson.id === currentId);
-    const nextLesson = lessons
-      .slice(currentIndex + 1)
-      .find((lesson) => lesson.status !== 'locked');
-    const lessonToStart = nextLesson ?? lessons[0];
-    if (lessonToStart) {
-      lessonStore.startSession(lessonToStart.id);
+    if (!lessons.length) {
+      window.location.href = '/';
+      return;
+    }
+    const currentIndex = lessons.findIndex((lesson) => lesson.id === referenceId);
+    let nextLesson =
+      currentIndex >= 0
+        ? lessons.slice(currentIndex + 1).find((lesson) => lesson.status !== 'locked')
+        : undefined;
+    if (!nextLesson) {
+      nextLesson = lessons.find(
+        (lesson) => lesson.status !== 'locked' && lesson.id !== referenceId,
+      );
+    }
+    if (!nextLesson) {
+      lessonStore.notify(
+        'success',
+        'Вы прошли все доступные уроки. Возвращаемся к темам.',
+      );
+      window.location.href = '/';
+      return;
+    }
+    try {
+      await lessonStore.startSession(nextLesson.id);
       this.activePanel = 'player';
+    } catch (error) {
+      console.error('Failed to start next lesson', error);
+      lessonStore.notify(
+        'error',
+        'Не удалось открыть следующий урок. Возвращаемся к темам.',
+      );
+      window.location.href = '/';
     }
   };
 
@@ -917,26 +833,4 @@ export class AppShell extends LitElement {
   private handleConflictClear = () => {
     lessonStore.clearConflicts();
   };
-
-  private handleUserSubmit(event: Event) {
-    event.preventDefault();
-    const form = event.currentTarget as HTMLFormElement;
-    const data = new FormData(form);
-    const userId = String(data.get('userId') ?? '').trim();
-    const groupId = String(data.get('groupId') ?? '').trim();
-    const token = String(data.get('token') ?? '').trim();
-
-    if (!userId) {
-      this.userFormError = 'Укажите ID ученика перед сохранением.';
-      form.querySelector<HTMLInputElement>("input[name='userId']")?.focus();
-      return;
-    }
-
-    this.userFormError = undefined;
-    lessonStore.setUser({
-      id: userId,
-      groupId,
-      token,
-    });
-  }
 }

@@ -66,6 +66,11 @@ export interface ScoreState {
   lastHintPenalty?: number;
 }
 
+export interface SessionProgress {
+  currentStep: number;
+  totalSteps: number;
+}
+
 export const MAX_HINTS_PER_SESSION = 2;
 
 export interface UserState {
@@ -114,6 +119,9 @@ export interface LessonStoreSnapshot {
   conflicts: OfflineOperation[];
   connection: ConnectionState;
   onboardingComplete: boolean;
+  sessionProgress: SessionProgress;
+  lastCompletedLessonId?: string;
+  lastCompletedLessonTitle?: string;
 }
 
 export type LessonStoreListener = (snapshot: LessonStoreSnapshot) => void;
@@ -138,6 +146,11 @@ const defaultTimer: TimerState = {
   totalSeconds: 0,
 };
 
+const defaultSessionProgress: SessionProgress = {
+  currentStep: 0,
+  totalSteps: 0,
+};
+
 export class LessonStore {
   private state: LessonStoreSnapshot;
   private listeners = new Set<LessonStoreListener>();
@@ -148,6 +161,7 @@ export class LessonStore {
   private analyticsBuffer: number[] = [];
   private lastKeypressAt = 0;
   private autoSubmittedOnTimeout = false;
+  private useCourseCatalog = false;
 
   constructor() {
     const storedUser = readFromStorage<UserState>(STORAGE_KEYS.user, {
@@ -171,6 +185,9 @@ export class LessonStore {
       notifications: [],
       conflicts: [],
       onboardingComplete: onboarding.done,
+      lastCompletedLessonId: undefined,
+      lastCompletedLessonTitle: undefined,
+      sessionProgress: { ...defaultSessionProgress },
       connection: {
         online: navigator.onLine,
         queueSize: 0,
@@ -215,13 +232,42 @@ export class LessonStore {
     this.patch({ onboardingComplete: true });
   }
 
+  setCourses(courses: StudentCourseSummary[]) {
+    const lessons = courses.map((course) => this.mapCourseToLesson(course));
+    this.useCourseCatalog = lessons.length > 0;
+    if (!this.useCourseCatalog) {
+      return;
+    }
+    this.patch({
+      lessons: this.applyActiveLesson(lessons, this.state.activeSession?.lessonId),
+    });
+  }
+
+  notify(tone: 'info' | 'success' | 'error' | 'warning', text: string) {
+    this.pushNotification(tone, text);
+  }
+
   async startSession(lessonId: string) {
-    const lesson = lessonCatalog.find((l) => l.id === lessonId);
+    const lesson = this.findLessonDefinition(lessonId);
     if (!lesson || this.state.user.id.length === 0) {
       throw new Error('lesson or user is missing');
     }
 
     this.currentLesson = lesson;
+    if (this.useCourseCatalog) {
+      try {
+        await this.api.fetchCsrfToken();
+        const response = await this.api.startStudentSession(lesson.id);
+        this.handleSessionCreated(response, lesson);
+      } catch (error) {
+        this.pushNotification(
+          'error',
+          'Не удалось запустить генератор заданий: ' + (error as Error).message,
+        );
+      }
+      return;
+    }
+
     try {
       const response = await this.api.createSession({
         user_id: this.state.user.id,
@@ -255,6 +301,13 @@ export class LessonStore {
     };
 
     this.currentLesson = lesson;
+    this.useCourseCatalog = true;
+    this.patch({
+      lessons: this.applyActiveLesson(
+        this.state.lessons.length ? this.state.lessons : [this.mapCourseToLesson(course)],
+        lesson.id,
+      ),
+    });
     try {
       const response = await this.api.startStudentSession(course.id);
       this.handleSessionCreated(response, lesson);
@@ -514,7 +567,11 @@ export class LessonStore {
         remainingSeconds: totalSeconds,
         lastUpdated: new Date().toISOString(),
       },
-      lessons: this.computeLessons(this.state.scoreboard, lesson.id),
+      lessons: this.getUpdatedLessons(this.state.scoreboard, lesson.id),
+      sessionProgress: {
+        currentStep: 1,
+        totalSteps: Math.max(1, lesson.levels ?? 1),
+      },
     });
     this.autoSubmittedOnTimeout = false;
   }
@@ -543,16 +600,39 @@ export class LessonStore {
       lastBonusApplied: scoring.bonusApplied,
       lastHintPenalty: undefined,
     };
+    const progress = this.state.sessionProgress;
+    const totalSteps = progress.totalSteps || this.currentLesson?.levels || 1;
+    const nextStep = result.correct
+      ? Math.min(totalSteps, Math.max(progress.currentStep, 1) + 1)
+      : progress.currentStep || 1;
+
+    const lessons = this.useCourseCatalog
+      ? this.updateLessonProgressFromScore(scoreboard)
+      : this.getUpdatedLessons(scoreboard, this.state.activeSession?.lessonId);
 
     this.patch({
       scoreboard,
-      lessons: this.computeLessons(scoreboard, this.state.activeSession?.lessonId),
+      sessionProgress: {
+        currentStep: nextStep,
+        totalSteps,
+      },
+      lessons,
     });
 
-    if (!result.correct) {
-      this.pushNotification('warning', 'Ответ неверный. Попробуйте еще раз.');
-    } else {
-      this.pushNotification('success', 'Ответ верный! Отлично справились.');
+    const fallback = result.correct
+      ? 'Ответ верный! Отлично справились.'
+      : 'Ответ неверный. Попробуйте ещё раз.';
+    const message = result.feedback?.trim() ? result.feedback.trim() : fallback;
+    this.pushNotification(result.correct ? 'success' : 'warning', message);
+
+    const reachedLimit = totalSteps > 0 && scoreboard.attempts >= totalSteps;
+    if (reachedLimit) {
+      const passed = scoreboard.accuracy >= 80;
+      this.completeActiveSession(
+        passed
+          ? 'Урок завершён — можно переходить к следующему.'
+          : 'Урок завершён, но для зачёта нужно 80% правильных.',
+      );
     }
   }
 
@@ -580,7 +660,7 @@ export class LessonStore {
         error: undefined,
       },
       scoreboard,
-      lessons: this.computeLessons(scoreboard, this.state.activeSession?.lessonId),
+      lessons: this.getUpdatedLessons(scoreboard, this.state.activeSession?.lessonId),
     });
   }
 
@@ -691,11 +771,20 @@ export class LessonStore {
   }
 
   private updateSync(syncing: boolean, message?: string, conflictsCount?: number) {
+    let statusMessage =
+      typeof message === 'string' ? message : this.state.connection.statusMessage;
+    if (!syncing && typeof message !== 'string') {
+      const hadSyncMessage =
+        statusMessage?.toLowerCase().includes('синхронизац') ?? false;
+      if (hadSyncMessage && !(conflictsCount && conflictsCount > 0)) {
+        statusMessage = undefined;
+      }
+    }
     this.patch({
       connection: {
         ...this.state.connection,
         syncing,
-        statusMessage: message ?? this.state.connection.statusMessage,
+        statusMessage,
         lastSyncAt: !syncing
           ? new Date().toISOString()
           : this.state.connection.lastSyncAt,
@@ -714,8 +803,8 @@ export class LessonStore {
     });
   }
 
-  private computeLessons(score: ScoreState, activeLessonId?: string) {
-    return lessonCatalog.map((lesson, index) => {
+  private computeLessons(score: ScoreState, activeLessonId?: string): LessonCard[] {
+    return lessonCatalog.map((lesson, index): LessonCard => {
       const isFirst = index === 0;
       const unlocked = score.accuracy >= 80 || isFirst;
       let status: LessonCard['status'] = unlocked ? 'available' : 'locked';
@@ -744,6 +833,97 @@ export class LessonStore {
     });
   }
 
+  private mapCourseToLesson(course: StudentCourseSummary): LessonCard {
+    const totalTasks = Math.max(1, course.total_tasks);
+    const percentCorrect = Math.min(100, Math.max(0, Math.round(course.progress ?? 0)));
+    const levelsCompleted = Math.min(
+      totalTasks,
+      Math.round((percentCorrect / 100) * totalTasks),
+    );
+    const statusMap: Record<StudentCourseSummary['status'], LessonCard['status']> = {
+      new: 'available',
+      in_progress: 'available',
+      completed: 'completed',
+    };
+    const mappedStatus = statusMap[course.status] ?? 'available';
+    const status: LessonCard['status'] = mappedStatus;
+
+    return {
+      id: course.id,
+      title: course.title,
+      summary: course.description,
+      difficulty: course.difficulty,
+      durationMinutes: Math.max(5, Math.round(course.total_tasks * 3)),
+      topicId: course.topic_id ?? course.level_id ?? undefined,
+      levels: totalTasks,
+      status,
+      progress: percentCorrect,
+      levelsCompleted,
+      percentCorrect,
+    };
+  }
+
+  private applyActiveLesson(
+    lessons: LessonCard[],
+    activeLessonId?: string,
+  ): LessonCard[] {
+    if (!activeLessonId) {
+      return lessons;
+    }
+    return lessons.map(
+      (lesson): LessonCard =>
+        lesson.id === activeLessonId ? { ...lesson, status: 'active' } : lesson,
+    );
+  }
+
+  private getUpdatedLessons(
+    scoreboard: ScoreState,
+    activeLessonId?: string,
+  ): LessonCard[] {
+    if (this.useCourseCatalog) {
+      return this.applyActiveLesson(this.state.lessons, activeLessonId);
+    }
+    return this.computeLessons(scoreboard, activeLessonId);
+  }
+
+  private updateLessonProgressFromScore(scoreboard: ScoreState): LessonCard[] {
+    if (!this.currentLesson) {
+      return this.state.lessons;
+    }
+
+    return this.state.lessons.map((lesson) => {
+      if (lesson.id !== this.currentLesson?.id) {
+        return lesson;
+      }
+
+      const levelsCompleted = Math.min(lesson.levels, scoreboard.attempts);
+      const completionPercent =
+        lesson.levels > 0
+          ? Math.min(100, Math.round((levelsCompleted / lesson.levels) * 100))
+          : 0;
+      const fullyCompleted = lesson.levels > 0 && levelsCompleted >= lesson.levels;
+      let status: LessonCard['status'] = fullyCompleted ? 'available' : 'active';
+      if (fullyCompleted && scoreboard.accuracy >= 80) {
+        status = 'completed';
+      }
+
+      return {
+        ...lesson,
+        percentCorrect: scoreboard.accuracy,
+        progress: completionPercent,
+        levelsCompleted,
+        status,
+      };
+    });
+  }
+
+  private findLessonDefinition(lessonId: string) {
+    if (this.useCourseCatalog) {
+      return this.state.lessons.find((lesson) => lesson.id === lessonId);
+    }
+    return lessonCatalog.find((lesson) => lesson.id === lessonId);
+  }
+
   private mapSessionToActive(session: SessionResponse) {
     return {
       id: session.id,
@@ -757,10 +937,38 @@ export class LessonStore {
     };
   }
 
+  private completeActiveSession(message?: string) {
+    if (!this.state.activeSession) {
+      return;
+    }
+    this.timer.disconnect();
+    this.patch({
+      activeSession: undefined,
+      timer: {
+        ...this.state.timer,
+        status: 'expired',
+        remainingSeconds: 0,
+        lastUpdated: new Date().toISOString(),
+      },
+      lastCompletedLessonId: this.currentLesson?.id ?? this.state.lastCompletedLessonId,
+      lastCompletedLessonTitle:
+        this.currentLesson?.title ?? this.state.lastCompletedLessonTitle,
+    });
+    if (message) {
+      this.pushNotification('info', message);
+    }
+  }
+
   private pushNotification(tone: 'info' | 'success' | 'error' | 'warning', text: string) {
     const notification = { id: nanoid(), tone, text };
     const notifications = [...this.state.notifications.slice(-2), notification];
     this.patch({ notifications });
+  }
+
+  clearNotifications() {
+    if (this.state.notifications.length) {
+      this.patch({ notifications: [] });
+    }
   }
 
   private patch(partial: Partial<LessonStoreSnapshot>) {

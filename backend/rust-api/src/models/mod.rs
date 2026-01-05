@@ -12,6 +12,8 @@ pub struct Session {
     pub status: SessionStatus,
     pub hints_used: u32,
     pub score: i32,
+    #[serde(default)]
+    pub level_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

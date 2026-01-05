@@ -1,14 +1,16 @@
 import { LitElement, html, css, type PropertyValues } from 'lit';
 import { customElement } from 'lit/decorators.js';
-import type { ScoreState } from '@/lib/session-store';
+import type { ScoreState, SessionProgress } from '@/lib/session-store';
 
 @customElement('score-board')
 export class ScoreBoard extends LitElement {
   static properties = {
     data: { type: Object },
+    progress: { type: Object },
   };
 
   declare data: ScoreState;
+  declare progress?: SessionProgress;
   declare private announceText: string;
 
   constructor() {
@@ -22,6 +24,7 @@ export class ScoreBoard extends LitElement {
       longestStreak: 0,
       hintsUsed: 0,
     };
+    this.progress = undefined;
     this.announceText = this.composeAnnouncement(this.data);
   }
 
@@ -85,10 +88,20 @@ export class ScoreBoard extends LitElement {
   `;
 
   render() {
+    const totalSteps = this.progress?.totalSteps ?? 0;
+    const solvedSteps =
+      totalSteps > 0
+        ? Math.min(Math.max((this.progress?.currentStep ?? 1) - 1, 0), totalSteps)
+        : 0;
+
     const stats = [
       { label: 'Баллы', value: this.data.totalScore },
       { label: 'Точность', value: `${this.data.accuracy}%` },
       { label: 'Попытки', value: `${this.data.correct}/${this.data.attempts}` },
+      {
+        label: 'Задания',
+        value: totalSteps > 0 ? `${solvedSteps} / ${totalSteps}` : '—',
+      },
       { label: 'Серия', value: this.data.currentStreak },
       { label: 'Рекорд', value: this.data.longestStreak },
       {
@@ -156,6 +169,9 @@ export class ScoreBoard extends LitElement {
   }
 
   private composeDeltaMessage(data: ScoreState): string | null {
+    if (data.attempts === 0) {
+      return null;
+    }
     if (typeof data.lastHintPenalty === 'number' && data.lastHintPenalty < 0) {
       return `Штраф за подсказку ${data.lastHintPenalty}`;
     }

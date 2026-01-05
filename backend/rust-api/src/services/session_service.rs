@@ -94,6 +94,7 @@ impl SessionService {
             status: SessionStatus::Active,
             hints_used: 0,
             score: 0,
+            level_id: req.level_id.clone(),
         };
 
         // Save to Redis with TTL - clone connection for this operation

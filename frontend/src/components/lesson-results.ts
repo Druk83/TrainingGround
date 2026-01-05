@@ -98,7 +98,7 @@ export class LessonResults extends LitElement {
     }
 
     const passed = this.scoreboard.accuracy >= 80;
-    const status = passed ? 'Уровень пройден' : 'Требуется 80%';
+    const status = passed ? 'Урок пройден' : 'Нужно 80% правильных';
     return html`
       <div>
         <p class="status">${status}</p>
@@ -106,7 +106,7 @@ export class LessonResults extends LitElement {
         <div class="grid">
           <div class="card">
             <div class="value">${this.scoreboard.totalScore}</div>
-            <span>Итоговые баллы</span>
+            <span>Баллы</span>
           </div>
           <div class="card">
             <div class="value">${this.scoreboard.accuracy}%</div>
@@ -123,7 +123,7 @@ export class LessonResults extends LitElement {
         </div>
         <div class="actions">
           <button @click=${passed ? this.handleNextLevel : this.handleRetry}>
-            ${passed ? 'Следующий уровень' : 'Повторить уровень'}
+            ${passed ? 'Следующий урок' : 'Повторить урок'}
           </button>
           <button class="secondary" @click=${this.handleBack}>Вернуться к темам</button>
         </div>

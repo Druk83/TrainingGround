@@ -162,9 +162,11 @@ impl AnswerService {
         })
         .await?;
 
+        let session_level_id = session.level_id.clone();
+
         // Update progress summary for S5 rule (80% threshold)
         retry_async_with_config(aggressive_cfg.clone(), || async {
-            self.update_progress_summary(user_id, task_id, is_correct)
+            self.update_progress_summary(user_id, session_level_id.as_deref(), task_id, is_correct)
                 .await
         })
         .await?;
@@ -410,17 +412,19 @@ impl AnswerService {
     async fn update_progress_summary(
         &self,
         user_id: &str,
-        task_id: &str,
+        level_id: Option<&str>,
+        fallback_task_id: &str,
         is_correct: bool,
     ) -> Result<()> {
-        // For S5, we track progress per level (not per task)
-        // In real implementation, we'd get level_id from task
-        // For now, we'll use a simplified approach with task_id as level_id
-        let level_id = format!("level_{}", task_id);
+        // Используем реальный level_id, если он был указан при создании сессии
+        let level_key = level_id
+            .filter(|value| !value.is_empty())
+            .unwrap_or(fallback_task_id)
+            .to_string();
 
         let collection: mongodb::Collection<ProgressSummary> =
             self.mongo.collection("progress_summary_v2");
-        let summary_id = format!("{}:{}", user_id, level_id);
+        let summary_id = format!("{}:{}", user_id, level_key);
 
         // Try to get existing summary
         let existing = collection
@@ -442,7 +446,7 @@ impl AnswerService {
             ProgressSummary {
                 id: summary_id.clone(),
                 user_id: user_id.to_string(),
-                level_id: level_id.clone(),
+                level_id: level_key.clone(),
                 attempts_total: 1,
                 correct_count: if is_correct { 1 } else { 0 },
                 percentage: if is_correct { 100.0 } else { 0.0 },
@@ -466,7 +470,7 @@ impl AnswerService {
         if new_summary.attempts_total >= 5 && new_summary.percentage >= 80.0 {
             tracing::info!(
                 "User {} achieved 80% threshold on level {} ({:.1}% with {} attempts) - ready for next level",
-                user_id, level_id, new_summary.percentage, new_summary.attempts_total
+                user_id, level_key, new_summary.percentage, new_summary.attempts_total
             );
             // In real implementation, you'd update user's available levels here
         }

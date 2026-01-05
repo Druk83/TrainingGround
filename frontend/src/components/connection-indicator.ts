@@ -74,16 +74,19 @@ export class ConnectionIndicator extends LitElement {
 
   render() {
     const statusText = this.online ? 'Онлайн' : 'Офлайн';
+    const showSyncButton = this.queueSize > 0 || this.syncing;
     return html`
       <div class="status" aria-live="polite">
         <span class="dot ${this.online ? 'online' : 'offline'}" aria-hidden="true"></span>
         <span>${statusText}</span>
-        <span>Очередь: ${this.queueSize}</span>
+        ${this.queueSize > 0 ? html`<span>Очередь: ${this.queueSize}</span>` : null}
         ${this.conflicts ? html`<span>Конфликты: ${this.conflicts}</span>` : null}
         ${this.message ? html`<span>${this.message}</span>` : null}
-        <button @click=${this.handleSync} ?disabled=${this.syncing}>
-          ${this.syncing ? 'Синхронизируем...' : 'Синхронизировать'}
-        </button>
+        ${showSyncButton
+          ? html`<button @click=${this.handleSync} ?disabled=${this.syncing}>
+              ${this.syncing ? 'Синхронизация…' : 'Синхронизировать'}
+            </button>`
+          : null}
       </div>
     `;
   }

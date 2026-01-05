@@ -406,6 +406,7 @@ export class StudentHome extends LitElement {
     try {
       const response = await this.api.listStudentCourses();
       this.courses = response.courses ?? [];
+      lessonStore.setCourses(this.courses);
     } catch (error) {
       console.error('Failed to load courses', error);
       this.error = (error as Error).message;

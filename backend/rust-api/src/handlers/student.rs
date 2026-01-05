@@ -91,10 +91,17 @@ pub async fn list_courses(
             let level_id = template.level_id.to_hex();
             let progress = progress_map.get(&level_id);
 
-            let title = metadata_string(&template.metadata, "title")
+            let title = normalize_text(metadata_string(&template.metadata, "title"))
+                .or_else(|| normalize_text(Some(level.name.clone())))
                 .unwrap_or_else(|| template.slug.clone());
-            let description = metadata_string(&template.metadata, "description")
-                .unwrap_or_else(|| "Описание будет добавлено позже.".to_string());
+            let description = normalize_text(metadata_string(&template.metadata, "description"))
+                .or_else(|| {
+                    topic
+                        .map(|doc| doc.description.clone())
+                        .and_then(|text| normalize_text(Some(text)))
+                })
+                .or_else(|| normalize_text(Some(level.description.clone())))
+                .unwrap_or_else(|| format!("Практикум уровня «{}»", level.name));
             let total_tasks =
                 metadata_number(&template.metadata, &["total_tasks", "lessons_count"])
                     .unwrap_or(DEFAULT_TASKS_PER_COURSE);
@@ -304,7 +311,7 @@ async fn load_progress(
     mongo: &Database,
     user_id: &str,
 ) -> Result<HashMap<String, ProgressSummary>, StudentApiError> {
-    let collection = mongo.collection::<ProgressSummary>("progress_summary");
+    let collection = mongo.collection::<ProgressSummary>("progress_summary_v2");
     let mut cursor = collection
         .find(doc! { "user_id": user_id })
         .await
@@ -360,6 +367,12 @@ fn metadata_number(doc: &Document, keys: &[&str]) -> Option<i32> {
         }
     }
     None
+}
+
+fn normalize_text(value: Option<String>) -> Option<String> {
+    value
+        .map(|text| text.trim().to_string())
+        .filter(|text| !text.is_empty())
 }
 
 fn map_difficulty(value: Option<&str>) -> String {
