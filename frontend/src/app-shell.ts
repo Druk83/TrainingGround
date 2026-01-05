@@ -16,6 +16,7 @@ import {
 import { css, html, LitElement, PropertyValues } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
+import type { Question } from '@/components/question-renderer';
 
 // Reserved for future state management (currently using lessonStore directly)
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -36,32 +37,42 @@ const STACKED_PANELS: Array<{ id: PanelId; label: string }> = [
 @customElement('app-shell')
 export class AppShell extends LitElement {
   @state()
-  snapshot: LessonStoreSnapshot = lessonStore.snapshot;
+  declare snapshot: LessonStoreSnapshot;
   @state()
-  swReadyMessage?: string;
+  declare swReadyMessage?: string;
   @state()
-  swUpdateHandler?: () => void;
+  declare swUpdateHandler?: () => void;
   private unsubscribe?: () => void;
   private offlineReadyHandler = () => {
     this.swReadyMessage = 'Приложение готово к офлайн-режиму';
   };
   @state()
-  private isStackedLayout = false;
+  declare private isStackedLayout: boolean;
   @state()
-  private isUltraNarrow = false;
+  declare private isUltraNarrow: boolean;
   @state()
-  private isCompactHeight = false;
+  declare private isCompactHeight: boolean;
   @state()
-  private activePanel: PanelId = 'player';
+  declare private activePanel: PanelId;
   @state()
-  private userFormError?: string;
+  declare private userFormError?: string;
   @state()
-  private showConflictsPanel = true;
+  declare private showConflictsPanel: boolean;
   private readonly hotkeysEnabled = isFeatureEnabled('hotkeys');
   private mediaSubscriptions: Array<{
     list: MediaQueryList;
     handler: (event: MediaQueryListEvent) => void;
   }> = [];
+
+  constructor() {
+    super();
+    this.snapshot = lessonStore.snapshot;
+    this.isStackedLayout = false;
+    this.isUltraNarrow = false;
+    this.isCompactHeight = false;
+    this.activePanel = 'player';
+    this.showConflictsPanel = true;
+  }
 
   static styles = css`
     :host {
@@ -438,6 +449,7 @@ export class AppShell extends LitElement {
           .session=${this.snapshot.activeSession}
           .timer=${this.snapshot.timer as TimerState}
           .scoreboard=${this.snapshot.scoreboard as ScoreState}
+          .question=${this.getCurrentQuestion()}
           .hotkeysEnabled=${this.hotkeysEnabled}
           @answer-submit=${this.forwardAnswer}
           @answer-typing=${this.handleTyping}
@@ -829,6 +841,30 @@ export class AppShell extends LitElement {
     lessonStore.requestHint();
   };
 
+  private cachedQuestion?: Question;
+  private cachedQuestionKey?: string;
+
+  private getCurrentQuestion(): Question | undefined {
+    const session = this.snapshot.activeSession;
+    const text = session?.description?.trim();
+    if (!session || !text) {
+      this.cachedQuestion = undefined;
+      this.cachedQuestionKey = undefined;
+      return undefined;
+    }
+    const key = `${session.id}:${text}`;
+    if (this.cachedQuestion && this.cachedQuestionKey === key) {
+      return this.cachedQuestion;
+    }
+    this.cachedQuestion = {
+      id: session.taskId ?? session.id,
+      type: 'text',
+      text,
+    };
+    this.cachedQuestionKey = key;
+    return this.cachedQuestion;
+  }
+
   private handleSync = () => {
     lessonStore.flushOfflineQueue();
   };
@@ -842,7 +878,8 @@ export class AppShell extends LitElement {
   }
 
   private handleRetryLesson = () => {
-    const lessonId = this.snapshot.activeSession?.taskId ?? this.snapshot.lessons[0]?.id;
+    const lessonId =
+      this.snapshot.activeSession?.lessonId ?? this.snapshot.lessons[0]?.id;
     if (lessonId) {
       lessonStore.startSession(lessonId);
       this.activePanel = 'player';
@@ -854,7 +891,7 @@ export class AppShell extends LitElement {
   };
 
   private handleNextLevel = () => {
-    const currentId = this.snapshot.activeSession?.taskId;
+    const currentId = this.snapshot.activeSession?.lessonId;
     const lessons = this.snapshot.lessons;
     const currentIndex = lessons.findIndex((lesson) => lesson.id === currentId);
     const nextLesson = lessons

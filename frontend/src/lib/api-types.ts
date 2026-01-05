@@ -31,6 +31,29 @@ export interface CreateSessionResponse {
   expires_at: string;
 }
 
+export type StudentCourseStatus = 'new' | 'in_progress' | 'completed';
+
+export interface StudentCourseSummary {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  level_id: string;
+  level_name?: string;
+  topic_id?: string;
+  topic_name?: string;
+  status: StudentCourseStatus;
+  progress: number;
+  total_tasks: number;
+  completed_tasks: number;
+  last_session_id?: string;
+}
+
+export interface StudentCoursesResponse {
+  courses: StudentCourseSummary[];
+}
+
 export interface SubmitAnswerPayload {
   answer: string;
   idempotency_key?: string;

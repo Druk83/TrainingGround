@@ -357,7 +357,10 @@ services:
     environment:
       MONGODB_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb-primary:27017,mongodb-secondary1:27017,mongodb-secondary2:27017/${MONGO_DB:-trainingground}?authSource=admin&replicaSet=rs0
       MONGODB_DB: ${MONGO_DB:-trainingground}
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       QDRANT_URL: http://qdrant:6333
       QDRANT_API_KEY: ${QDRANT_API_KEY:-}
       YANDEXGPT_API_KEY: ${YANDEXGPT_API_KEY:-}

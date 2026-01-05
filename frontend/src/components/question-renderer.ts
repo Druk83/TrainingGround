@@ -17,19 +17,27 @@ export interface Question {
 @customElement('question-renderer')
 export class QuestionRenderer extends LitElement {
   @property({ type: Object })
-  question?: Question;
+  declare question?: Question;
 
   @property({ type: String })
-  answer: string = '';
+  declare answer: string;
 
   @property({ type: Boolean })
-  submitDisabled: boolean = false;
+  declare submitDisabled: boolean;
 
   @property({ type: Boolean })
-  hotkeysEnabled: boolean = false;
+  declare hotkeysEnabled: boolean;
 
   @state()
-  private selectedOption?: string;
+  declare private selectedOption?: string;
+
+  constructor() {
+    super();
+    this.answer = '';
+    this.submitDisabled = false;
+    this.hotkeysEnabled = false;
+    this.selectedOption = undefined;
+  }
 
   static styles = css`
     :host {
@@ -167,7 +175,7 @@ export class QuestionRenderer extends LitElement {
     }
   `;
 
-  updated(changed: Map<string, unknown>) {
+  protected willUpdate(changed: Map<string, unknown>) {
     if (changed.has('question')) {
       this.selectedOption = undefined;
       this.answer = '';

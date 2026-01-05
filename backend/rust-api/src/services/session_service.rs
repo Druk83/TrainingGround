@@ -87,7 +87,7 @@ impl SessionService {
         let session = Session {
             id: session_id.clone(),
             user_id: req.user_id.clone(),
-            task_id: req.task_id.clone(),
+            task_id: task.id.clone(),
             group_id: req.group_id.clone(),
             started_at: now,
             expires_at,
@@ -236,10 +236,44 @@ impl SessionService {
 
         let metadata_bson =
             mongodb::bson::to_bson(&instance.metadata).unwrap_or(Bson::Document(doc! {}));
+        let template_object_id = instance
+            .metadata
+            .get("template_id")
+            .and_then(|value| value.as_str())
+            .and_then(|value| ObjectId::parse_str(value).ok())
+            .ok_or_else(|| anyhow!("Generated task missing template_id"))?;
+
+        let meta_title = instance
+            .metadata
+            .get("title")
+            .and_then(|value| value.as_str())
+            .map(|value| value.to_string());
+        let meta_description = instance
+            .metadata
+            .get("description")
+            .and_then(|value| value.as_str())
+            .map(|value| value.to_string());
+        let meta_time_limit = instance
+            .metadata
+            .get("time_limit_seconds")
+            .and_then(|value| value.as_i64())
+            .unwrap_or(300);
+
+        let title = meta_title.unwrap_or_else(|| {
+            format!(
+                "Generated task from level {}",
+                level_id.chars().take(8).collect::<String>()
+            )
+        });
+        let description = meta_description.unwrap_or_else(|| instance.text.clone());
+        let time_limit_seconds = meta_time_limit.max(60) as i32;
 
         let task_doc = doc! {
-            "template_id": &instance.task_id,
+            "template_id": template_object_id,
             "session_id": Uuid::new_v4().to_string(),
+            "title": &title,
+            "description": &description,
+            "time_limit_seconds": time_limit_seconds,
             "content": {
                 "text": &instance.text,
                 "correct_answer": &instance.correct_answer,

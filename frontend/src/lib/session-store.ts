@@ -3,6 +3,7 @@ import type {
   CreateSessionResponse,
   RequestHintResponse,
   SessionResponse,
+  StudentCourseSummary,
   SubmitAnswerResponse,
   TimerEvent,
 } from './api-types';
@@ -89,6 +90,7 @@ export interface LessonStoreSnapshot {
   user: UserState;
   activeSession?: {
     id: string;
+    lessonId: string;
     taskId: string;
     title: string;
     description: string;
@@ -231,6 +233,35 @@ export class LessonStore {
       this.pushNotification(
         'error',
         'Ошибка при создании сессии: ' + (error as Error).message,
+      );
+    }
+  }
+
+  async startCourseSession(course: StudentCourseSummary) {
+    if (!course || this.state.user.id.length === 0) {
+      this.pushNotification('warning', 'Невозможно определить пользователя или курс');
+      return;
+    }
+
+    await this.api.fetchCsrfToken();
+    const lesson: LessonDefinition = {
+      id: course.id,
+      title: course.title,
+      summary: course.description,
+      difficulty: course.difficulty,
+      durationMinutes: Math.max(5, Math.round(course.total_tasks * 3)),
+      topicId: course.topic_id,
+      levels: Math.max(1, course.total_tasks),
+    };
+
+    this.currentLesson = lesson;
+    try {
+      const response = await this.api.startStudentSession(course.id);
+      this.handleSessionCreated(response, lesson);
+    } catch (error) {
+      this.pushNotification(
+        'error',
+        'Не удалось запустить генератор заданий: ' + (error as Error).message,
       );
     }
   }
@@ -464,6 +495,7 @@ export class LessonStore {
   ) {
     const activeSession = {
       id: response.session_id,
+      lessonId: lesson.id,
       taskId: response.task?.id ?? lesson.id,
       title: response.task?.title ?? lesson.title,
       description: response.task?.description ?? lesson.summary,
@@ -514,7 +546,7 @@ export class LessonStore {
 
     this.patch({
       scoreboard,
-      lessons: this.computeLessons(scoreboard, this.state.activeSession?.taskId),
+      lessons: this.computeLessons(scoreboard, this.state.activeSession?.lessonId),
     });
 
     if (!result.correct) {
@@ -548,7 +580,7 @@ export class LessonStore {
         error: undefined,
       },
       scoreboard,
-      lessons: this.computeLessons(scoreboard, this.state.activeSession?.taskId),
+      lessons: this.computeLessons(scoreboard, this.state.activeSession?.lessonId),
     });
   }
 
@@ -715,6 +747,7 @@ export class LessonStore {
   private mapSessionToActive(session: SessionResponse) {
     return {
       id: session.id,
+      lessonId: this.currentLesson?.id ?? session.task_id,
       taskId: session.task_id,
       title: this.currentLesson?.title ?? session.task_id,
       description: this.currentLesson?.summary ?? '',

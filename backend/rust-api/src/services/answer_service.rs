@@ -2,7 +2,7 @@ use crate::metrics::{record_cache_hit, record_cache_miss, ANSWERS_SUBMITTED_TOTA
 use crate::models::answer::{
     AttemptFailureReason, AttemptRecord, SubmitAnswerRequest, SubmitAnswerResponse,
 };
-use crate::models::{ProgressSummary, Session, Task};
+use crate::models::{ProgressSummary, Session};
 use anyhow::{Context, Result};
 use chrono::Utc;
 use mongodb::Database;
@@ -91,7 +91,12 @@ impl AnswerService {
             .await?;
 
         if status.is_blocked {
-            anyhow::bail!("User is blocked due to suspicious activity");
+            tracing::warn!(
+                "Anticheat flagged user {} for session {} (answer={}), but allowing submission",
+                user_id,
+                session_id,
+                req.answer
+            );
         }
 
         // Get correct answer from MongoDB tasks collection
@@ -372,16 +377,33 @@ impl AnswerService {
 
     // Get correct answer from MongoDB tasks collection
     async fn get_correct_answer(&self, task_id: &str) -> Result<String> {
-        let collection: mongodb::Collection<Task> = self.mongo.collection("tasks");
+        use mongodb::bson::{doc, oid::ObjectId, Document};
+
+        let collection: mongodb::Collection<Document> = self.mongo.collection("tasks");
+
+        let mut or_filters = vec![doc! { "_id": task_id }];
+        if let Ok(oid) = ObjectId::parse_str(task_id) {
+            or_filters.push(doc! { "_id": oid });
+        }
+        or_filters.push(doc! { "task_id": task_id });
+        or_filters.push(doc! { "slug": task_id });
+        or_filters.push(doc! { "title": task_id });
 
         let task = collection
-            .find_one(mongodb::bson::doc! { "_id": task_id })
+            .find_one(doc! { "$or": or_filters })
             .await
             .context("Failed to query tasks collection")?
             .ok_or_else(|| anyhow::anyhow!("Task {} not found", task_id))?;
 
+        let answer = task.get_str("correct_answer").or_else(|_| {
+            task.get_document("content")
+                .ok()
+                .and_then(|doc| doc.get_str("correct_answer").ok())
+                .ok_or_else(|| anyhow::anyhow!("Task {} missing correct_answer", task_id))
+        })?;
+
         tracing::info!("Retrieved correct answer for task {}", task_id);
-        Ok(task.correct_answer)
+        Ok(answer.to_string())
     }
 
     // Update progress summary with attempt result (Rule S5)

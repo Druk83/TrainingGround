@@ -12,6 +12,7 @@ type LessonPlayerArgs = {
 
 const activeSession: NonNullable<LessonStoreSnapshot['activeSession']> = {
   id: 'session-1',
+  lessonId: 'intro-grammar-course',
   taskId: 'intro-grammar',
   title: 'Тренировка: сложные предложения',
   description: 'Сформулируйте аргумент и приведите пример.',

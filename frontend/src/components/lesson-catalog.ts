@@ -9,8 +9,14 @@ export class LessonCatalog extends LitElement {
     activeLessonId: { type: String },
   };
 
-  lessons: LessonCard[] = [];
-  activeLessonId?: string;
+  declare lessons: LessonCard[];
+  declare activeLessonId?: string;
+
+  constructor() {
+    super();
+    this.lessons = [];
+    this.activeLessonId = undefined;
+  }
 
   static styles = css`
     :host {

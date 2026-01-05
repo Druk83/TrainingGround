@@ -101,6 +101,15 @@ pub fn create_router(app_state: std::sync::Arc<services::AppState>) -> Router {
                 )),
         )
         .nest(
+            "/api/v1/student",
+            student_routes()
+                .layer(middleware::from_fn(middlewares::csrf::csrf_middleware))
+                .layer(middleware::from_fn_with_state(
+                    app_state.clone(),
+                    middlewares::auth::auth_middleware,
+                )),
+        )
+        .nest(
             "/admin",
             admin_routes(app_state.clone())
                 .layer(middleware::from_fn(middlewares::csrf::csrf_middleware))
@@ -206,6 +215,12 @@ fn teacher_routes() -> Router<std::sync::Arc<services::AppState>> {
             "/notifications/history",
             get(handlers::teacher::list_notification_history),
         )
+}
+
+fn student_routes() -> Router<std::sync::Arc<services::AppState>> {
+    Router::new()
+        .route("/courses", get(handlers::student::list_courses))
+        .route("/sessions", post(handlers::student::start_session))
 }
 
 fn admin_routes(

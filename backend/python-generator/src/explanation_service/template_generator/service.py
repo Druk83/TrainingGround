@@ -42,7 +42,7 @@ class TemplateGeneratorService:
         self._random = random.Random()
 
     async def generate_instances(
-        self, payload: GenerateInstancesRequest
+        self, payload: GenerateInstancesRequest, *, allow_reuse: bool = False
     ) -> GenerateInstancesResponse:
         try:
             templates = await self._repository.list_ready_templates(payload.level_id)
@@ -58,7 +58,9 @@ class TemplateGeneratorService:
             )
 
         instances: list[TaskInstance] = []
-        seen_templates = await self._load_seen_templates(payload.user_id)
+        seen_templates = set()
+        if not allow_reuse:
+            seen_templates = await self._load_seen_templates(payload.user_id)
         candidates = templates.copy()
         self._random.shuffle(candidates)
 

@@ -54,6 +54,7 @@ import type {
   SendNotificationResponse,
   SessionResponse,
   SettingsTestResponse,
+  StudentCoursesResponse,
   SsoSettings,
   SubmitAnswerPayload,
   SubmitAnswerResponse,
@@ -117,6 +118,7 @@ const ADMIN_BASE = stripTrailingSlash(
         `${BACKEND_ORIGIN}/admin`),
 );
 const TEACHER_BASE = stripTrailingSlash(`${API_BASE}/teacher`);
+const STUDENT_BASE = stripTrailingSlash(`${API_BASE}/student`);
 
 type MongoObjectId = {
   $oid?: string;
@@ -214,6 +216,17 @@ export class ApiClient {
     return this.request<RequestHintResponse>(`${API_BASE}/sessions/${sessionId}/hints`, {
       method: 'POST',
       body: JSON.stringify(body),
+    });
+  }
+
+  async listStudentCourses() {
+    return this.request<StudentCoursesResponse>(`${STUDENT_BASE}/courses`);
+  }
+
+  async startStudentSession(templateId: string) {
+    return this.request<CreateSessionResponse>(`${STUDENT_BASE}/sessions`, {
+      method: 'POST',
+      body: JSON.stringify({ template_id: templateId }),
     });
   }
 

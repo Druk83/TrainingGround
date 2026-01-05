@@ -79,13 +79,18 @@ export class LessonResults extends LitElement {
   `;
 
   @property({ type: Object })
-  scoreboard?: ScoreState;
+  declare scoreboard?: ScoreState;
 
   @property({ type: String })
-  lessonTitle?: string;
+  declare lessonTitle?: string;
 
   @property({ type: Boolean })
-  visible = false;
+  declare visible: boolean;
+
+  constructor() {
+    super();
+    this.visible = false;
+  }
 
   render() {
     if (!this.visible || !this.scoreboard) {

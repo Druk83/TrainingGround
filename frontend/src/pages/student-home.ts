@@ -1,19 +1,13 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
+import { ApiClient } from '@/lib/api-client';
 import { authService } from '@/lib/auth-service';
+import { lessonStore } from '@/lib/session-store';
 import '@/components/app-header';
 
-interface Course {
-  id: string;
-  title: string;
-  description: string;
-  difficulty: 'easy' | 'medium' | 'hard';
-  progress: number; // 0-100
-  total_tasks: number;
-  completed_tasks: number;
-  status: 'new' | 'in_progress' | 'completed';
-  last_session_id?: string;
-}
+import type { StudentCourseSummary } from '@/lib/api-types';
+
+type Course = StudentCourseSummary;
 
 type DifficultyFilter = 'all' | 'easy' | 'medium' | 'hard';
 type StatusFilter = 'all' | 'new' | 'in_progress' | 'completed';
@@ -111,6 +105,15 @@ export class StudentHome extends LitElement {
       grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
       gap: 1.5rem;
       margin-bottom: 2rem;
+    }
+
+    .error {
+      margin-bottom: 1rem;
+      padding: 1rem 1.25rem;
+      border-radius: var(--radius-medium, 8px);
+      background: rgba(255, 99, 71, 0.1);
+      border: 1px solid rgba(255, 99, 71, 0.3);
+      color: #ffd1c7;
     }
 
     .course-card {
@@ -323,10 +326,13 @@ export class StudentHome extends LitElement {
     }
   `;
 
+  private api = new ApiClient();
   @state() declare private courses: Course[];
   @state() declare private difficultyFilter: DifficultyFilter;
   @state() declare private statusFilter: StatusFilter;
   @state() declare private loading: boolean;
+  @state() declare private error?: string;
+  @state() declare private actionCourseId?: string;
 
   constructor() {
     super();
@@ -336,21 +342,78 @@ export class StudentHome extends LitElement {
     this.loading = false;
   }
 
+  private ensureLessonStoreUser(tokenOverride?: string | null) {
+    const storeUser = lessonStore.snapshot.user;
+    const authUser = authService.getUser();
+    if (!authUser) {
+      return;
+    }
+    const nextToken = tokenOverride ?? authService.getToken() ?? undefined;
+    if (storeUser.id === authUser.id && storeUser.token && !tokenOverride) {
+      return;
+    }
+    lessonStore.setUser({
+      id: authUser.id,
+      groupId: authUser.group_ids?.[0],
+      token: nextToken,
+    });
+  }
+
   connectedCallback() {
     super.connectedCallback();
-    this.loadCourses();
+    void this.initialize();
+  }
+
+  private async initialize() {
+    let token = authService.getToken();
+    if (!token || this.isTokenExpired(token)) {
+      try {
+        token = await authService.refreshToken();
+      } catch (error) {
+        console.error('Failed to refresh token before loading courses', error);
+        this.error = 'Не удалось обновить сессию. Войдите снова.';
+      }
+    }
+
+    if (!token) {
+      return;
+    }
+
+    this.api.setToken(token);
+    this.ensureLessonStoreUser(token);
+    await this.loadCourses();
+  }
+
+  private isTokenExpired(token: string) {
+    try {
+      const [, payloadBase64] = token.split('.');
+      const payload = JSON.parse(atob(payloadBase64 ?? ''));
+      if (!payload?.exp) {
+        return false;
+      }
+      const expiresAt = payload.exp * 1000;
+      const safetyWindowMs = 10_000;
+      return Date.now() + safetyWindowMs >= expiresAt;
+    } catch {
+      return false;
+    }
   }
 
   private async loadCourses() {
     this.loading = true;
+    this.error = undefined;
 
-    // TODO: Replace with actual API call to GET /api/v1/student/courses
-    // Пока API не реализован, показываем пустой список
-    this.courses = [];
-
-    this.loading = false;
+    try {
+      const response = await this.api.listStudentCourses();
+      this.courses = response.courses ?? [];
+    } catch (error) {
+      console.error('Failed to load courses', error);
+      this.error = (error as Error).message;
+      this.courses = [];
+    } finally {
+      this.loading = false;
+    }
   }
-
   private get filteredCourses(): Course[] {
     return this.courses.filter((course) => {
       const matchesDifficulty =
@@ -359,6 +422,12 @@ export class StudentHome extends LitElement {
         this.statusFilter === 'all' || course.status === this.statusFilter;
       return matchesDifficulty && matchesStatus;
     });
+  }
+
+  private async mountAppShell() {
+    if (!customElements.get('app-shell')) {
+      await import('../app-shell');
+    }
   }
 
   private handleDifficultyFilterChange(e: Event) {
@@ -370,15 +439,47 @@ export class StudentHome extends LitElement {
   }
 
   private handleStartCourse(courseId: string) {
-    // TODO: Navigate to course/session page
-    console.log('Starting course:', courseId);
-    alert(`Функция запуска курса будет реализована позже. Course ID: ${courseId}`);
+    void this.launchCourse(courseId);
   }
 
-  private handleContinueCourse(courseId: string, sessionId?: string) {
-    // TODO: Continue existing session or create new one
-    console.log('Continuing course:', courseId, 'Session:', sessionId);
-    alert(`Функция продолжения курса будет реализована позже. Course ID: ${courseId}`);
+  private handleContinueCourse(courseId: string, _sessionId?: string) {
+    void this.launchCourse(courseId);
+  }
+
+  private async launchCourse(courseId: string) {
+    let token = authService.getToken();
+    if (!token || this.isTokenExpired(token)) {
+      try {
+        token = await authService.refreshToken();
+        if (token) {
+          this.api.setToken(token);
+          this.ensureLessonStoreUser(token);
+        }
+      } catch (error) {
+        console.error('Failed to refresh token before starting course', error);
+        this.error = 'Не удалось обновить сессию. Войдите снова.';
+        return;
+      }
+    }
+
+    const course = this.courses.find((item) => item.id === courseId);
+    if (!course) {
+      return;
+    }
+
+    this.actionCourseId = courseId;
+    try {
+      await lessonStore.startCourseSession(course);
+      if (lessonStore.snapshot.activeSession) {
+        await this.mountAppShell();
+        this.remove();
+      }
+    } catch (error) {
+      console.error('Failed to start course session', error);
+      this.error = (error as Error).message;
+    } finally {
+      this.actionCourseId = undefined;
+    }
   }
 
   private handleViewProfile() {
@@ -387,9 +488,9 @@ export class StudentHome extends LitElement {
 
   private getDifficultyLabel(difficulty: string): string {
     const labels: Record<string, string> = {
-      easy: 'Легко',
-      medium: 'Средне',
-      hard: 'Сложно',
+      easy: 'Лёгкий',
+      medium: 'Средний',
+      hard: 'Сложный',
     };
     return labels[difficulty] || difficulty;
   }
@@ -398,7 +499,7 @@ export class StudentHome extends LitElement {
     const labels: Record<string, string> = {
       new: 'Новый',
       in_progress: 'В процессе',
-      completed: 'Завершен',
+      completed: 'Завершён',
     };
     return labels[status] || status;
   }
@@ -409,7 +510,7 @@ export class StudentHome extends LitElement {
     if (!user) {
       return html`
         <div class="container">
-          <div class="error">Пользователь не найден. Пожалуйста, войдите в систему.</div>
+          <div class="error">Пользователь не найден. Пожалуйста, войдите снова.</div>
         </div>
       `;
     }
@@ -421,45 +522,43 @@ export class StudentHome extends LitElement {
     return html`
       <app-header></app-header>
       <div class="container">
-        <!-- Welcome Banner -->
         <div class="welcome">
           <h2>Добро пожаловать, ${user.name}!</h2>
-          <p>Продолжайте обучение и развивайте свои навыки программирования</p>
+          <p>Здесь собраны ваши курсы и последние результаты.</p>
         </div>
 
-        <!-- Top Bar -->
         <div class="top-bar">
-          <div><strong>${this.courses.length}</strong> курсов доступно</div>
-          <button class="secondary" @click=${this.handleViewProfile}>Мой профиль</button>
+          <div><strong>${this.courses.length}</strong> доступных курсов</div>
+          <button class="secondary" @click=${this.handleViewProfile}>
+            Перейти в профиль
+          </button>
         </div>
 
-        <!-- Continue Section -->
-        ${inProgressCourses.length > 0
+        ${this.error ? html`<div class="error">${this.error}</div>` : null}
+        ${inProgressCourses.length
           ? html`
               <div class="header">
                 <h1>Продолжить обучение</h1>
-                <p>Вы начали эти курсы</p>
+                <p>Вернитесь к активным заданиям.</p>
               </div>
 
               <div class="courses-grid">
                 ${inProgressCourses.map((course) => this.renderCourseCard(course, true))}
               </div>
             `
-          : ''}
+          : null}
 
-        <!-- All Courses Section -->
         <div class="header">
           <h1>Все курсы</h1>
-          <p>Выберите курс для начала обучения</p>
+          <p>Начните новый курс или продолжите текущий.</p>
         </div>
 
-        <!-- Filters -->
         <div class="filters">
           <div class="filter-group">
             <span class="filter-label">Сложность</span>
             <select @change=${this.handleDifficultyFilterChange}>
               <option value="all">Все уровни</option>
-              <option value="easy">Легкий</option>
+              <option value="easy">Лёгкий</option>
               <option value="medium">Средний</option>
               <option value="hard">Сложный</option>
             </select>
@@ -469,25 +568,24 @@ export class StudentHome extends LitElement {
             <span class="filter-label">Статус</span>
             <select @change=${this.handleStatusFilterChange}>
               <option value="all">Все статусы</option>
-              <option value="new">Новые</option>
+              <option value="new">Новый</option>
               <option value="in_progress">В процессе</option>
-              <option value="completed">Завершенные</option>
+              <option value="completed">Завершён</option>
             </select>
           </div>
         </div>
 
-        <!-- Courses Grid -->
         ${this.loading
           ? html`
               <div class="empty-state">
-                <h3>Загрузка курсов...</h3>
+                <h3>Загружаем курсы...</h3>
               </div>
             `
           : this.filteredCourses.length === 0
             ? html`
                 <div class="empty-state">
                   <h3>Курсы не найдены</h3>
-                  <p>Попробуйте изменить фильтры</p>
+                  <p>Попробуйте изменить фильтры.</p>
                 </div>
               `
             : html`
@@ -500,6 +598,7 @@ export class StudentHome extends LitElement {
   }
 
   private renderCourseCard(course: Course, showContinue = false) {
+    const isBusy = this.actionCourseId === course.id;
     return html`
       <div class="course-card ${course.status}">
         <div class="course-header">
@@ -530,13 +629,17 @@ export class StudentHome extends LitElement {
         <div class="course-actions">
           ${course.status === 'new'
             ? html`
-                <button @click=${() => this.handleStartCourse(course.id)}>
+                <button
+                  ?disabled=${isBusy}
+                  @click=${() => this.handleStartCourse(course.id)}
+                >
                   Начать курс
                 </button>
               `
             : course.status === 'in_progress'
               ? html`
                   <button
+                    ?disabled=${isBusy}
                     @click=${() =>
                       this.handleContinueCourse(course.id, course.last_session_id)}
                   >
@@ -546,9 +649,10 @@ export class StudentHome extends LitElement {
               : html`
                   <button
                     class="secondary"
+                    ?disabled=${isBusy}
                     @click=${() => this.handleStartCourse(course.id)}
                   >
-                    Пройти заново
+                    Пройти ещё раз
                   </button>
                 `}
         </div>

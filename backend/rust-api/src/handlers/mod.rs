@@ -159,4 +159,5 @@ pub mod feature_flags;
 pub mod reporting;
 pub mod sessions;
 pub mod sse;
+pub mod student;
 pub mod teacher;
