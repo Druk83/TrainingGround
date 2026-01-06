@@ -42,7 +42,7 @@ class TemplateGeneratorService:
         self._random = random.Random()
 
     async def generate_instances(
-        self, payload: GenerateInstancesRequest, *, allow_reuse: bool = False
+        self, payload: GenerateInstancesRequest
     ) -> GenerateInstancesResponse:
         try:
             templates = await self._repository.list_ready_templates(payload.level_id)
@@ -59,9 +59,22 @@ class TemplateGeneratorService:
 
         instances: list[TaskInstance] = []
         seen_templates = set()
-        if not allow_reuse:
+        if payload.template_id:
+            candidates = [
+                template
+                for template in templates
+                if template.template_id == payload.template_id
+            ]
+            if not candidates:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Template not found or not ready for enrichment.",
+                )
+        else:
+            candidates = templates.copy()
+
+        if not payload.allow_reuse:
             seen_templates = await self._load_seen_templates(payload.user_id)
-        candidates = templates.copy()
         self._random.shuffle(candidates)
 
         for template in candidates:
@@ -69,9 +82,12 @@ class TemplateGeneratorService:
                 break
             if payload.user_id and template.template_id in seen_templates:
                 continue
-            instance = await self._build_instance(template, payload.user_id)
+            instance = await self._build_instance(
+                template, payload.user_id, payload.allow_reuse
+            )
             instances.append(instance)
-            seen_templates.add(template.template_id)
+            if not payload.allow_reuse:
+                seen_templates.add(template.template_id)
 
         if not instances:
             raise HTTPException(
@@ -82,7 +98,7 @@ class TemplateGeneratorService:
         return GenerateInstancesResponse(instances=instances)
 
     async def _build_instance(
-        self, template: TemplateDescriptor, user_id: str | None
+        self, template: TemplateDescriptor, user_id: str | None, allow_reuse: bool
     ) -> TaskInstance:
         cache = await self._load_cached_instance(template.template_id)
         context = TemplateContext(
@@ -109,7 +125,8 @@ class TemplateGeneratorService:
                 template.template_id, text, correct_answer, options
             )
 
-        await self._remember_template(user_id, template.template_id)
+        if not allow_reuse:
+            await self._remember_template(user_id, template.template_id)
 
         metadata = {
             **template.metadata,

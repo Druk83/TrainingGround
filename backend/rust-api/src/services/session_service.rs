@@ -11,29 +11,11 @@ use mongodb::options::FindOptions;
 use mongodb::Database;
 use redis::aio::ConnectionManager;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Debug, Serialize)]
-struct GenerateInstancesRequest {
-    level_id: String,
-    count: u32,
-    user_id: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct GenerateInstancesResponse {
-    instances: Vec<TaskInstance>,
-}
-
-#[derive(Debug, Deserialize)]
-struct TaskInstance {
-    task_id: String,
-    text: String,
-    correct_answer: String,
-    options: Option<Vec<String>>,
-    metadata: serde_json::Value,
-}
+use crate::services::template_generator::{
+    request_instances, GenerateInstancesRequest, TaskInstance,
+};
 
 pub struct SessionService {
     mongo: Database,
@@ -57,7 +39,10 @@ impl SessionService {
 
         // Попытка генерации через Template Generator если указан level_id
         let task = if let Some(ref level_id) = req.level_id {
-            match self.generate_and_store_task(level_id, &req.user_id).await {
+            match self
+                .generate_and_store_task(level_id, &req.user_id, None, false)
+                .await
+            {
                 Ok(generated_task) => {
                     tracing::info!(
                         "Generated task via Template Generator for level: {}",
@@ -292,8 +277,16 @@ impl SessionService {
     }
 
     /// Генерация задания через Template Generator и сохранение в MongoDB
-    async fn generate_and_store_task(&self, level_id: &str, user_id: &str) -> Result<FetchedTask> {
-        let instances = self.generate_task_instances(level_id, user_id, 1).await?;
+    async fn generate_and_store_task(
+        &self,
+        level_id: &str,
+        user_id: &str,
+        template_id: Option<&str>,
+        allow_reuse: bool,
+    ) -> Result<FetchedTask> {
+        let instances = self
+            .generate_task_instances(level_id, user_id, 1, template_id, allow_reuse)
+            .await?;
 
         if instances.is_empty() {
             return Err(anyhow!("Template Generator returned no instances"));
@@ -386,57 +379,29 @@ impl SessionService {
         level_id: &str,
         user_id: &str,
         count: u32,
+        template_id: Option<&str>,
+        allow_reuse: bool,
     ) -> Result<Vec<TaskInstance>> {
-        let url = format!("{}/internal/generate_instances", self.python_api_url);
-
-        let request_payload = GenerateInstancesRequest {
+        let payload = GenerateInstancesRequest {
             level_id: level_id.to_string(),
             count,
-            user_id: user_id.to_string(),
+            user_id: Some(user_id.to_string()),
+            template_id: template_id.map(|value| value.to_string()),
+            allow_reuse,
         };
 
-        tracing::debug!(
-            "Calling Template Generator API: {} with level_id={}, count={}",
-            url,
-            level_id,
-            count
-        );
-
-        let response = self
-            .http_client
-            .post(&url)
-            .json(&request_payload)
-            .timeout(std::time::Duration::from_secs(5))
-            .send()
+        let instances = request_instances(&self.http_client, &self.python_api_url, &payload)
             .await
-            .context("Failed to call Template Generator API")?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(anyhow!(
-                "Template Generator returned error {}: {}",
-                status,
-                error_text
-            ));
-        }
-
-        let api_response: GenerateInstancesResponse = response
-            .json()
-            .await
-            .context("Failed to parse Template Generator response")?;
+            .context("Template Generator request failed")?;
 
         tracing::info!(
             "Generated {} task instances for level {} and user {}",
-            api_response.instances.len(),
+            instances.len(),
             level_id,
             user_id
         );
 
-        Ok(api_response.instances)
+        Ok(instances)
     }
 }
 

@@ -7,6 +7,7 @@ import '@/components/embeddings-monitor';
 import '@/components/feature-flags-panel';
 import '@/components/rules-management';
 import '@/components/template-management';
+import '@/components/template-enrichment-panel';
 import '@/components/topics-management';
 import { ApiClient } from '@/lib/api-client';
 import type { BackupRecord, SystemMetrics } from '@/lib/api-types';
@@ -19,6 +20,7 @@ type AdminTab =
   | 'rules'
   | 'quality'
   | 'embeddings'
+  | 'enrichment'
   | 'feature-flags';
 
 const TAB_DEFINITIONS: ReadonlyArray<{
@@ -61,6 +63,12 @@ const TAB_DEFINITIONS: ReadonlyArray<{
     id: 'embeddings',
     label: 'Эмбеддинги',
     description: 'Очередь и консистентность',
+    roles: ['admin', 'content_admin'],
+  },
+  {
+    id: 'enrichment',
+    label: 'Обогащение',
+    description: 'Генерация и проверка заданий',
     roles: ['admin', 'content_admin'],
   },
   {
@@ -432,6 +440,8 @@ export class AdminConsole extends LitElement {
         return html`<content-quality></content-quality>`;
       case 'embeddings':
         return html`<embeddings-monitor></embeddings-monitor>`;
+      case 'enrichment':
+        return html`<template-enrichment-panel></template-enrichment-panel>`;
       case 'feature-flags':
         return html`<feature-flags-panel></feature-flags-panel>`;
       default:

@@ -5,7 +5,7 @@ use axum::{
     http::{header, HeaderValue, Method},
     middleware::{self, Next},
     response::Response,
-    routing::{get, post, put},
+    routing::{delete, get, post, put},
     Router,
 };
 use std::time::Duration;
@@ -256,6 +256,26 @@ fn admin_routes(
         .route(
             "/templates/{id}/reject",
             post(handlers::admin::reject_template),
+        )
+        .route(
+            "/templates/{id}/enrichment/run",
+            post(handlers::admin::start_template_enrichment_run),
+        )
+        .route(
+            "/templates/{id}/enrichment/runs",
+            get(handlers::admin::list_template_enrichment_runs),
+        )
+        .route(
+            "/templates/{id}/enrichment/tasks",
+            get(handlers::admin::list_template_enrichment_tasks),
+        )
+        .route(
+            "/templates/{id}/enrichment/tasks/{task_id}",
+            delete(handlers::admin::delete_template_enrichment_task),
+        )
+        .route(
+            "/templates/{id}/enrichment/tasks/{task_id}/regenerate",
+            post(handlers::admin::regenerate_template_enrichment_task),
         )
         .route(
             "/templates/validate",

@@ -94,4 +94,6 @@ pub mod reporting_service;
 pub mod session_service;
 pub mod superuser_seed;
 pub mod system_settings_service;
+pub mod template_enrichment_service;
+pub mod template_generator;
 pub mod user_management_service;

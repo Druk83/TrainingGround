@@ -32,12 +32,17 @@ use crate::{
         EmbeddingConsistencyReport, EmbeddingJobSummary, EmbeddingRebuildRequest,
         LevelCreateRequest, LevelRecord, LevelReorderRequest, LevelSummary, LevelUpdateRequest,
         QueueStatus, RuleCoverage, RuleCreateRequest, RuleRecord, RuleSummary, RuleUpdateRequest,
-        TemplateCreateRequest, TemplateDetail, TemplateDuplicate, TemplateListQuery,
+        TemplateCreateRequest, TemplateDetail, TemplateDuplicate, TemplateEnrichmentRequest,
+        TemplateEnrichmentRunSummary, TemplateEnrichmentTaskView, TemplateListQuery,
         TemplateRevertRequest, TemplateSummary, TemplateUpdateRequest, TemplateValidationIssue,
         TemplateVersionSummary, TopicCreateRequest, TopicRecord, TopicSummary, TopicUpdateRequest,
     },
-    services::{content_service::ContentService, AppState},
+    services::{
+        content_service::ContentService, template_enrichment_service::TemplateEnrichmentService,
+        AppState,
+    },
 };
+use serde::Deserialize;
 
 pub async fn list_templates(
     State(state): State<Arc<AppState>>,
@@ -297,6 +302,69 @@ pub async fn reject_template(
     Ok(Json(summary))
 }
 
+pub async fn start_template_enrichment_run(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(template_id): Path<String>,
+    AppJson(payload): AppJson<TemplateEnrichmentRequest>,
+) -> Result<Json<TemplateEnrichmentRunSummary>, ApiError> {
+    let template_obj = parse_object_id(&template_id, "template_id")?;
+    let service = TemplateEnrichmentService::new(&state);
+    let summary = service.start_run(&template_obj, &claims, payload).await?;
+    Ok(Json(summary))
+}
+
+pub async fn list_template_enrichment_runs(
+    State(state): State<Arc<AppState>>,
+    Path(template_id): Path<String>,
+    Query(query): Query<TemplateRunsQuery>,
+) -> Result<Json<Vec<TemplateEnrichmentRunSummary>>, ApiError> {
+    let template_obj = parse_object_id(&template_id, "template_id")?;
+    let service = TemplateEnrichmentService::new(&state);
+    let limit = query.limit.unwrap_or(25).clamp(1, 100);
+    let runs = service.list_runs(&template_obj, limit).await?;
+    Ok(Json(runs))
+}
+
+pub async fn list_template_enrichment_tasks(
+    State(state): State<Arc<AppState>>,
+    Path(template_id): Path<String>,
+    Query(query): Query<TemplateTasksQuery>,
+) -> Result<Json<Vec<TemplateEnrichmentTaskView>>, ApiError> {
+    let template_obj = parse_object_id(&template_id, "template_id")?;
+    let service = TemplateEnrichmentService::new(&state);
+    let limit = query.limit.unwrap_or(50).clamp(1, 200);
+    let tasks = service
+        .list_tasks(&template_obj, query.status.as_deref(), limit)
+        .await?;
+    Ok(Json(tasks))
+}
+
+pub async fn delete_template_enrichment_task(
+    State(state): State<Arc<AppState>>,
+    Path((template_id, task_id)): Path<(String, String)>,
+) -> Result<Json<()>, ApiError> {
+    let template_obj = parse_object_id(&template_id, "template_id")?;
+    let task_obj = parse_object_id(&task_id, "task_id")?;
+    let service = TemplateEnrichmentService::new(&state);
+    service.delete_task(&template_obj, &task_obj).await?;
+    Ok(Json(()))
+}
+
+pub async fn regenerate_template_enrichment_task(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<JwtClaims>,
+    Path((template_id, task_id)): Path<(String, String)>,
+) -> Result<Json<TemplateEnrichmentTaskView>, ApiError> {
+    let template_obj = parse_object_id(&template_id, "template_id")?;
+    let task_obj = parse_object_id(&task_id, "task_id")?;
+    let service = TemplateEnrichmentService::new(&state);
+    let view = service
+        .regenerate_task(&template_obj, &task_obj, &claims)
+        .await?;
+    Ok(Json(view))
+}
+
 pub async fn validate_templates(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<TemplateValidationIssue>>, ApiError> {
@@ -386,4 +454,18 @@ impl IntoResponse for ApiError {
         };
         (status, Json(message)).into_response()
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TemplateTasksQuery {
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub limit: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TemplateRunsQuery {
+    #[serde(default)]
+    pub limit: Option<i64>,
 }
