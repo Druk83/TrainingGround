@@ -385,7 +385,7 @@ export class AppShell extends LitElement {
         aria-labelledby=${ariaLabel}
         ?hidden=${hidden}
       >
-        <h1 id="player-title" class="sr-only">Игровой плеер</h1>
+        <h1 id="player-title" class="sr-only">Учебный тренажёр</h1>
         <lesson-player
           .session=${this.snapshot.activeSession}
           .timer=${this.snapshot.timer as TimerState}

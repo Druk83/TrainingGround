@@ -30,29 +30,35 @@ export class TimerDisplay extends LitElement {
     :host {
       display: block;
       background: var(--surface-3);
-      padding: 1rem;
-      border-radius: 1rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.5rem;
       border: 1px solid #1f2937;
     }
 
     .time {
-      font-size: clamp(2rem, 6vw, 3rem);
+      font-size: clamp(0.75rem, 2vw, 1rem);
       font-weight: 600;
       color: var(--text-main);
     }
 
     .bar {
       width: 100%;
-      height: 0.5rem;
+      height: 0.15rem;
       border-radius: 999px;
       background: #111827;
       overflow: hidden;
-      margin-top: 0.5rem;
+      margin-top: 0.15rem;
     }
 
     .bar div {
       height: 100%;
       background: var(--primary);
+    }
+
+    p {
+      margin: 0.2rem 0 0;
+      font-size: 0.6rem;
+      color: var(--text-muted);
     }
 
     .time.urgent {

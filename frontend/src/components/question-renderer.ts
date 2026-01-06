@@ -46,8 +46,8 @@ export class QuestionRenderer extends LitElement {
 
     .question-text {
       margin-bottom: 1.5rem;
-      font-size: 1.1rem;
-      line-height: 1.6;
+      font-size: clamp(1.25rem, 4vw, 2.2rem);
+      line-height: 1.3;
       color: var(--text-main);
     }
 

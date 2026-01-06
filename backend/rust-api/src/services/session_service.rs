@@ -5,7 +5,9 @@ use crate::models::{
 };
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
+use futures::TryStreamExt;
 use mongodb::bson::{doc, oid::ObjectId, Bson, Document};
+use mongodb::options::FindOptions;
 use mongodb::Database;
 use redis::aio::ConnectionManager;
 use reqwest::Client;
@@ -69,7 +71,18 @@ impl SessionService {
                         e,
                         req.task_id
                     );
-                    self.fetch_task(&req.task_id).await?
+                    match self.fetch_task(&req.task_id).await {
+                        Ok(task) => task,
+                        Err(fetch_err) => {
+                            tracing::warn!(
+                                "Legacy task lookup failed for id {}, trying cached tasks for level {} ({})",
+                                req.task_id,
+                                level_id,
+                                fetch_err
+                            );
+                            self.fetch_recent_task_for_level(level_id).await?
+                        }
+                    }
                 }
             }
         } else {
@@ -193,41 +206,93 @@ impl SessionService {
         };
 
         let task = tasks_collection
-            .find_one(filter)
+            .find_one(filter.clone())
             .await
             .context("Failed to query task")?
             .ok_or_else(|| anyhow!("Task not found"))?;
 
-        let id = match task.get("_id") {
-            Some(Bson::ObjectId(oid)) => oid.to_hex(),
-            Some(Bson::String(value)) => value.to_string(),
-            _ => return Err(anyhow!("Task has unsupported _id type")),
-        };
+        let mut fetched = Self::task_from_document(&task)?;
+        if fetched.title.starts_with("Generated task from level") {
+            let mut resolved_label = Self::extract_level_label(&task);
+            if resolved_label.is_none() {
+                if let Some(level_id) = Self::extract_level_id(&task) {
+                    resolved_label = self.load_level_label(&level_id).await;
+                }
+            }
 
-        let title = task
-            .get_str("title")
-            .map_err(|_| anyhow!("Task title missing"))?
-            .to_string();
-        let description = task
-            .get_str("description")
-            .map_err(|_| anyhow!("Task description missing"))?
-            .to_string();
-        let time_limit_seconds = task
-            .get_i32("time_limit_seconds")
-            .or_else(|_| task.get_i64("time_limit_seconds").map(|v| v as i32))
-            .map_err(|_| anyhow!("Task time limit missing"))?;
+            if let Some(label) = resolved_label {
+                let normalized_title = format!("{} — задание", label.clone());
+                if normalized_title != fetched.title {
+                    let update = doc! {
+                        "$set": {
+                            "title": &normalized_title,
+                            "level_label": &label,
+                        }
+                    };
+                    let _ = tasks_collection.update_one(filter, update).await;
+                }
+                fetched.title = normalized_title;
+            }
+        }
 
-        Ok(FetchedTask {
-            id,
-            title,
-            description,
-            time_limit_seconds: time_limit_seconds as u32,
-        })
+        Ok(fetched)
+    }
+
+    async fn fetch_recent_task_for_level(&self, level_id: &str) -> Result<FetchedTask> {
+        let tasks_collection = self.mongo.collection::<Document>("tasks");
+        let options = FindOptions::builder()
+            .sort(doc! { "createdAt": -1 })
+            .limit(1)
+            .build();
+
+        let mut cursor = tasks_collection
+            .find(doc! { "metadata.level_id": level_id })
+            .with_options(options)
+            .await
+            .context("Failed to query cached task by level")?;
+
+        let task = cursor
+            .try_next()
+            .await
+            .context("Failed to iterate cached tasks by level")?
+            .ok_or_else(|| anyhow!("No cached tasks found for level {}", level_id))?;
+
+        tracing::info!(
+            "Using cached generated task for level {} from MongoDB",
+            level_id
+        );
+
+        let mut fetched = Self::task_from_document(&task)?;
+        if fetched.title.starts_with("Generated task from level") {
+            let mut resolved_label = Self::extract_level_label(&task);
+            if resolved_label.is_none() {
+                if let Some(level_id) = Self::extract_level_id(&task) {
+                    resolved_label = self.load_level_label(&level_id).await;
+                }
+            }
+
+            if let Some(label) = resolved_label {
+                let normalized_title = format!("{} — задание", label.clone());
+                if normalized_title != fetched.title {
+                    if let Some(id_filter) = Self::document_id_filter(&task) {
+                        let update = doc! {
+                            "$set": {
+                                "title": &normalized_title,
+                                "level_label": &label,
+                            }
+                        };
+                        let _ = tasks_collection.update_one(id_filter, update).await;
+                    }
+                }
+                fetched.title = normalized_title;
+            }
+        }
+
+        Ok(fetched)
     }
 
     /// Генерация задания через Template Generator и сохранение в MongoDB
     async fn generate_and_store_task(&self, level_id: &str, user_id: &str) -> Result<FetchedTask> {
-        // Генерируем одно задание через Template Generator
         let instances = self.generate_task_instances(level_id, user_id, 1).await?;
 
         if instances.is_empty() {
@@ -235,13 +300,10 @@ impl SessionService {
         }
 
         let instance = &instances[0];
-
-        // Сохраняем сгенерированное задание в MongoDB tasks коллекцию
         let tasks_collection = self.mongo.collection::<Document>("tasks");
 
         let now = Utc::now();
         let now_bson = mongodb::bson::DateTime::from_millis(now.timestamp_millis());
-
         let metadata_bson =
             mongodb::bson::to_bson(&instance.metadata).unwrap_or(Bson::Document(doc! {}));
         let template_object_id = instance
@@ -267,14 +329,17 @@ impl SessionService {
             .and_then(|value| value.as_i64())
             .unwrap_or(300);
 
-        let title = meta_title.unwrap_or_else(|| {
-            format!(
-                "Generated task from level {}",
-                level_id.chars().take(8).collect::<String>()
-            )
-        });
+        let level_label = self
+            .load_level_label(level_id)
+            .await
+            .unwrap_or_else(|| format!("Уровень {}", level_id.chars().take(6).collect::<String>()));
+        let fallback_title = format!("{} — задание", level_label.clone());
+        let title = meta_title.unwrap_or_else(|| fallback_title.clone());
         let description = meta_description.unwrap_or_else(|| instance.text.clone());
         let time_limit_seconds = meta_time_limit.max(60) as i32;
+        let level_bson = ObjectId::parse_str(level_id)
+            .map(Bson::ObjectId)
+            .unwrap_or_else(|_| Bson::String(level_id.to_string()));
 
         let task_doc = doc! {
             "template_id": template_object_id,
@@ -282,6 +347,8 @@ impl SessionService {
             "title": &title,
             "description": &description,
             "time_limit_seconds": time_limit_seconds,
+            "level_id": level_bson.clone(),
+            "level_label": &level_label,
             "content": {
                 "text": &instance.text,
                 "correct_answer": &instance.correct_answer,
@@ -307,31 +374,13 @@ impl SessionService {
 
         tracing::info!("Stored generated task in MongoDB: {}", inserted_id);
 
-        let level_label = self
-            .load_level_label(level_id)
-            .await
-            .unwrap_or_else(|| format!("Уровень {}", level_id.chars().take(6).collect::<String>()));
-
-        let task_title = format!("{} — задание", level_label);
-        let task_description = instance
-            .metadata
-            .get("description")
-            .and_then(|value| value.as_str())
-            .map(|value| value.to_string())
-            // Если шаблон не вернул отдельного описания, показываем сам текст задания,
-            // чтобы студент сразу видел, на что нужно отвечать.
-            .unwrap_or_else(|| instance.text.clone());
-
-        // Возвращаем задание в формате FetchedTask
         Ok(FetchedTask {
             id: inserted_id,
-            title: task_title,
-            description: task_description,
+            title,
+            description,
             time_limit_seconds: 300, // 5 минут по умолчанию
         })
     }
-
-    /// Генерация экземпляров заданий через Template Generator (Python API)
     async fn generate_task_instances(
         &self,
         level_id: &str,
@@ -410,5 +459,65 @@ impl SessionService {
                 None
             }
         }
+    }
+
+    fn extract_level_label(task: &Document) -> Option<String> {
+        task.get_str("level_label")
+            .ok()
+            .map(|value| value.to_string())
+            .or_else(|| {
+                task.get("metadata")
+                    .and_then(|value| value.as_document())
+                    .and_then(|doc| doc.get_str("level_label").ok())
+                    .map(|value| value.to_string())
+            })
+    }
+
+    fn extract_level_id(task: &Document) -> Option<String> {
+        match task.get("level_id") {
+            Some(Bson::ObjectId(oid)) => Some(oid.to_hex()),
+            Some(Bson::String(value)) => Some(value.to_string()),
+            _ => task
+                .get("metadata")
+                .and_then(|value| value.as_document())
+                .and_then(|doc| doc.get_str("level_id").ok())
+                .map(|value| value.to_string()),
+        }
+    }
+
+    fn document_id_filter(task: &Document) -> Option<Document> {
+        match task.get("_id")? {
+            Bson::ObjectId(oid) => Some(doc! { "_id": *oid }),
+            Bson::String(value) => Some(doc! { "_id": value.clone() }),
+            other => Some(doc! { "_id": other.clone() }),
+        }
+    }
+
+    fn task_from_document(task: &Document) -> Result<FetchedTask> {
+        let id = match task.get("_id") {
+            Some(Bson::ObjectId(oid)) => oid.to_hex(),
+            Some(Bson::String(value)) => value.to_string(),
+            _ => return Err(anyhow!("Task has unsupported _id type")),
+        };
+
+        let title = task
+            .get_str("title")
+            .map_err(|_| anyhow!("Task title missing"))?
+            .to_string();
+        let description = task
+            .get_str("description")
+            .map_err(|_| anyhow!("Task description missing"))?
+            .to_string();
+        let time_limit_seconds = task
+            .get_i32("time_limit_seconds")
+            .or_else(|_| task.get_i64("time_limit_seconds").map(|v| v as i32))
+            .map_err(|_| anyhow!("Task time limit missing"))?;
+
+        Ok(FetchedTask {
+            id,
+            title,
+            description,
+            time_limit_seconds: time_limit_seconds as u32,
+        })
     }
 }

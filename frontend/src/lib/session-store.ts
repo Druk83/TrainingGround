@@ -710,17 +710,17 @@ export class LessonStore {
     } else {
       if (!this.autoSubmittedOnTimeout) {
         this.autoSubmittedOnTimeout = true;
-        void this.submitAnswer('');
+        this.completeActiveSession('Время сессии истекло. Возвращаемся к каталогу.');
+      } else {
+        this.patch({
+          timer: {
+            ...this.state.timer,
+            status: 'expired',
+            remainingSeconds: 0,
+            lastUpdated: event.timestamp,
+          },
+        });
       }
-      this.patch({
-        timer: {
-          ...this.state.timer,
-          status: 'expired',
-          remainingSeconds: 0,
-          lastUpdated: event.timestamp,
-        },
-      });
-      this.pushNotification('warning', 'Время сессии истекло');
     }
   }
   private handleOfflineQueueEvent(event: OfflineQueueEvent) {
