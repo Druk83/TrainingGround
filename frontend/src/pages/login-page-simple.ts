@@ -169,7 +169,7 @@ export class LoginPageSimple extends LitElement {
       <div class="login-container">
         <div class="logo">
           <h1>TrainingGround</h1>
-          <p>Платформа обучения программированию</p>
+          <p>Платформа тренировок</p>
         </div>
 
         ${this.error ? html`<div class="error" role="alert">${this.error}</div>` : ''}

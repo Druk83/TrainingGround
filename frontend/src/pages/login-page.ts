@@ -303,7 +303,7 @@ export class LoginPage extends LitElement {
       <div class="login-container">
         <div class="logo">
           <h1>TrainingGround</h1>
-          <p>Платформа обучения программированию</p>
+          <p>Платформа тренировок</p>
         </div>
 
         ${!this.online
