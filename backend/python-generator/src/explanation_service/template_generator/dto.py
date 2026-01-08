@@ -21,6 +21,8 @@ class GenerateInstancesRequest(BaseModel):
     level_id: str
     count: int = Field(default=1, ge=1)
     user_id: str | None = None
+    template_id: str | None = None
+    allow_reuse: bool = False
 
     @field_validator("count")
     def clamp_count(cls, value: int) -> int:

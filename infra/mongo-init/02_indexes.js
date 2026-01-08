@@ -85,6 +85,17 @@ db.materialized_stats.createIndex({ type: 1, entity_id: 1 }, { unique: true });
 db.materialized_stats.createIndex({ calculatedAt: -1 });
 print('[OK] Materialized stats indexes created');
 
+// === TEMPLATE ENRICHMENT RUNS ===
+db.template_enrichment_runs.createIndex({ template_id: 1, started_at: -1 });
+db.template_enrichment_runs.createIndex({ status: 1, started_at: -1 });
+print('[OK] Template enrichment run indexes created');
+
+// === TEMPLATE ENRICHMENT TASKS ===
+db.template_enrichment_tasks.createIndex({ template_id: 1, generated_at: -1 });
+db.template_enrichment_tasks.createIndex({ run_id: 1 });
+db.template_enrichment_tasks.createIndex({ status: 1, generated_at: -1 });
+print('[OK] Template enrichment task indexes created');
+
 // === LEADERBOARDS (TTL: 24 hours) ===
 db.leaderboards.createIndex({ scope: 1, scope_id: 1 }, { unique: true, sparse: true });
 db.leaderboards.createIndex({ generatedAt: 1 }, { expireAfterSeconds: 86400 }); // 24 hours

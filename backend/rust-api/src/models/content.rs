@@ -495,6 +495,102 @@ pub struct TemplateListQuery {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct TemplateEnrichmentRequest {
+    pub count: u32,
+    #[serde(default)]
+    pub allow_reuse: bool,
+    #[serde(default)]
+    pub reject_limit: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum TemplateEnrichmentRunStatus {
+    InProgress,
+    Completed,
+    Failed,
+}
+
+impl TemplateEnrichmentRunStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TemplateEnrichmentRunStatus::InProgress => "in_progress",
+            TemplateEnrichmentRunStatus::Completed => "completed",
+            TemplateEnrichmentRunStatus::Failed => "failed",
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TemplateEnrichmentRunRecord {
+    #[serde(rename = "_id")]
+    pub id: ObjectId,
+    pub template_id: ObjectId,
+    pub user_id: Option<ObjectId>,
+    pub count: u32,
+    pub allow_reuse: bool,
+    pub reject_limit: Option<u32>,
+    pub status: TemplateEnrichmentRunStatus,
+    pub success_count: u32,
+    pub error_count: u32,
+    pub started_at: mongodb::bson::DateTime,
+    pub finished_at: Option<mongodb::bson::DateTime>,
+    pub error_message: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TemplateEnrichmentRunSummary {
+    pub id: String,
+    pub template_id: String,
+    pub user_id: Option<String>,
+    pub count: u32,
+    pub allow_reuse: bool,
+    pub reject_limit: Option<u32>,
+    pub status: TemplateEnrichmentRunStatus,
+    pub success_count: u32,
+    pub error_count: u32,
+    pub started_at: String,
+    pub finished_at: Option<String>,
+    pub error_message: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TemplateEnrichmentTaskRecord {
+    #[serde(rename = "_id")]
+    pub id: ObjectId,
+    pub template_id: ObjectId,
+    pub run_id: ObjectId,
+    pub text: String,
+    pub correct_answer: String,
+    #[serde(default)]
+    pub options: Vec<String>,
+    #[serde(default)]
+    pub metadata: Document,
+    #[serde(default = "default_task_status")]
+    pub status: String,
+    pub generated_at: mongodb::bson::DateTime,
+    pub generated_by: Option<ObjectId>,
+    #[serde(default)]
+    pub deleted_at: Option<mongodb::bson::DateTime>,
+}
+
+fn default_task_status() -> String {
+    "active".to_string()
+}
+
+#[derive(Debug, Serialize)]
+pub struct TemplateEnrichmentTaskView {
+    pub id: String,
+    pub template_id: String,
+    pub run_id: String,
+    pub text: String,
+    pub correct_answer: String,
+    pub options: Vec<String>,
+    pub status: String,
+    pub generated_at: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct TemplateCreateRequest {
     pub slug: String,
     pub level_id: String,

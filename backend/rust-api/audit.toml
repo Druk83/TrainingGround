@@ -15,4 +15,5 @@ ignore = [
 
 [output]
 # Show full dependency tree for vulnerabilities
+quiet = false
 deny = []

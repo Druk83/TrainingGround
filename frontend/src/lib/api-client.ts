@@ -64,6 +64,9 @@ import type {
   TeacherStudentDetail,
   TeacherStudentSummary,
   TemplateDuplicate,
+  TemplateEnrichmentPayload,
+  TemplateEnrichmentRun,
+  TemplateEnrichmentTask,
   TemplateFilterParams,
   TemplateRevertPayload,
   TemplateValidationIssue,
@@ -464,6 +467,57 @@ export class ApiClient {
     return this.request<TemplateValidationIssue[]>(`${ADMIN_BASE}/templates/validate`, {
       method: 'POST',
     });
+  }
+
+  async listTemplateEnrichmentRuns(templateId: string, limit = 25) {
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    return this.request<TemplateEnrichmentRun[]>(
+      `${ADMIN_BASE}/templates/${templateId}/enrichment/runs?${params.toString()}`,
+    );
+  }
+
+  async startTemplateEnrichmentRun(
+    templateId: string,
+    payload: TemplateEnrichmentPayload,
+  ) {
+    return this.request<TemplateEnrichmentRun>(
+      `${ADMIN_BASE}/templates/${templateId}/enrichment/run`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    );
+  }
+
+  async listTemplateEnrichmentTasks(
+    templateId: string,
+    params?: { status?: string; limit?: number },
+  ) {
+    const query = new URLSearchParams();
+    if (params?.status) query.set('status', params.status);
+    if (params?.limit) query.set('limit', String(params.limit));
+    const suffix = query.toString();
+    const url = suffix
+      ? `${ADMIN_BASE}/templates/${templateId}/enrichment/tasks?${suffix}`
+      : `${ADMIN_BASE}/templates/${templateId}/enrichment/tasks`;
+    return this.request<TemplateEnrichmentTask[]>(url);
+  }
+
+  async deleteTemplateEnrichmentTask(templateId: string, taskId: string) {
+    return this.request<void>(
+      `${ADMIN_BASE}/templates/${templateId}/enrichment/tasks/${taskId}`,
+      {
+        method: 'DELETE',
+      },
+    );
+  }
+
+  async regenerateTemplateEnrichmentTask(templateId: string, taskId: string) {
+    return this.request<TemplateEnrichmentTask>(
+      `${ADMIN_BASE}/templates/${templateId}/enrichment/tasks/${taskId}/regenerate`,
+      { method: 'POST' },
+    );
   }
 
   async listDuplicates() {

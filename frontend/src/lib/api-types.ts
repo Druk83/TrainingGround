@@ -325,6 +325,40 @@ export interface TemplateFilterParams {
   limit?: number;
 }
 
+export type TemplateEnrichmentRunStatus = 'in_progress' | 'completed' | 'failed';
+
+export interface TemplateEnrichmentRun {
+  id: string;
+  template_id: string;
+  user_id?: string;
+  count: number;
+  allow_reuse: boolean;
+  reject_limit?: number;
+  status: TemplateEnrichmentRunStatus;
+  success_count: number;
+  error_count: number;
+  started_at: string;
+  finished_at?: string | null;
+  error_message?: string | null;
+}
+
+export interface TemplateEnrichmentTask {
+  id: string;
+  template_id: string;
+  run_id: string;
+  text: string;
+  correct_answer: string;
+  options: string[];
+  status: string;
+  generated_at: string;
+}
+
+export interface TemplateEnrichmentPayload {
+  count: number;
+  allow_reuse: boolean;
+  reject_limit?: number;
+}
+
 export interface AdminTemplateUpdatePayload {
   status?: AdminTemplateStatus;
   content?: string;
