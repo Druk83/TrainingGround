@@ -114,11 +114,13 @@ impl AnswerService {
 
         // Calculate score based on rules S1-S5
         let (score_awarded, combo_bonus, current_streak) = if is_correct {
+            tracing::info!("Processing correct answer for user: {}", user_id);
             retry_async_with_config(retry_cfg.clone(), || async {
                 self.process_correct_answer(user_id).await
             })
             .await?
         } else {
+            tracing::info!("Processing incorrect answer for user: {}", user_id);
             retry_async_with_config(retry_cfg.clone(), || async {
                 self.process_incorrect_answer(user_id).await
             })
@@ -231,6 +233,13 @@ impl AnswerService {
         let base_score = 10; // S1
         let combo_bonus = if streak >= 3 { 5 } else { 0 }; // S4
 
+        tracing::debug!(
+            "Correct answer: user={}, streak={}, streak_key={}",
+            user_id,
+            streak,
+            streak_key
+        );
+
         Ok((base_score, combo_bonus, streak))
     }
 
@@ -244,6 +253,12 @@ impl AnswerService {
             .arg(&streak_key)
             .query_async::<()>(&mut conn)
             .await?;
+
+        tracing::debug!(
+            "Incorrect answer: user={}, streak_reset, streak_key={}",
+            user_id,
+            streak_key
+        );
 
         Ok((0, 0, 0))
     }

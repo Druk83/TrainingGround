@@ -184,6 +184,17 @@ pub async fn get_stats(
         0.0
     };
 
+    tracing::info!(
+        "Student stats loaded: user={}, score={}, accuracy={:.2}%, attempts={}, correct={}, streak={}, hints={}",
+        user_id,
+        total_score,
+        accuracy,
+        attempts_total,
+        correct_total,
+        current_streak,
+        hints_used
+    );
+
     Ok(Json(StudentStatsResponse {
         total_score,
         accuracy,

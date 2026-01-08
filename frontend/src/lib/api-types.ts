@@ -54,6 +54,15 @@ export interface StudentCoursesResponse {
   courses: StudentCourseSummary[];
 }
 
+export interface StudentStatsResponse {
+  total_score: number;
+  accuracy: number;
+  attempts_total: number;
+  correct_total: number;
+  current_streak: number;
+  hints_used: number;
+}
+
 export interface SubmitAnswerPayload {
   answer: string;
   idempotency_key?: string;

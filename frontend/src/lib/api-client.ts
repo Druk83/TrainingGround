@@ -54,8 +54,9 @@ import type {
   SendNotificationResponse,
   SessionResponse,
   SettingsTestResponse,
-  StudentCoursesResponse,
   SsoSettings,
+  StudentCoursesResponse,
+  StudentStatsResponse,
   SubmitAnswerPayload,
   SubmitAnswerResponse,
   SystemMetrics,
@@ -221,6 +222,10 @@ export class ApiClient {
 
   async listStudentCourses() {
     return this.request<StudentCoursesResponse>(`${STUDENT_BASE}/courses`);
+  }
+
+  async getStudentStats() {
+    return this.request<StudentStatsResponse>(`${STUDENT_BASE}/stats`);
   }
 
   async startStudentSession(templateId: string) {
@@ -938,3 +943,6 @@ async function safeParseJson(response: Response) {
     return undefined;
   }
 }
+
+export { API_BASE, STUDENT_BASE };
+export type { StudentStatsResponse };

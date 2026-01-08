@@ -1,4 +1,5 @@
 import '@/components/app-header';
+import { ApiClient } from '@/lib/api-client';
 import { authService } from '@/lib/auth-service';
 import { lessonStore, type ScoreState } from '@/lib/session-store';
 import { LitElement, css, html } from 'lit';
@@ -18,9 +19,12 @@ export class UserProfile extends LitElement {
   @state()
   declare private scoreboard: ScoreState;
   private unsubscribe?: () => void;
+  private api: ApiClient;
 
   constructor() {
     super();
+    const token = authService.getToken();
+    this.api = new ApiClient({ jwt: token ?? undefined });
     this.scoreboard = {
       totalScore: 0,
       attempts: 0,
@@ -365,6 +369,7 @@ export class UserProfile extends LitElement {
       this.scoreboard = { ...snapshot.scoreboard };
     });
     this.loadSessions();
+    this.loadStudentStats();
   }
 
   disconnectedCallback() {
@@ -395,6 +400,35 @@ export class UserProfile extends LitElement {
     } catch (err) {
       console.error('Failed to load sessions:', err);
       this.error = 'Не удалось загрузить список сессий';
+    }
+  }
+
+  private async loadStudentStats() {
+    try {
+      const token = authService.getToken();
+      if (!token) {
+        console.warn('User not authenticated, skipping stats load');
+        return;
+      }
+
+      // Update API client token if needed
+      this.api.setToken(token);
+
+      const stats = await this.api.getStudentStats();
+
+      // Update scoreboard from stats
+      this.scoreboard = {
+        totalScore: stats.total_score,
+        attempts: stats.attempts_total,
+        correct: stats.correct_total,
+        accuracy: Math.round(stats.accuracy * 100) / 100, // Round to 2 decimal places
+        currentStreak: stats.current_streak,
+        longestStreak: 0, // Backend doesn't return this, but we can calculate it if needed
+        hintsUsed: stats.hints_used,
+      };
+    } catch (err) {
+      console.error('Failed to load student stats:', err);
+      // Don't set error message here as it's not critical
     }
   }
 
@@ -566,7 +600,7 @@ export class UserProfile extends LitElement {
           </div>
           <div class="stat-card">
             <span class="label">Точность</span>
-            <span class="value">${this.scoreboard.accuracy}%</span>
+            <span class="value">${this.scoreboard.accuracy.toFixed(2)}%</span>
           </div>
           <div class="stat-card">
             <span class="label">Серия</span>

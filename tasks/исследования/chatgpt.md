@@ -1,0 +1,10 @@
+Критика Docker-конфигурации
+
+Основной docker-compose.yml запускает почти весь продовый стек: 3‑нодовый Mongo (docker-compose.yml (line 5)), Vault (docker-compose.yml (line 142)), Prometheus (docker-compose.yml (line 218)), Grafana (docker-compose.yml (line 330)) и экспортеры, тогда как .env.example уже задаёт COMPOSE_PROFILES=monitoring (.env.example (line 7)). В результате make up поднимает тяжёлую и шумную среду даже для простого запуска Rust API. Лучше разделить конфигурации (например, базовый файл и overrides) или вынести мониторинг в отдельный профиль, который активируется явно.
+Продакшеновый docker-compose.prod.yml фактически дублирует каждый сервис из базового файла (Mongo docker-compose.yml (line 5) vs docker-compose.prod.yml (line 65), Vault docker-compose.yml (line 142) vs docker-compose.prod.yml (line 168), Rust API docker-compose.yml (line 167) vs docker-compose.prod.yml (line 196), Python генератор docker-compose.yml (line 307) vs docker-compose.prod.yml (line 275)). При любом изменении придётся вручную синхронизировать оба файла. Вынесение общих сервисов в docker-compose.base.yml или использование x- anchor/overrides значительно снижает риск расхождений.
+Dockerfile для Rust (backend/rust-api/Dockerfile (lines 4-17)) использует весь каталог backend/rust-api как контекст, но .dockerignore отсутствует, поэтому в образ копируется target/, .git/ и другие артефакты, что замедляет сборки и сбивает кэш. В Python‑бэкенде уже введён .dockerignore (backend/python-generator/.dockerignore (line 1)), аналогичные исключения стоит завести и для Rust‑сервиса.
+Дальнейшие шаги
+
+Вынести общие сервисы в базовый compose и давать dev/prod только нужные переопределения, чтобы исключить расхождения конфигураций.
+Добавить .dockerignore в backend/rust-api, исключив target/, .git/, .env* и прочие локальные артефакты.
+Документировать и/или добавить make‑таргет, который запускает только критически нужные сервисы (без мониторинга), а остальную часть стека включать отдельно.

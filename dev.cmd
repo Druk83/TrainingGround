@@ -14,6 +14,7 @@ if "%1"=="check" goto check
 if "%1"=="lint" goto lint
 if "%1"=="format" goto format
 if "%1"=="audit" goto audit
+if "%1"=="clean" goto clean
 goto help
 
 :up
@@ -180,6 +181,25 @@ cd ..\backend\rust-api && cargo audit
 cd ..\backend\python-generator && pip-audit
 goto end
 
+:clean
+echo Cleaning unused Docker artifacts...
+call :prune_stopped_containers
+call :prune_dangling_images
+call :prune_builder_cache
+goto end
+
+:prune_stopped_containers
+docker container prune -f >nul
+goto :eof
+
+:prune_dangling_images
+docker image prune -f >nul
+goto :eof
+
+:prune_builder_cache
+docker builder prune -f >nul
+goto :eof
+
 :help
 echo TrainingGround Development Commands
 echo.
@@ -198,6 +218,7 @@ echo   check       Run pre-commit checks
 echo   lint        Run all linters
 echo   format      Format all code
 echo   audit       Run security audits
+echo   clean       Remove stopped containers/dangling images and builder cache
 echo.
 goto end
 

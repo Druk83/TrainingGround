@@ -1,4 +1,7 @@
+import { requestExplanation } from '@/services/explanations';
 import { nanoid } from 'nanoid';
+import { sendAnalyticsEvent } from './analytics';
+import { ApiClient } from './api-client';
 import type {
   CreateSessionResponse,
   RequestHintResponse,
@@ -7,19 +10,16 @@ import type {
   SubmitAnswerResponse,
   TimerEvent,
 } from './api-types';
-import { ApiClient } from './api-client';
+import { isFeatureEnabled } from './feature-flags';
+import { lessonCatalog, type LessonDefinition } from './lesson-catalog';
 import {
   OfflineQueue,
   type OfflineOperation,
   type OfflineQueueEvent,
 } from './offline-queue';
-import { sendAnalyticsEvent } from './analytics';
+import { applyHintPenalty, HINT_PENALTY } from './scoring';
+import { readFromStorage, STORAGE_KEYS, writeToStorage } from './storage';
 import { TimerStream } from './timer-stream';
-import { lessonCatalog, type LessonDefinition } from './lesson-catalog';
-import { isFeatureEnabled } from './feature-flags';
-import { requestExplanation } from '@/services/explanations';
-import { readFromStorage, writeToStorage, STORAGE_KEYS } from './storage';
-import { applyHintPenalty, calculateAnswerScore, HINT_PENALTY } from './scoring';
 
 export interface LessonCard extends LessonDefinition {
   status: 'locked' | 'available' | 'active' | 'completed';
@@ -207,6 +207,36 @@ export class LessonStore {
 
     if (navigator.onLine) {
       void this.flushOfflineQueue();
+    }
+
+    // Load student stats on initialization if user is authenticated
+    if (storedUser.token) {
+      void this.loadStudentStats();
+    }
+  }
+
+  private async loadStudentStats(): Promise<void> {
+    try {
+      const stats = await this.api.getStudentStats();
+
+      const scoreboard: ScoreState = {
+        totalScore: stats.total_score,
+        attempts: stats.attempts_total,
+        correct: stats.correct_total,
+        accuracy: Math.round(stats.accuracy * 100) / 100, // Round to 2 decimal places
+        currentStreak: stats.current_streak,
+        longestStreak: 0, // Backend doesn't provide this currently
+        hintsUsed: stats.hints_used,
+        hintsRemaining: undefined,
+        lastScoreDelta: 0,
+        lastBonusApplied: false,
+        lastHintPenalty: undefined,
+      };
+
+      this.patch({ scoreboard });
+    } catch (err) {
+      console.warn('Failed to load student stats on initialization:', err);
+      // Silently fail - use default scores
     }
   }
 
@@ -578,14 +608,14 @@ export class LessonStore {
 
   private handleAnswerResult(result: SubmitAnswerResponse) {
     const prevScoreboard = this.state.scoreboard;
-    const scoring = calculateAnswerScore({
-      correct: result.correct,
-      currentStreak: prevScoreboard.currentStreak,
-    });
+
+    // Use streak from backend (which is the source of truth)
+    const currentStreak = result.current_streak;
+
     const attempts = prevScoreboard.attempts + 1;
     const correct = result.correct ? prevScoreboard.correct + 1 : prevScoreboard.correct;
     const accuracy = attempts === 0 ? 0 : Math.round((correct / attempts) * 100);
-    const longestStreak = Math.max(prevScoreboard.longestStreak, scoring.newStreak);
+    const longestStreak = Math.max(prevScoreboard.longestStreak, currentStreak);
     const delta = result.total_score - prevScoreboard.totalScore;
 
     const scoreboard = {
@@ -593,11 +623,11 @@ export class LessonStore {
       attempts,
       correct,
       accuracy,
-      currentStreak: scoring.newStreak,
+      currentStreak,
       longestStreak,
       totalScore: result.total_score,
       lastScoreDelta: delta,
-      lastBonusApplied: scoring.bonusApplied,
+      lastBonusApplied: result.combo_bonus > 0,
       lastHintPenalty: undefined,
     };
     const progress = this.state.sessionProgress;
